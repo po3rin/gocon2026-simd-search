@@ -154,6 +154,15 @@
   .gloss div{background:var(--panel);padding:11px 13px}
   .gloss b{color:var(--text);font-size:13px}
   .gloss span{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:3px}
+
+  /* PDF / print */
+  @media print {
+    .wrap{max-width:none;padding:0 6px}
+    .sechead{margin:22px 0 12px}
+    pre,.calc,.card,img,.gloss div,.callout,.chip,ol.loop li,h3{break-inside:avoid;page-break-inside:avoid}
+    h2,h3{page-break-after:avoid}
+    a{color:#0a58ca}
+  }
 </style>
 </head>
 <body>
