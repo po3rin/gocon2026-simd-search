@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Go × SIMDで高速化するベクトル検索 ~ SIMDが効く境界、効かない境界を探れ！</title>
+<title>Go × SIMDで高速化するベクトル検索 ~ SIMDが効く境界を探れ！</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -171,7 +171,7 @@
 <div class="wrap">
   <header>
     <p class="eyebrow">Roofline-driven optimization · Go 1.26 archsimd · AWS c7i 実測</p>
-    <h1>SIMD ベクトル検索を<br><span class="thin">ルーフラインで詰める</span></h1>
+    <h1>Go × SIMDで高速化するベクトル検索<br><span class="thin">ルーフラインモデルでSIMDが効く境界を探れ！</span></h1>
     <p class="lede">Go 1.26 の実験的 SIMD で、外部ライブラリなしの Pure Go ベクトル検索を高速化します。ただし闇雲には触りません — <b>ルーフライン</b>という1枚の地図の上で「測る → 算術強度(AI)を出す → 当たっている天井を見る → その天井を狙う手だけ打つ」を繰り返します。</p>
   </header>
   <p style="color:var(--muted);font-size:13px;margin:10px 0 0">📖 専門用語(レジスタ / AVX / FMA …)に迷ったら、末尾の<b style="color:#0f172a">用語ミニ辞典(§12)</b>へ。</p>
