@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" font-family="'Hiragino Sans','Noto Sans CJK JP',sans-serif">
+<style>.t{fill:#0f172a}.m{fill:#475569}.w{fill:#ffffff}</style>
+<defs><marker id="a" markerWidth="11" markerHeight="9" refX="8" refY="4.5" orient="auto"><polygon points="0 0,11 4.5,0 9" fill="#2563eb"/></marker></defs>
+<rect width="960" height="560" fill="#ffffff"/>
+<text x="480" y="40" font-size="22" font-weight="700" class="t" text-anchor="middle">ルーフライン駆動の最適化ループ</text>
+<text x="480" y="64" font-size="13" class="m" text-anchor="middle">最適化のたびに、この4手を回すだけ。Stageが変わってもループは同じ。</text>
+<path d="M 526.4 167.3 A 150 150 0 0 1 622.7 263.6" fill="none" stroke="#2563eb" stroke-width="2.4" marker-end="url(#a)"/>
+<path d="M 622.7 356.4 A 150 150 0 0 1 526.4 452.7" fill="none" stroke="#2563eb" stroke-width="2.4" marker-end="url(#a)"/>
+<path d="M 433.6 452.7 A 150 150 0 0 1 337.3 356.4" fill="none" stroke="#2563eb" stroke-width="2.4" marker-end="url(#a)"/>
+<path d="M 337.3 263.6 A 150 150 0 0 1 433.6 167.3" fill="none" stroke="#2563eb" stroke-width="2.4" marker-end="url(#a)"/>
+<rect x="363" y="117" width="234" height="86" rx="12" fill="#eff6ff" stroke="#1e3a8a" stroke-opacity="0.15"/>
+<circle cx="387" cy="143" r="14" fill="#1d4ed8"/>
+<text x="387" y="148" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">1</text>
+<text x="409" y="147" font-size="15" font-weight="700" class="t">測る</text>
+<text x="381" y="175" font-size="11.5" class="m">GFLOP/s と転送量 (make roofline)</text>
+<rect x="513" y="267" width="234" height="86" rx="12" fill="#eff6ff" stroke="#1e3a8a" stroke-opacity="0.15"/>
+<circle cx="537" cy="293" r="14" fill="#1d4ed8"/>
+<text x="537" y="298" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">2</text>
+<text x="559" y="297" font-size="15" font-weight="700" class="t">AIを出し点を打つ</text>
+<text x="531" y="325" font-size="11.5" class="m">flop/byte を計算して図にプロット</text>
+<rect x="363" y="417" width="234" height="86" rx="12" fill="#eff6ff" stroke="#1e3a8a" stroke-opacity="0.15"/>
+<circle cx="387" cy="443" r="14" fill="#1d4ed8"/>
+<text x="387" y="448" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">3</text>
+<text x="409" y="447" font-size="15" font-weight="700" class="t">当たる天井を特定</text>
+<text x="381" y="475" font-size="11.5" class="m">メモリ斜線か / 演算横線か / 未達か</text>
+<rect x="213" y="267" width="234" height="86" rx="12" fill="#eff6ff" stroke="#1e3a8a" stroke-opacity="0.15"/>
+<circle cx="237" cy="293" r="14" fill="#1d4ed8"/>
+<text x="237" y="298" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">4</text>
+<text x="259" y="297" font-size="15" font-weight="700" class="t">その天井を狙う手だけ打つ</text>
+<text x="231" y="325" font-size="11.5" class="m">未達→並列化 / 斜線→AI右へ / 横線→幅・FMA</text>
+<circle cx="480" cy="310" r="46" fill="#1d4ed8"/>
+<text x="480" y="306" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">測って</text>
+<text x="480" y="325" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">決める</text>
+</svg>

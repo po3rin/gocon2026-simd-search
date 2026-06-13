@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+<defs><marker id="ar" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker>
+<marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker></defs>
+<style>text{font-family:'Helvetica Neue', Helvetica, Arial, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;}</style>
+<rect width="960" height="540" fill="#ffffff"/>
+<text x="480" y="36" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">メモリ帯域の壁 — 計算を速くしてもデータが届かない</text>
+<rect x="40" y="100" width="240" height="220" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+<text x="160" y="130" font-size="15" font-weight="600" fill="#111827" text-anchor="middle">DRAM(メインメモリ)</text>
+<rect x="64" y="150" width="192" height="130" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1.2"/>
+<text x="160" y="185" font-size="13" fill="#111827" text-anchor="middle">ベクトルデータ</text>
+<text x="160" y="212" font-size="16" font-weight="600" fill="#2563eb" text-anchor="middle">153 MB</text>
+<text x="160" y="240" font-size="11" fill="#6b7280" text-anchor="middle">10万件 × 384次元 × 4B</text>
+<text x="160" y="262" font-size="11" fill="#6b7280" text-anchor="middle">クエリのたびに全部読む</text>
+<rect x="300" y="180" width="240" height="60" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+<line x1="306" y1="210" x2="528" y2="210" stroke="#dc2626" stroke-width="2.5" marker-end="url(#ar)"/>
+<text x="420" y="166" font-size="13" font-weight="600" fill="#dc2626" text-anchor="middle">メモリ帯域 ≒ 8.6 GB/s</text>
+<text x="420" y="262" font-size="12" fill="#6b7280" text-anchor="middle">ベルトコンベア(これ以上速く運べない)</text>
+<rect x="560" y="120" width="150" height="180" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+<text x="635" y="150" font-size="14" font-weight="600" fill="#111827" text-anchor="middle">キャッシュ</text>
+<text x="635" y="174" font-size="11" fill="#6b7280" text-anchor="middle">数十MB(高速)</text>
+<text x="635" y="210" font-size="12" fill="#dc2626" text-anchor="middle">153MB は</text>
+<text x="635" y="230" font-size="12" fill="#dc2626" text-anchor="middle">入りきらない!</text>
+<line x1="710" y1="210" x2="760" y2="210" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+<rect x="766" y="120" width="154" height="180" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<text x="843" y="150" font-size="14" font-weight="600" fill="#111827" text-anchor="middle">CPU(ALU)</text>
+<text x="843" y="180" font-size="12" fill="#111827" text-anchor="middle">SIMDで計算は</text>
+<text x="843" y="200" font-size="12" fill="#111827" text-anchor="middle">8倍速くなった</text>
+<text x="843" y="236" font-size="13" font-weight="600" fill="#16a34a" text-anchor="middle">…のに暇</text>
+<text x="843" y="262" font-size="11" fill="#6b7280" text-anchor="middle">データ待ちで遊んでいる</text>
+<rect x="40" y="360" width="880" height="140" rx="8" fill="#f9fafb" stroke="#d1d5db" stroke-width="1"/>
+<text x="60" y="392" font-size="13" font-weight="600" fill="#111827">実測:</text>
+<text x="120" y="392" font-size="13" fill="#111827">naive 全探索 = 28.6ms、SIMD 全探索 = 18.0ms(1.6倍止まり)。カーネル単体では 4.6倍出るのに。</text>
+<text x="60" y="424" font-size="13" font-weight="600" fill="#111827">理由:</text>
+<text x="120" y="424" font-size="13" fill="#111827">どちらもベルトコンベア(メモリ帯域)の速度に張り付いているから。</text>
+<text x="60" y="466" font-size="13" font-weight="600" fill="#16a34a">対策:</text>
+<text x="120" y="466" font-size="13" fill="#111827">運ぶデータを小さくする → バイナリ量子化(次の図)へ。</text>
+</svg>

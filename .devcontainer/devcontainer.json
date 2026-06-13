@@ -1,0 +1,20 @@
+{
+  "name": "gocon2026-simd-search",
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.26"
+    }
+  },
+  "containerEnv": {
+    "GOEXPERIMENT": "simd"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["golang.go"],
+      "settings": {
+        "go.toolsEnvVars": { "GOEXPERIMENT": "simd" }
+      }
+    }
+  }
+}

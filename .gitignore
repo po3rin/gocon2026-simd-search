@@ -1,0 +1,42 @@
+# ---- Go (based on github/gitignore Go.gitignore) ----
+# Compiled binaries / objects
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.bin
+# Test binary (go test -c)
+*.test
+# Coverage / profiling output
+*.out
+*.prof
+coverage.*
+# Go workspace
+go.work
+go.work.sum
+# Delve debug binary
+__debug_bin*
+
+# ---- Project ----
+/data/
+# `make isa-report` のビルド成果物(テストバイナリ)
+/.isa-report/
+
+# ---- Terraform ----
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+
+# ---- Local / tooling ----
+.claude/settings.local.json
+.env
+
+# ---- OS / editor ----
+.DS_Store
+*~
+.idea/
+.vscode/

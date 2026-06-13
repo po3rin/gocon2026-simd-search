@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520">
+<defs><marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker>
+<marker id="ap" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/></marker></defs>
+<style>text{font-family:'Helvetica Neue', Helvetica, Arial, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;}</style>
+<rect width="960" height="520" fill="#ffffff"/>
+<text x="480" y="36" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">ベクトル検索のしくみ — 「意味が近い」を内積で測る</text>
+<rect x="40" y="70" width="880" height="150" rx="8" fill="#f9fafb" stroke="#d1d5db" stroke-width="1" stroke-dasharray="6,4"/>
+<text x="56" y="94" font-size="12" fill="#6b7280">事前準備(インデックス作成)</text>
+<rect x="70" y="110" width="160" height="80" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="150" y="145" font-size="13" fill="#111827" text-anchor="middle">文書 10万件</text>
+<text x="150" y="166" font-size="11" fill="#6b7280" text-anchor="middle">「ファイルを読む方法」…</text>
+<line x1="230" y1="150" x2="320" y2="150" stroke="#9333ea" stroke-width="1.5" marker-end="url(#ap)"/>
+<rect x="240" y="125" width="74" height="18" fill="#f9fafb" opacity="0.95"/>
+<text x="276" y="138" font-size="11" fill="#9333ea" text-anchor="middle">埋め込み</text>
+<rect x="326" y="110" width="220" height="80" rx="8" fill="#faf5ff" stroke="#e9d5ff" stroke-width="1.5"/>
+<text x="436" y="140" font-size="13" fill="#111827" text-anchor="middle">384次元のベクトル</text>
+<text x="436" y="162" font-size="11" fill="#6b7280" text-anchor="middle">[0.12, -0.83, 0.45, … ] × 10万本</text>
+<line x1="546" y1="150" x2="640" y2="150" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+<path d="M 660 120 a 90 14 0 0 0 180 0 a 90 14 0 0 0 -180 0 v 56 a 90 14 0 0 0 180 0 v -56" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+<text x="750" y="158" font-size="13" fill="#111827" text-anchor="middle">インデックス</text>
+<text x="750" y="176" font-size="11" fill="#6b7280" text-anchor="middle">float32 153MB</text>
+<rect x="70" y="280" width="160" height="80" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="150" y="312" font-size="13" fill="#111827" text-anchor="middle">クエリ</text>
+<text x="150" y="334" font-size="11" fill="#6b7280" text-anchor="middle">「ファイル 読み込み」</text>
+<line x1="230" y1="320" x2="320" y2="320" stroke="#9333ea" stroke-width="1.5" marker-end="url(#ap)"/>
+<rect x="240" y="295" width="74" height="18" fill="#ffffff" opacity="0.95"/>
+<text x="276" y="308" font-size="11" fill="#9333ea" text-anchor="middle">埋め込み</text>
+<rect x="326" y="280" width="220" height="80" rx="8" fill="#faf5ff" stroke="#e9d5ff" stroke-width="1.5"/>
+<text x="436" y="312" font-size="13" fill="#111827" text-anchor="middle">クエリベクトル</text>
+<text x="436" y="334" font-size="11" fill="#6b7280" text-anchor="middle">[0.31, -0.77, 0.52, … ]</text>
+<line x1="546" y1="320" x2="640" y2="320" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+<rect x="646" y="270" width="208" height="100" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+<text x="750" y="300" font-size="13" font-weight="600" fill="#111827" text-anchor="middle">全件と内積を計算</text>
+<text x="750" y="322" font-size="11" fill="#6b7280" text-anchor="middle">10万件 × 384次元</text>
+<text x="750" y="344" font-size="11" fill="#dc2626" text-anchor="middle">← ここが計算の本体(重い)</text>
+<line x1="750" y1="206" x2="750" y2="264" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+<line x1="750" y1="370" x2="750" y2="410" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+<rect x="646" y="416" width="208" height="60" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<text x="750" y="442" font-size="13" fill="#111827" text-anchor="middle">内積が大きい順に top-10</text>
+<text x="750" y="462" font-size="11" fill="#6b7280" text-anchor="middle">= 意味が近い文書</text>
+<text x="70" y="450" font-size="12" fill="#6b7280">RAG・セマンティック検索の中核技術。</text>
+<text x="70" y="470" font-size="12" fill="#6b7280">計算の本体は「内積の繰り返し」= SIMD が最も得意な形。</text>
+</svg>

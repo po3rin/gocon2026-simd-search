@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620">
+<defs><marker id="ar" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker>
+<marker id="ag" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker></defs>
+<style>text{font-family:'Helvetica Neue', Helvetica, Arial, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;}</style>
+<rect width="960" height="620" fill="#ffffff"/>
+<text x="480" y="36" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">VZEROUPPER — 1命令の不在が呼び出しごとに約550サイクル奪う</text>
+<text x="480" y="72" font-size="13" fill="#6b7280" text-anchor="middle">前提: SIMD用の ymm レジスタ(256bit)は、スカラー用の xmm レジスタ(128bit)と下位を共有している</text>
+<rect x="230" y="90" width="250" height="44" rx="4" fill="#fee2e2" stroke="#fca5a5" stroke-width="1.5"/>
+<rect x="480" y="90" width="250" height="44" rx="4" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="355" y="117" font-size="12" fill="#991b1b" text-anchor="middle">ymm0 上位128bit(SIMD専用)</text>
+<text x="605" y="117" font-size="12" fill="#1e40af" text-anchor="middle">下位128bit = xmm0(スカラーと共有)</text>
+<rect x="40" y="170" width="880" height="180" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+<text x="60" y="198" font-size="14" font-weight="600" fill="#dc2626">Go 1.26 のデフォルト(VZEROUPPERなし)</text>
+<rect x="60" y="220" width="200" height="60" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="160" y="246" font-size="12" fill="#111827" text-anchor="middle">SIMDループ実行</text>
+<text x="160" y="266" font-size="11" fill="#6b7280" text-anchor="middle">ymm の上位が「汚れる」</text>
+<line x1="260" y1="250" x2="350" y2="250" stroke="#dc2626" stroke-width="2" marker-end="url(#ar)"/>
+<rect x="356" y="220" width="220" height="60" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="466" y="246" font-size="12" fill="#111827" text-anchor="middle">スカラーfloat命令(SSE)</text>
+<text x="466" y="266" font-size="11" fill="#6b7280" text-anchor="middle">水平和、呼び出し元の比較…</text>
+<line x1="576" y1="250" x2="666" y2="250" stroke="#dc2626" stroke-width="2" marker-end="url(#ar)"/>
+<rect x="672" y="212" width="228" height="76" rx="8" fill="#fee2e2" stroke="#fca5a5" stroke-width="1.5"/>
+<text x="786" y="240" font-size="13" font-weight="600" fill="#991b1b" text-anchor="middle">CPU内部で後始末が発生</text>
+<text x="786" y="262" font-size="12" fill="#991b1b" text-anchor="middle">〜550サイクル/呼び出し</text>
+<text x="786" y="280" font-size="11" fill="#6b7280" text-anchor="middle">プロファイラには映らない</text>
+<text x="60" y="330" font-size="12" fill="#991b1b">実測: 384次元の内積 167ns(naive 206ns とほぼ同じ。SIMDの意味なし)</text>
+<rect x="40" y="380" width="880" height="180" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<text x="60" y="408" font-size="14" font-weight="600" fill="#16a34a">VZEROUPPER を1命令入れる(3行のアセンブリを自作)</text>
+<rect x="60" y="430" width="200" height="60" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="160" y="456" font-size="12" fill="#111827" text-anchor="middle">SIMDループ実行</text>
+<text x="160" y="476" font-size="11" fill="#6b7280" text-anchor="middle">ymm の上位が「汚れる」</text>
+<line x1="260" y1="460" x2="350" y2="460" stroke="#16a34a" stroke-width="2" marker-end="url(#ag)"/>
+<rect x="356" y="430" width="220" height="60" rx="8" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+<text x="466" y="456" font-size="13" font-weight="600" fill="#14532d" text-anchor="middle">VZEROUPPER</text>
+<text x="466" y="476" font-size="11" fill="#6b7280" text-anchor="middle">上位128bitをクリア(1〜2cycle)</text>
+<line x1="576" y1="460" x2="666" y2="460" stroke="#16a34a" stroke-width="2" marker-end="url(#ag)"/>
+<rect x="672" y="422" width="228" height="76" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="786" y="450" font-size="12" fill="#111827" text-anchor="middle">スカラーfloat命令(SSE)</text>
+<text x="786" y="472" font-size="13" font-weight="600" fill="#16a34a" text-anchor="middle">ペナルティなし</text>
+<text x="60" y="540" font-size="12" fill="#14532d">実測: 同じコードが 167ns → 23ns(7.1倍)。naive 比 8.8倍 — SIMDループ自体は最初から速かった</text>
+<text x="480" y="600" font-size="12" fill="#6b7280" text-anchor="middle">C/C++コンパイラは自動で挿入する命令。Go 1.26(GOEXPERIMENT=simd)は挿入しないため手書きが必要</text>
+</svg>
