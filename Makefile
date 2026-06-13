@@ -3,7 +3,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 roofline roofline-ceiling recall cpuinfo isa-report
+.PHONY: test bench bench0 bench1 bench2 bench3 roofline roofline-batch roofline-ceiling recall cpuinfo isa-report
 
 test:
 	$(GO) test ./...
@@ -31,8 +31,13 @@ bench: bench3
 roofline:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
+## バッチ化の効き: B=1(全探索) vs B=32(バッチ)で scalar/SIMD を比較
+## 演算律速にすると SIMD が exact 検索でも効くことを見る(docs/workshop/workshop.html Stage 2)
+roofline-batch:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s
+
 ## ルーフラインの天井そのものを実測: 演算ピーク(FMA飽和) + メモリ帯域(read/triad)
-## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.html §03)
+## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.html §04)
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP|ReadBW|TriadBW)' -benchtime 2s
 
@@ -57,7 +62,7 @@ REMOTE      := ubuntu@$(REMOTE_HOST)
 REMOTE_DIR  := simd-search
 REMOTE_RUN  = ssh $(SSH_OPTS) $(REMOTE) 'cd $(REMOTE_DIR) && GOEXPERIMENT=simd go
 
-.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-ceiling remote-recall remote-cpuinfo
+.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-batch remote-roofline-ceiling remote-recall remote-cpuinfo
 
 remote-sync:
 	@test -n "$(REMOTE_HOST)" || (echo "VM がない: cd infra && terraform apply" && exit 1)
@@ -73,6 +78,10 @@ remote-bench: remote-sync
 ## AVX-512 VM でルーフラインの3点(GFLOP/s・AI・MB/query)を計測
 remote-roofline: remote-sync
 	$(REMOTE_RUN) test ./internal/index -run - -bench "BenchmarkSearch(Naive|SIMD|Binary)$$" -benchtime 2s'
+
+## AVX-512 VM でバッチ化の効き(B=1 vs B=32, scalar vs SIMD)を実測
+remote-roofline-batch: remote-sync
+	$(REMOTE_RUN) test ./internal/index -run - -bench "BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$" -benchtime 2s'
 
 ## AVX-512 VM で天井そのもの(演算ピーク + メモリ帯域)を実測
 remote-roofline-ceiling: remote-sync

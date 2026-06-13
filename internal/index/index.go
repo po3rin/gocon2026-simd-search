@@ -103,3 +103,45 @@ func (ix *Index) SearchBinaryRerank(q []float32, k, factor int) []Result {
 	}
 	return t.results()
 }
+
+// SearchBatchNaive runs len(qs) queries in a single pass over the DB.
+// 各 DB ベクトル d を1回ロードして B 本のクエリ全部と内積する(d はキャッシュ常駐で
+// 使い回される)。DRAM 転送は B=1 と同じなので算術強度 AI ≈ 0.5×B に上がり、
+// バッチを大きくするほど演算律速側へ移る(事実上の GEMM 化)。
+func (ix *Index) SearchBatchNaive(qs [][]float32, k int) [][]Result {
+	tops := make([]*topK, len(qs))
+	for b := range tops {
+		tops[b] = newTopK(k)
+	}
+	for id := 0; id < ix.N; id++ {
+		d := ix.Vec(id)
+		for b := range qs {
+			tops[b].push(id, vec.DotNaive(qs[b], d))
+		}
+	}
+	out := make([][]Result, len(qs))
+	for b := range tops {
+		out[b] = tops[b].results()
+	}
+	return out
+}
+
+// SearchBatchSIMD is SearchBatchNaive with the SIMD dot.
+// バッチで演算律速にした上で SIMD を効かせる狙い。
+func (ix *Index) SearchBatchSIMD(qs [][]float32, k int) [][]Result {
+	tops := make([]*topK, len(qs))
+	for b := range tops {
+		tops[b] = newTopK(k)
+	}
+	for id := 0; id < ix.N; id++ {
+		d := ix.Vec(id)
+		for b := range qs {
+			tops[b].push(id, vec.Dot(qs[b], d))
+		}
+	}
+	out := make([][]Result, len(qs))
+	for b := range tops {
+		out[b] = tops[b].results()
+	}
+	return out
+}

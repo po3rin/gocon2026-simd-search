@@ -11,14 +11,16 @@ import (
 // ワークショップ本番は実埋め込みデータを使うが、ベンチの規模感は同じ:
 // 10万ベクトル × 384次元。
 const (
-	benchN   = 100_000
-	benchDim = 384
+	benchN     = 100_000
+	benchDim   = 384
+	benchBatch = 32 // バッチ検索のクエリ本数(DB再利用で AI ≈ 0.5×B)
 )
 
 var (
 	benchOnce sync.Once
 	benchIx   *Index
 	benchQ    []float32
+	benchQs   [][]float32
 )
 
 func benchSetup() {
@@ -35,6 +37,14 @@ func benchSetup() {
 		benchQ = make([]float32, benchDim)
 		for j := range benchQ {
 			benchQ[j] = float32(r.NormFloat64())
+		}
+		benchQs = make([][]float32, benchBatch)
+		for b := range benchQs {
+			q := make([]float32, benchDim)
+			for j := range q {
+				q[j] = float32(r.NormFloat64())
+			}
+			benchQs[b] = q
 		}
 	})
 }
@@ -115,4 +125,37 @@ func BenchmarkSearchBinaryRerank(b *testing.B) {
 	for b.Loop() {
 		benchIx.SearchBinaryRerank(benchQ, 10, 10)
 	}
+}
+
+// reportBatchRoofline: バッチ検索(B本同時)の点。DRAM転送は B=1 と同じ(d を再利用)
+// なので AI ≈ 0.5×B。GFLOP/s と「クエリあたり ms」で SIMD の効きを見る。
+func reportBatchRoofline(b *testing.B, iters int) {
+	sec := b.Elapsed().Seconds()
+	flop := float64(benchN) * benchDim * 2 * benchBatch * float64(iters)
+	b.ReportMetric(flop/sec/1e9, "GFLOP/s")
+	b.ReportMetric(float64(benchBatch)*0.5, "AI(flop/byte)")
+	b.ReportMetric(sec/float64(iters)/float64(benchBatch)*1e3, "ms/query")
+}
+
+// Batch: B本のクエリで DB ロードを再利用 → 演算律速側へ → SIMD が exact 検索でも効くか?
+func BenchmarkSearchBatchNaive(b *testing.B) {
+	benchSetup()
+	b.SetBytes(benchN * benchDim * 4)
+	iters := 0
+	for b.Loop() {
+		benchIx.SearchBatchNaive(benchQs, 10)
+		iters++
+	}
+	reportBatchRoofline(b, iters)
+}
+
+func BenchmarkSearchBatchSIMD(b *testing.B) {
+	benchSetup()
+	b.SetBytes(benchN * benchDim * 4)
+	iters := 0
+	for b.Loop() {
+		benchIx.SearchBatchSIMD(benchQs, 10)
+		iters++
+	}
+	reportBatchRoofline(b, iters)
 }

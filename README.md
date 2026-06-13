@@ -1,7 +1,7 @@
 # gocon2026-simd-search
 
 Go Conference 2026 ショートワークショップ
-**「40分で40倍速!ルーフラインで読み解くPure Go × SIMDベクトル検索」** の教材リポジトリ。
+**「ルーフラインで読み解く Pure Go × SIMD ベクトル検索」** の教材リポジトリ。
 
 > 🚧 現在は CFP 応募用の実測フェーズ。ワークショップ教材は **[`docs/workshop/workshop.html`](docs/workshop/workshop.html)**(読んで動かす形式・穴埋めなし)。
 
@@ -47,8 +47,8 @@ make recall    # Recall@10(binary vs rerank)
 `make roofline` の出力例(点を打つ = ルーフラインの①②):
 
 ```
-BenchmarkSearchNaive   ... ns/op   ... MB/s   0.5 AI(flop/byte)   2.7 GFLOP/s   153.6 MB/query
-BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   4.3 GFLOP/s   153.6 MB/query  ← メモリ斜線に張り付く
+BenchmarkSearchNaive   ... ns/op   ... MB/s   0.5 AI(flop/byte)   2.85 GFLOP/s   153.6 MB/query
+BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   4.6 GFLOP/s    153.6 MB/query  ← メモリ斜線に張り付く
 BenchmarkSearchBinary  ... ns/op   ... MB/s                                       4.8 MB/query  ← 横に動いて 1/32
 ```
 
