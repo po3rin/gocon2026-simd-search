@@ -29,7 +29,7 @@ Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 「縦に上る(実装効率)」と「横に動く(データ表現)」のどちらを打つべきかが図から決まる。
 そして横に動いた先でまた SIMD が効く。**
 
-ワークショップの進め方・本物のルーフライン(c7i 実測)・各 Stage の点と天井・計測方法・原典は、
+ワークショップの進め方・本物のルーフライン(Codespaces / AMD EPYC 7763 実測)・各 Stage の点と天井・計測方法・原典は、
 教材 **[`docs/workshop/workshop.md`](docs/workshop/workshop.md)** に集約(各 Stage の点と当たっている天井を静止画のルーフラインで示し、Go コードと計測コマンドを併記)。
 
 ## 動かし方
@@ -49,8 +49,9 @@ make bench-bonus # (付録) AVX-512 VPOPCNT。AVX-512機向け・速くならな
 `make roofline` の出力例(点を打つ = ルーフラインの①②):
 
 ```
-BenchmarkSearchNaive   ... ns/op   ... MB/s   0.5 AI(flop/byte)   2.85 GFLOP/s   153.6 MB/query
-BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   4.6 GFLOP/s    153.6 MB/query  ← メモリ斜線に張り付く
+# 例: 8コア Codespace(AMD EPYC 7763)。数値は当たった CPU で変わります
+BenchmarkSearchNaive   ... ns/op   ... MB/s   0.5 AI(flop/byte)   2.15 GFLOP/s   153.6 MB/query
+BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   9.2 GFLOP/s    153.6 MB/query  ← メモリ斜線(read天井)に張り付く
 BenchmarkSearchBinary  ... ns/op   ... MB/s                                       4.8 MB/query  ← 横に動いて 1/32
 ```
 

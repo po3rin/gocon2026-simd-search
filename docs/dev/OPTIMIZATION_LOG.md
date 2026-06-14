@@ -326,9 +326,61 @@ VMOVDQU X2, 0x398(SP)     # acc をスタックへ書き戻し
    演算天井が 39 でも 120 でも 240 でも結論(量子化が本命)は変わらない。「コンパイラの未熟さすら
    ルーフラインの上では些末」というのが綺麗なオチ。
 
+## Step 7: Codespaces(AMD EPYC 7763 / Zen3)で本編を再計測(2026-06-14)
+
+本編(Stage 0/1/2 + rerank)を Codespaces 一本化したので、実際に **8-core Codespace
+(`premiumLinux`)** を立てて本編フルを取り直した。当たった CPU は **AMD EPYC 7763
+(Zen3、AVX2+FMA あり / AVX-512 VPOPCNTDQ なし)**。手順は [CODESPACES.md](CODESPACES.md)。
+これで「本編は Codespaces のどの CPU でも再現／AVX-512 は保証されない」を実機で確認できた
+(付録 `SearchBinarySIMD` は VPOPCNT 非搭載のため fallback)。
+
+### 生ログ(8-core EPYC 7763 / Go 1.26.4 / `GOEXPERIMENT=simd` / 10万×384次元)
+
+```
+# 検索(本編フル, make bench)
+SearchNaive         35.59 ms   4.32 GB/s   2.16 GFLOP/s   AI 0.5
+SearchSIMD           8.41 ms  18.26 GB/s   9.13 GFLOP/s   AI 0.5   ← 4.2x(!)
+SearchBinary         0.762 ms (4.8 MB/query)                       46.7x
+SearchBinaryRerank   0.822 ms                                      43.3x
+Recall@10:  binary 0.180  →  binary+rerank 0.868
+
+# 天井(make roofline-ceiling)
+PeakFLOP_AVX2(12acc)  25.57 GF     PeakFLOP_AVX2(4acc)  13.41 GF  ← 12>4 は c7i と同傾向(spill)
+PeakReadBW             6.13 GB/s   PeakTriadBW           4.18 GB/s  ← どちらも過小(下記)
+
+# バッチ(make roofline-batch)
+SearchSIMD(B=1)        8.18 ms/q   9.39 GF   AI 0.5
+SearchBatchNaive(B=32) 34.12 ms/q  2.25 GF   AI 16
+SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
+```
+
+### c7i との違い ―― 「SIMD 全探索」の倍率は CPU で変わる(数値を約束しない設計の裏付け)
+
+| | c7i (Xeon 8488C / Sapphire Rapids) | Codespaces (EPYC 7763 / Zen3) |
+|---|---|---|
+| SIMD 全探索 | 16.7 ms / **1.6x**(メモリ斜線に張り付き) | 8.41 ms / **4.2x** |
+| naive 全探索 | 27.0 ms (5.7 GB/s) | 35.6 ms (4.3 GB/s) |
+| バイナリ量子化 | 0.62 ms / 43x | 0.762 ms / **46.7x** |
+
+- **核は不変**: SIMD 全探索は最後はメモリ帯域に頭打ち(EPYC でも 18.3 GB/s で plateau)、
+  量子化(46.7x)が本命、という二本柱は両 CPU で成立。
+- **倍率だけが動く**: c7i は naive も SIMD もメモリ天井近く(5.7→9.2 GB/s)で差 1.6x。
+  EPYC は **naive がレイテンシ律速で帯域を使い切れず(4.3 GB/s)**、SIMD が 18.3 GB/s まで
+  伸ばすので差 4.2x。同じ「SIMD はメモリ天井で止まる」でも、naive の出発点が違うと倍率が変わる。
+  → **「点を各自のベンチで打って確かめる(数値を約束しない)」というワークショップ設計の良い実例**。
+- **天井ベンチの過小**: PeakReadBW 6.13 / PeakTriad 4.18 GB/s は、SIMD 全探索の実達成
+  18.3 GB/s を下回る。Step 6 と同じ「縮約ベンチがハードを飽和できていない」問題で、
+  EPYC ではより顕著。真の単コア DRAM 帯域は ≥18 GB/s 側。天井ベンチも疑ってかかる教材ポイント。
+- ⚠️ **影響注意**: 本編環境を Codespaces に一本化したため、Stage 1 の「全探索は 1.6x 止まり=
+  メモリ律速」という**具体的な数字の演出は EPYC では 4.2x になり弱まる**。README / workshop.md の
+  数値例と「メモリ斜線に張り付く」注記は c7i 前提なので、要すり合わせ(別途検討)。
+
 ## 高速化の階段(最終形)
 
-| 段階 | 何をしたか | 1クエリ | 倍率 |
+> 倍率は **AWS c7i** の史実。Codespaces(EPYC 7763)の実測は Step 7 を参照(SIMD 全探索の倍率が
+> 1.6x→4.2x と CPU で変わる)。「絶対値・倍率は約束しない、各自のベンチで点を打つ」が本ワークショップの建付け。
+
+| 段階 | 何をしたか | 1クエリ(c7i) | 倍率(c7i) |
 |---|---|---|---|
 | Stage 0 | スカラー全探索 | 28.6 ms | 1.0x |
 | Stage 1 | 内積を SIMD 化(+VZEROUPPER) | 18.0 ms | 1.6x(カーネル単体は 4.6x) |
@@ -376,4 +428,5 @@ VMOVDQU X2, 0x398(SP)     # acc をスタックへ書き戻し
   証拠として残置(`make bench-bonus`)。
 - AWS c7i(Sapphire Rapids / Xeon 8488C)は AVX-512 + VPOPCNTDQ をフル装備。**付録の AVX-512
   を実機で確かめる用**として `infra/` の Terraform 一式 + `make remote-bench` を残す。
-  本ログの Step 実測はこの c7i 上の記録(=史実)。Codespaces で本編を取り直す際は別途追記する。
+  本ログの Step 0〜6 の実測はこの c7i 上の記録(=史実)。**Codespaces(EPYC 7763)での本編
+  再計測は実施済み → Step 7**。

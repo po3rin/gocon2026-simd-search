@@ -5,7 +5,7 @@
 <marker id="ao" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto"><polygon points="0 0,10 4,0 8" fill="#ea580c"/></marker>
 </defs>
 <rect width="960" height="600" fill="#ffffff"/>
-<text x="40" y="40" font-size="22" font-weight="700" class="t">ルーフライン — Go SIMD ベクトル検索 (AWS c7i 実測)</text>
+<text x="40" y="40" font-size="22" font-weight="700" class="t">ルーフライン — Go SIMD ベクトル検索 (Codespaces / AMD EPYC 7763 実測)</text>
 <text x="40" y="62" font-size="13" class="m">横=算術強度 AI(1バイトあたり何回計算するか) / 縦=性能 GFLOP/s。両対数。</text>
 <line x1="130.0" y1="60" x2="130.0" y2="470" stroke="#eef2f7"/>
 <text x="130.0" y="490" font-size="12" class="m" text-anchor="middle">0.1</text>
@@ -29,30 +29,28 @@
 <text x="40" y="56" font-size="13" font-weight="600" class="t">↑ 性能 (GFLOP/s)</text>
 <path d="M 130.0 258.6 L 338.4 144.7" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 4" fill="none" opacity="0.5"/>
 <text x="158.5" y="260.7" font-size="10.5" fill="#f59e0b" opacity="0.9" transform="rotate(-52 158.5 260.7)">量子化後 (cache 天井)</text>
-<line x1="517.4" y1="252.6" x2="880.0" y2="252.6" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="2 4"/>
-<text x="878.0" y="247.6" font-size="10.5" fill="#64748b" text-anchor="end">Go archsimd 実測 39</text>
-<line x1="639.4" y1="185.8" x2="880.0" y2="185.8" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="2 4"/>
-<text x="878.0" y="180.8" font-size="10.5" fill="#64748b" text-anchor="end">AVX2 理論 120</text>
-<path d="M 130.0 464.3 L 714.7 144.7 L 880.0 144.7" stroke="#dc2626" stroke-width="2.6" fill="none"/>
-<text x="310.7" y="360.8" font-size="11.5" fill="#dc2626" font-weight="600" transform="rotate(-42 310.7 360.8)">DRAM 11 GB/s</text>
-<text x="878.0" y="136.7" font-size="11.5" fill="#dc2626" font-weight="600" text-anchor="end">silicon ~240 GF (AVX-512)</text>
-<circle cx="714.7" cy="144.7" r="4" fill="none" stroke="#dc2626"/>
-<text x="714.7" y="134.7" font-size="10.5" fill="#dc2626" text-anchor="middle">リッジ 22</text>
+<line x1="563.7" y1="196.7" x2="880.0" y2="196.7" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="2 4"/>
+<text x="878.0" y="191.7" font-size="10.5" fill="#64748b" text-anchor="end">AVX2 理論 ~100</text>
+<path d="M 130.0 433.8 L 415.5 277.8 L 880.0 277.8" stroke="#dc2626" stroke-width="2.6" fill="none"/>
+<text x="272.0" y="362.0" font-size="11.5" fill="#dc2626" font-weight="600" transform="rotate(-29 272 362)">DRAM 18.4 GB/s (read)</text>
+<text x="878.0" y="270.8" font-size="11.5" fill="#dc2626" font-weight="600" text-anchor="end">Go実測 25.5 GF(演算天井)</text>
+<circle cx="415.5" cy="277.8" r="4" fill="none" stroke="#dc2626"/>
+<text x="415.5" y="267.8" font-size="10.5" fill="#dc2626" text-anchor="middle">リッジ 1.4</text>
 <line x1="304.7" y1="60" x2="304.7" y2="470" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="1 4"/>
 <text x="307.7" y="464" font-size="10" fill="#94a3b8">kernel AI 0.5</text>
-<line x1="304.7" y1="407.8" x2="304.7" y2="387.4" stroke="#16a34a" stroke-width="2" marker-end="url(#ar)"/>
-<line x1="310.7" y1="379.4" x2="673.0" y2="187.1" stroke="#ea580c" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ao)"/>
-<circle cx="304.7" cy="407.8" r="6.5" fill="#475569" stroke="#fff" stroke-width="1.5"/>
-<text x="316.7" y="399.8" font-size="12" font-weight="700" fill="#475569" text-anchor="start">S0 scalar 2.85GF</text>
-<circle cx="304.7" cy="379.4" r="6.5" fill="#16a34a" stroke="#fff" stroke-width="1.5"/>
-<text x="292.7" y="399.4" font-size="12" font-weight="700" fill="#16a34a" text-anchor="end">S1 SIMD 4.6GF</text>
-<circle cx="693.8" cy="301.8" r="6.5" fill="#0ea5e9" stroke="#fff" stroke-width="1.5"/>
-<text x="705.8" y="305.8" font-size="12" font-weight="700" fill="#0ea5e9" text-anchor="start">kernel単体 17GF</text>
-<circle cx="681.0" cy="181.1" r="6.5" fill="#ea580c" stroke="#fff" stroke-width="1.5"/>
-<text x="693.0" y="185.1" font-size="12" font-weight="700" fill="#ea580c" text-anchor="start">S2 量子化 43x</text>
+<line x1="304.7" y1="418.0" x2="304.7" y2="347.0" stroke="#16a34a" stroke-width="2" marker-end="url(#ar)"/>
+<line x1="312.0" y1="333.0" x2="665.0" y2="216.0" stroke="#ea580c" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ao)"/>
+<circle cx="304.7" cy="424.6" r="6.5" fill="#475569" stroke="#fff" stroke-width="1.5"/>
+<text x="316.7" y="428.6" font-size="12" font-weight="700" fill="#475569" text-anchor="start">S0 scalar 2.15GF</text>
+<circle cx="304.7" cy="338.3" r="6.5" fill="#16a34a" stroke="#fff" stroke-width="1.5"/>
+<text x="292.7" y="335.0" font-size="12" font-weight="700" fill="#16a34a" text-anchor="end">S1 SIMD 9.2GF(壁)</text>
+<circle cx="693.8" cy="314.6" r="6.5" fill="#0ea5e9" stroke="#fff" stroke-width="1.5"/>
+<text x="705.8" y="318.6" font-size="12" font-weight="700" fill="#0ea5e9" text-anchor="start">kernel単体 13.7GF</text>
+<circle cx="681.0" cy="210.0" r="6.5" fill="#ea580c" stroke="#fff" stroke-width="1.5"/>
+<text x="693.0" y="214.0" font-size="12" font-weight="700" fill="#ea580c" text-anchor="start">量子化 47x</text>
 <rect x="498" y="498" width="430" height="80" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
 <text x="512" y="518" font-size="12" class="t" font-weight="600">読み方</text>
-<text x="512" y="536" font-size="11.5" class="m">・AI=0.5 はリッジ22の遥か左 = 構造的にメモリ律速</text>
-<text x="512" y="553" font-size="11.5" class="m">・S0→S1 は縦に上る(SIMD)。だが天井5.5GFで頭打ち</text>
+<text x="512" y="536" font-size="11.5" class="m">・AI=0.5 はリッジ1.4の遥か左 = 構造的にメモリ律速</text>
+<text x="512" y="553" font-size="11.5" class="m">・S0→S1 は縦に上る(SIMD)。だが天井9.2GF(壁)で頭打ち</text>
 <text x="512" y="570" font-size="11.5" class="m">・S1→S2 は横に動く(量子化でバイト1/32 → 壁を越える)</text>
 </svg>
