@@ -3,7 +3,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus roofline roofline-batch roofline-ceiling recall cpuinfo isa-report
+.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus roofline roofline-batch roofline-ceiling roofline-decompose recall cpuinfo isa-report
 
 test:
 	$(GO) test ./...
@@ -46,6 +46,17 @@ roofline-batch:
 ## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §04)
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP|ReadBW|TriadBW)' -benchtime 2s
+
+## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(docs/workshop §06 Stage 2)
+## 自分のマシンの天井で: make roofline-decompose PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
+## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
+PEAK ?= 25.51
+BW   ?= 18.39
+roofline-decompose:
+	$(GO) run ./cmd/roofline-decompose -peak $(PEAK) -bw $(BW) > docs/images/memory-vs-compute-roofline.svg
+	@command -v rsvg-convert >/dev/null 2>&1 \
+	  && rsvg-convert -w 1920 docs/images/memory-vs-compute-roofline.svg -o docs/images/memory-vs-compute-roofline.png \
+	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
 ## Recall@10 の計測(binary vs binary+rerank)
 recall:

@@ -18,42 +18,30 @@
 
 ---
 
-## 施策1: `make profile` — pprof でフレームグラフ & 逐次 disassembly(最優先・全員配布)
+## 施策1: `make profile`(pprof) — ❌ 不採用(2026-06-15)
 
-### 狙い(どの章で何を確認するか)
-- **§06 Stage0**: `sum += ...` の依存連鎖律速 = 命令並列ゼロを、disassembly の命令時間で見る。
-- **§06 Stage1**: カーネルは速いのに全探索が伸びない = 時間が **load に乗っている**(メモリ待ち)を flame graph で見る。
-- **§06 Stage2**: バッチ化で時間が `vec.Dot`(演算)へ移るのを flame graph で見る。
-- **§12 VZEROUPPER / spill**: 水平和の SSE 命令・FMA 周辺の load/store に時間が乗るのを disassembly で見る。
+> **結論: workshop には入れない。** 経緯:
+> 1. 当初は「pprof で *メモリ律速 vs 演算律速* を見せる」想定だった。
+> 2. EPYC 7763 で Stage 0〜4 を実測 → **pprof ではメモリ/演算は見えない**(S1/S2 はほぼ同形・
+>    load% はむしろ演算律速側が高い・行レベルの偏りは sample skid)。**タイマ式 CPU プロファイラは
+>    「どこ(関数・行)」は示すが「なぜ(メモリ待ちか演算か)」は示さない。**
+> 3. そこで役割を「ボトルネックの所在と移動(DotNaive→Dot→Hamming)」に振り直して一度実装したが、
+>    **コールグラフが見にくく、題材的にホットスポットが自明(=内積)で得るものが薄い**ため撤去。
+>
+> **学び(残す価値のある結論):**
+> - メモリ律速 vs 演算律速の判別は **ルーフライン**(AI・帯域 vs 天井)の役目。pprof/trace では原理的に不可。
+>   直接測るなら HW カウンタ(perf --topdown / toplev)だが Codespaces では PMU 制限で動かない。
+> - 「メモリ時間 vs 演算時間が反転する」絵が欲しい場合は、**go 実測の天井から計算する**のが正解
+>   → `cmd/roofline-decompose` + `make roofline-decompose`(`docs/images/memory-vs-compute-roofline.svg`)。
+>   これは pprof ではなく `make roofline-ceiling`(go test)由来。workshop §06 Stage 2 に採用済み。
+>
+> 撤去物: `make profile` ターゲット / devcontainer の graphviz / `profile-stages.*` /
+> `callgraph-s0-naive.png` / `callgraph-s3-binary.png` / §06 末「ボトルネックの移動」節。
 
-### なぜこのツールか(Go エンジニア向き)
-`go tool pprof` は **Go 標準同梱**。`-http` でブラウザに flame graph / call graph /
-source 注釈 / **逐次 disassembly(命令ごとのサンプル数)** が出る。追加依存ゼロ。
-ワークショップ後もあらゆる Go コードの性能調査でそのまま使える。
-
-### 実装案
-- `Makefile` に `profile` ターゲットを追加(Stage を引数で選べる形に):
-  ```makefile
-  ## 指定 Stage の CPU プロファイルを取り、pprof をブラウザで開く
-  ## 例: make profile BENCH=BenchmarkSearchSIMD
-  BENCH ?= BenchmarkSearchSIMD
-  profile:
-  	$(GO) test ./internal/index -run - -bench '$(BENCH)$$' -benchtime 2s -cpuprofile /tmp/cpu.out
-  	$(GO) tool pprof -http=:8080 /tmp/cpu.out
-  ```
-- 既存の `internal/index/bench_test.go` はそのまま使える(`-cpuprofile` はテスト側の標準フラグ)。
-- `remote-profile`(infra の c7i 上で取得 → ローカルへ scp → pprof)も同型で足せる。
-
-### workshop への差し込み
-- §06 各 Stage と §12 に「**画面で確かめる**」小コラムを1つずつ。
-  「`make profile BENCH=...` → flame で時間がどこか / disassembly で命令時間」を1〜2行。
-- §12 は disassembly view のスクショを `docs/images/` に1枚足すと、現状の objdump テキストが「時間付き」に強化される。
-
-### 検証 / 注意
-- `go tool pprof` の disassembly も objdump 同様に VEX 系(FMA)を誤訳しうる。**バイト列で正体を確認**する注記は §12 と同じものを流用。
-- サンプリングなので 1 回の実行ではブレる。`-benchtime` を伸ばすか複数回。
-
-### 工数感: 小(Makefile 数行 + workshop コラム + スクショ1枚)
+### 代わりに採用したもの(メモリ/演算の可視化)
+- `cmd/roofline-decompose`(Pure Go)+ `make roofline-decompose` → `docs/images/memory-vs-compute-roofline.svg/png`。
+  `make roofline-ceiling`(go test)の実測天井から「メモリ時間 vs 演算時間」を計算し、バッチ化で律速が
+  反転する様子を描く。workshop §06 Stage 2 に掲載。pprof ではなく go test 由来。
 
 ---
 
@@ -147,11 +135,13 @@ source 注釈 / **逐次 disassembly(命令ごとのサンプル数)** が出る
 
 ---
 
-## 導入順(おすすめ)
+## 現状(2026-06-15)
 
-1. **施策1(pprof / `make profile`)** — 効果最大・工数最小・全員即動く。まずこれ。
-2. **施策3(`make roofline-plot`)** — 「測ると点が動く」で workshop の主役図を強化。
-3. **施策2(`make ssa` / `make disasm`)** — §12 深掘り。本編必須ではないので最後。
+- **施策1(pprof / `make profile`)= ❌ 不採用**。pprof ではメモリ/演算を判別できず、題材的にも
+  ホットスポットが自明で得るものが薄かった(上記)。撤去済み。
+- **採用済み**: `cmd/roofline-decompose` + `make roofline-decompose`(メモリ時間 vs 演算時間の反転図、
+  go test の実測天井から計算)。workshop §06 Stage 2 に掲載。
+- **未着手(任意)**: 施策3(`make roofline-plot` 対話ルーフライン) / 施策2(`make ssa` / `make disasm` codegen 可視化)。
 
 ## あえて入れないもの(理由)
 
