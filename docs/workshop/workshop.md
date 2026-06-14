@@ -1,5 +1,3 @@
-Roofline-driven optimization · Go 1.26 archsimd · GitHub Codespaces(AMD EPYC 7763)実測
-
 # Go × SIMDで高速化するベクトル検索 — ルーフラインモデルでSIMDが効く境界を探れ！
 Go 1.26 の実験的 SIMD で、外部ライブラリなしの Pure Go ベクトル検索を高速化します。ただし闇雲には触りません — **ルーフライン**という1枚の地図の上で「測る → 算術強度(AI)を出す → 当たっている天井を見る → その天井を狙う手だけ打つ」を繰り返します。
 
