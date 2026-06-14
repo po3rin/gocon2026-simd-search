@@ -14,7 +14,7 @@ import (
 // アキュムレータ12本: Sapphire Rapids は FMA 2 ユニット × レイテンシ〜4cyc なので
 // 8本以上 in-flight で飽和する。12本なら ymm レジスタ(16本)に収まりスピルしない。
 // 漸化式 a = a*m + c (m=0.9999, c=1) は固定点 10000 に収束し、オーバーフロー/
-// 非正規化数を踏まない。詳細は docs/workshop/workshop.html。
+// 非正規化数を踏まない。詳細は docs/workshop/workshop.md。
 
 func fill8(v float32) archsimd.Float32x8 {
 	var b [8]float32

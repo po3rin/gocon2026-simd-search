@@ -12,7 +12,7 @@ import (
 //   - BenchmarkPeakTriadBW : STREAM Triad a=b+s*c(参考・標準指標)
 //
 // 配列は LLC を確実に溢れさせる 256MB。GB/s を ReportMetric で出す。
-// 詳細は docs/workshop/workshop.html。
+// 詳細は docs/workshop/workshop.md。
 
 const memN = 1 << 26 // 67,108,864 float32 = 256 MB(LLC 溢れ確実)
 

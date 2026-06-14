@@ -4,7 +4,7 @@
 実際に踏んだ罠と、その診断・修正の記録。すべて実測ベース。
 
 > **読み方**: このファイルは「罠と診断の生ログ」。各 Step が**ルーフライン上で
-> どの天井に当たっていたか**は [参加者教材 workshop.html](../workshop/workshop.html) に整理してある。
+> どの天井に当たっていたか**は [参加者教材 workshop.md](../workshop/workshop.md) に整理してある。
 > 対応の目安: Step 0/1 = AI 0.5 でメモリ斜線に張り付く(縦に上る)、Step 3 = byte を
 > 削って横に動く、Step 4(VZEROUPPER) = メモリ天井に届く前の隠れ sub-ceiling の掃除。
 
@@ -241,7 +241,7 @@ VZEROUPPER 1命令(自体のコストは1〜2cycle)で同一コードが **7.1�
 
 「天井は推定でなく実測すべき」という指摘を受け、ルーフラインの上限そのものを c7i で
 マイクロベンチした(`make remote-roofline-ceiling` / `make remote-roofline`、同一セッション)。
-測り方は `../workshop/workshop.html` §2.5、流儀は LBNL ERT / Williams 2009(同 §10)に準拠。
+測り方は `../workshop/workshop.md` §2.5、流儀は LBNL ERT / Williams 2009(同 §10)に準拠。
 
 ### 生ログ(c7i.large / Xeon 8488C / 負荷時 〜3.75GHz / Go 1.26.4)
 

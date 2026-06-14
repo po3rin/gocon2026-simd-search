@@ -52,7 +52,7 @@ func benchSetup() {
 // reportFloatRoofline は内積系 Stage の「ルーフライン上の点」を出力する。
 // 内積カーネルは要素あたり mul+add = 2 flop、DB を fp32 で1回読むので 4 byte。
 // → AI = 0.5 flop/byte(クエリは10万件で使い回すのでキャッシュ常駐、DRAM 転送に数えない)。
-// 詳細は docs/workshop/workshop.html。
+// 詳細は docs/workshop/workshop.md。
 func reportFloatRoofline(b *testing.B, iters int) {
 	sec := b.Elapsed().Seconds()
 	flop := float64(benchN) * benchDim * 2 * float64(iters)

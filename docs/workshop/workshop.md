@@ -1,0 +1,573 @@
+Roofline-driven optimization · Go 1.26 archsimd · AWS c7i 実測
+
+# Go × SIMDで高速化するベクトル検索 — ルーフラインモデルでSIMDが効く境界を探れ！
+Go 1.26 の実験的 SIMD で、外部ライブラリなしの Pure Go ベクトル検索を高速化します。ただし闇雲には触りません — **ルーフライン**という1枚の地図の上で「測る → 算術強度(AI)を出す → 当たっている天井を見る → その天井を狙う手だけ打つ」を繰り返します。
+
+## はじめに
+
+**これは何か:** Go 1.26 の標準 SIMD(`simd/archsimd`)を使い、外部ライブラリなしの Pure Go でベクトル検索を高速化する、**読みながら手元で動かせる**教材です(Go Conference 2026・40分ワークショップ)。題材は内積によるベクトル検索。ただ速くするのではなく、**ルーフライン**という地図の上で「いまどこが詰まっているか」を測り、打つ手を選ぶのが軸です。
+
+**何が学べるか:**
+
+- Go の標準 SIMD(archsimd)の**書き方**と、コード生成の今(VZEROUPPER 未挿入・register spill)
+- **ルーフラインモデルとは** — 何で詰まっているか(演算律速/メモリ律速)を1枚で見極め、測る → 算術強度(AI)を出す → 当たっている天井を見る → その天井を狙う手だけ打つ
+- **SIMD が「どこで効くか」** — 演算律速なら効き(カーネル・バッチ化)、メモリ律速では効かない。それを測って見極められるようになる
+- **高速化の二本柱** — SIMD(実装効率)× データ表現(再利用＝バッチ / バイト削減＝量子化)。そして速度と精度の両立(rerank)
+- **実測の作法** — 2粒度で測る・天井をマイクロベンチで実測・`objdump` で生成コードを見る・Recall で精度を測る
+
+**対象と前提:** Go の基礎が読めれば十分で、CPU アーキの予備知識は要りません(専門用語は初出のところで補足します)。**読み方:** 上から順に通読でき、各 Stage は「なぜ → コード → どうなったか」を実行コマンドつきで追えます。
+
+## 01. そもそも SIMD ってなに？
+
+まず SIMD が無い世界から始めましょう。次の Go コードはベクトルの**内積**(かけ算の合計)です。
+
+```go
+var sum float32
+for i := range a {
+    sum += a[i] * b[i]   // 1個ずつ かけて 足す
+}
+```
+
+このループは「**1個ずつ**」処理します。`a\[i\]` と `b\[i\]` を1個取り出し、1回かけ算して、足す。CPU の命令レベルでも本当にそうで、1命令で float32 を1個しか扱いません。これを**スカラ処理**と呼びます。
+
+**SIMD** — (Single Instruction, Multiple Data)は、その名のとおり「**1つの命令で複数のデータをまとめて**」処理する CPU の機能です。CPU の中には普通の変数より大きな**ベクトルレジスタ**という入れ物があり、256bit のレジスタには float32(32bit)が **8個**入ります。8個入れて掛け算命令を1回実行すると、8個分の掛け算が**同時に**終わります。この違いを図にすると次のとおりです。
+
+![スカラ処理 vs SIMD処理](../images/scalar-vs-simd.png)
+
+図: スカラは要素を1個ずつ処理する。SIMD は1命令で8個(256bit)をまとめて処理する。
+
+384次元の内積なら、スカラで384回かかる掛け算が SIMD なら48回で済みます。**理論上は8倍速い**わけです。ただし「理論上」と断ったのには理由があります — 実際の速さは計算の速さだけでなく**メモリからデータが届く速さ**にも左右されるからです。データが間に合わなければ、計算をいくら速くしても頭打ちになります。この差は §06 のルーフライン(カーネル単体 vs 全探索)で実測しながら確かめます。
+
+Go 1.26 では `GOEXPERIMENT=simd` を付けてビルドすると `simd/archsimd` パッケージが使え、**アセンブリも cgo も書かずに**ベクトル命令を直接叩けます。メソッド呼び出しがほぼそのまま1つの CPU 命令にコンパイルされます:
+
+```go
+va := archsimd.LoadFloat32x8Slice(a)   // float32 を8個ロード
+vb := archsimd.LoadFloat32x8Slice(b)
+acc = va.MulAdd(vb, acc)               // acc += va*vb (FMA という1命令)
+```
+
+注意点:`archsimd` は今のところ **amd64(Intel/AMD)専用**。Apple Silicon の Mac(arm64)ではパッケージ自体が無く、スカラにフォールバックします。手元で SIMD を走らせたいときの選択肢は、下の**環境コラム**を参照(結論: Docker の amd64 でも代用できません)。
+
+### archsimd の API の読み方
+
+`archsimd` は特別な構文を覚えるパッケージではなく、**ベクトルレジスタを表す「型」を宣言し、その型の「メソッド」を呼ぶ**だけです。押さえるべきは次の3点です。
+
+**① 型が「データの形」を表す。** 型名そのものが「何ビット幅に、何を何個(レーン)詰めるか」を意味し、**型を選ぶことが使う命令幅を選ぶこと**になります。
+
+```go
+var a archsimd.Float32x8    // float32 を8レーン  = 256bit(AVX2)
+var b archsimd.Float32x16   // float32 を16レーン = 512bit(AVX-512)
+var c archsimd.Uint64x4     // uint64 を4レーン
+```
+
+**② メソッドが「1つの CPU 命令」に対応する。** 各メソッドはベクトル命令(イントリンシック)にほぼ1対1で変換され、**メソッド名から出てくる機械語の見当がつきます**。
+
+```go
+va := archsimd.LoadFloat32x8Slice(xs)  // スライス → レジスタ(ロード)
+va = va.MulAdd(vb, acc)                // 積和      → VFMADD
+xo := vc.Xor(vd)                       // XOR       → VPXOR
+po := xo.OnesCount()                   // popcount  → VPOPCNTQ
+va.StoreSlice(xs)                      // レジスタ → スライス(ストア)
+```
+
+**③ 使う前に、その CPU が対応しているか確かめる。** 未対応の CPU で呼ぶと panic するので、実行時に機能フラグでガードします。
+
+```go
+var hasSIMD    = archsimd.X86.AVX2() && archsimd.X86.FMA()                 // MulAdd は AVX2 + FMA が要る
+var hasVPOPCNT = archsimd.X86.AVX512() && archsimd.X86.AVX512VPOPCNTDQ()   // OnesCount は AVX-512 VPOPCNTDQ
+```
+
+(SIMD が無い環境向けのフォールバック構成や、境界に必要な `VZEROUPPER` の扱いには少しコツが要りますが、それぞれ §09 環境メモ と §10 付録で扱います。)
+
+## 02. ベクトル検索ってなに？
+
+SIMD の練習台に**ベクトル検索**を選びました。RAG やセマンティック検索を支える中核技術です。
+
+仕組みはシンプルで、文書もクエリも「埋め込みモデル」で**数百次元の数値ベクトル**に変換しておき、「クエリのベクトルと**内積が大きい**文書 = 意味が近い文書」として上位 k 件を返します。
+
+**なぜ内積で「似ている」が測れるのか** — 埋め込みモデルは、意味が近い文章ほどベクトルの向きが揃うように学習されています。向きが揃った2本のベクトルは内積が大きく、向きがバラバラだと小さくなります。だから「内積が大きい ≒ 意味が近い」になります:
+
+```text
+文章A 「猫が好き」   --embedding-->  [ 0.2, -0.1,  0.8, ...]  ┐
+                                                            ├─ 向きが近い → 内積が大きい ≒ 似ている
+文章B 「犬を飼う」   --embedding-->  [ 0.1, -0.2,  0.7, ...]  ┘
+
+文章C 「株価が急落」 --embedding-->  [-0.6,  0.5, -0.2, ...]  ─ 向きが違う → 内積が小さい ≒ 似ていない
+```
+
+全体の流れを図にすると次のようになります。
+
+![ベクトル検索のしくみ](../images/vector-search.png)
+
+図: 文書とクエリをベクトルに変換し、クエリとの内積で並べて上位 k 件を返す。計算の本体は内積。
+
+つまり計算の本体は「**内積を10万回計算する**」こと。内積は掛け算と足し算の塊なので、SIMD が最も得意とする形です。だから世のベクトルDB(Faiss、Qdrant、ClickHouse…)はみんな内部で SIMD を徹底的に使っています。それを Pure Go で追体験しよう、というのが今回の趣旨です。本ページの題材カーネルは `acc += a\[i\]\*d\[i\]`(クエリ a と DB ベクトル d の内積)で、これを10万本ぶん回します。
+
+## 03. まず動かす
+
+SIMD(§01)と題材のベクトル検索(§02)が分かったところで、理屈を進める前に**一度動かして現状の速さを測ります**。まず環境を用意し、続けてベースラインを計測します。
+
+### 環境を用意する
+
+SIMD が走るのは **amd64(Intel/AMD)実機**。一番楽なのは **GitHub Codespaces**(amd64・ゼロインストール)で、手元が Apple Silicon でもこれなら同じ数字が出ます。必要なものは **Go 1.26** と **make** だけ(`GOEXPERIMENT=simd` は Makefile が自動で付けます)。
+
+**① Codespaces(推奨)** — リポジトリの `Code → Codespaces → Create`。`.devcontainer/` に Go 1.26 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。
+
+**② ローカル(amd64 Linux / Windows)**
+
+```bash
+git clone https://github.com/po3rin/gocon2026-simd-search
+cd gocon2026-simd-search
+go install golang.org/dl/go1.26.4@latest && go1.26.4 download   # Go 1.26 を入れる
+make GO=$(go env GOPATH)/bin/go1.26.4 test                      # GOEXPERIMENT=simd は Makefile が付与
+```
+
+**③ Apple Silicon Mac** — arm64 では SIMD は走らず、**スカラ版でテストだけ**通ります(`make GO=$(go env GOPATH)/bin/go1.26.4 test`)。SIMD の数字は **Codespaces か amd64 実機**で(理由は §09)。**Docker の `--platform linux/amd64` は代用になりません**(§09)。
+
+### 動かす
+
+正しさの確認とベースライン計測はコマンド2つです:
+
+```bash
+make test       # 正しさ確認(通ればOK)
+make bench0     # スカラ実装の全探索(=ベースライン)を測る
+
+# ↓ 出てくる数字:
+# BenchmarkSearchNaive   27.0 ms/op   2.85 GFLOP/s   0.5 AI(flop/byte)
+```
+
+10万件のベクトルから上位を返すのに **1クエリ 27ms**。素朴に書くとこのくらいかかります。本ページがこれからやることは、たったひとつ — **この 27ms をどう速くするか**です。
+
+§01 を読んだ直後なので「SIMD で並列計算すれば速くなるはず」と思うでしょう。これは半分だけ正しく、やみくもに SIMD を足しても 27ms はほとんど縮みません(§06 Stage 1 で実際にそうなります)。
+
+そこで本ページは、速くする手をいきなり打たず、先に **「何で詰まっているか」を測って見極めてから**手を選びます。その地図になるのが **ルーフライン**で、次章から、いま出た `27ms` `2.85 GFLOP/s` `0.5 AI` を読み解いていきます。
+
+## 04. ルーフラインモデルとは
+
+§03 で `make bench0` を動かしたとき、出力に `2.85 GFLOP/s` と `0.5 AI(flop/byte)` という見慣れない列が出ていました。あの2つの数字が何を意味し、27ms をどう攻めればいいかを教えてくれるのが**ルーフライン**です。手を動かして出た数字を、ここで読み解きます。
+
+**ルーフラインモデル** — は、「このコードは何で遅いのか」を1枚の図で診断する性能モデルです(原典は Williams ら 2009、§08)。コードが遅いとき、原因は大きく2つに分かれます — **計算そのものが重い(演算律速)**か、**データの搬送待ち(メモリ律速)**か。この2つは打つ手が正反対(前者は計算を減らす・速くする、後者は運ぶデータ量や回数を減らす)で、取り違えたまま手を入れても効きません。**まずどちらで詰まっているかを見極める** — それがルーフラインの役目です。
+
+図は、**縦軸に性能(GFLOP/s＝1秒あたりの浮動小数点演算回数)・横軸に算術強度(AI ＝ 計算量 ÷ データ転送量)**を取り、その機械の物理的な上限を**屋根(ルーフ)**として描きます。屋根は2本あります — **左側はメモリ帯域で決まる右上がりの斜線**(運ぶのが間に合わない領域)と、**右側は演算ピークで決まる水平線**(計算が間に合わない領域)。どんなコードもこの屋根より上には行けません。ここに自分のコードの達成性能(GFLOP/s)と算術強度(AI)を当てはめれば、**2つの天井のどちらに当たっているか ＝ メモリ律速か演算律速か**がわかります。メモリ律速なら**算術強度(AI)を上げる**(データ設計を変える)、演算律速なら**実装効率を上げて演算性能を稼ぐ** — 打つ手が決まります。
+
+![ルーフラインの屋根の形(概念図): メモリ斜線・演算水平線・リッジ・左右の律速領域](../images/roofline-concept.png)
+
+図: ルーフラインの「屋根」。左はメモリ律速(斜線)、右は演算律速(水平線)、境目がリッジ。まだ点は打っていない、機械だけで決まる地図。
+
+では §03 の出力にあった `0.5 AI` が、なぜ 0.5 なのかを確かめましょう(題材は §02 の内積カーネル `acc += a\[i\]\*d\[i\]`)。**算術強度 (AI)** とは **「メモリから1バイト運ぶごとに、何回 計算するか」**(flop/byte)です。内積は要素あたり mul 1 + add 1 = 2 flop、DB ベクトルを 4バイト(fp32)読むので 4 byte(クエリ側は10万件で使い回すのでキャッシュに残り、毎回は運びません)。だから §03 で見た 0.5 はこう出ていたわけです:
+
+```text
+AI = 2 flop / 4 byte = 0.5 flop/byte
+```
+
+AI=0.5 は**とても小さい**値です。いまの CPU はおおむね「1バイト運ぶ間に十数〜数十回」計算できる(＝リッジが十数 flop/byte あたりにある)ので、0.5 は**リッジを大きく下回る ＝ メモリ律速**です。**まだ1行も最適化していない段階で、「このカーネルは構造的にメモリ待ち。演算性能を上げるより 算術強度(AI)を上げるのが本命だ」と先に分かる** — これがルーフラインモデルの効きどころです。
+
+では、このマシンの**本物の天井**(メモリ帯域と演算ピークの実数)はいくつなのでしょう。それを測るのが次章です。
+
+## 05. 天井を測る
+
+屋根(天井)は機械ごとに違います。理屈で決め打ちせず、**自分の手で測る**のがこの章です。前章の「AI=0.5 はメモリ律速」という見立ても、天井の実数があって初めて裏が取れます。まずは1コマンド走らせましょう:
+
+```bash
+make roofline-ceiling
+# 中身: go test ./internal/vec -run - \
+#         -bench 'BenchmarkPeak(FLOP|ReadBW|TriadBW)' -benchtime 2s
+
+# ↓ AWS c7i(Xeon 8488C・1コア)での実際の出力(抜粋):
+BenchmarkPeakFLOP_AVX2     39.31 GFLOP/s     ← 演算天井(FMA を飽和させた値)
+BenchmarkPeakReadBW         5.92 read-GB/s   ← 順次 read(スカラ縮約は発行律速で過小)
+BenchmarkPeakTriadBW       10.98 triad-GB/s  ← STREAM Triad(メモリ帯域の標準指標)
+```
+
+3つの数字が出ました。これが**このマシンの屋根の高さ**(演算天井 ≒ 39 GFLOP/s、メモリ帯域 ≒ 11 GB/s)です。では、この数字を出しているコードが何をしているのかを順に見ます。**測り方を知って初めて、数字を信用できる**からです。
+
+### 演算天井のコード — FMA をレジスタ上で連打する
+
+演算ピークは「**メモリも依存連鎖も挟まず、FMA だけを限界まで回したら何 GFLOP/s 出るか**」。だから独立したアキュムレータ(途中結果をためる変数)を**12本**用意し(互いに依存しない計算を並べると、FMA の待ち時間を隠せる — 後の Stage 1b でも同じ手を使います)、レジスタ上だけで FMA を連打します。`internal/vec/ceiling_flop_test.go` の核心はここ:
+
+```go
+// 12本の独立アキュムレータ。漸化式 a = a*m + c はメモリにも触れない
+m, c := fill8(0.9999), fill8(1.0)
+a0, a1, /* … */ a11 := fill8(0.5), fill8(1.5), /* … */ fill8(11.5)
+for b.Loop() {
+    for j := 0; j < inner; j++ {
+        a0 = a0.MulAdd(m, c)   // ← FMA。互いに独立なので 12本が並んで走る
+        a1 = a1.MulAdd(m, c)
+        /* … a2 〜 a11 も同様 … */
+    }
+}
+flop := float64(iters) * inner * 12 * 8 * 2  // 12acc × 8lane × 2flop/FMA
+b.ReportMetric(flop/sec/1e9, "GFLOP/s")      // ← これが 39.31
+```
+
+実測 **39.3 GFLOP/s**。試しにアキュムレータを4本に減らした `BenchmarkPeakFLOP_AVX2_4acc` を測ると **22.9 GF** まで落ちます — 独立な本数が足りず、FMA の待ち時間を隠しきれないから。**「独立な本数を増やすと速くなる」**というこの効きは、後の Stage 1b で内積カーネルでも再び使います。これがレジスタ上の演算天井です。
+(理論ピークは ~120 GF。実測がその約1/3しか出ない理由は §10 付録で。)
+
+### メモリ天井のコード — キャッシュに乗らない巨大配列を舐める
+
+メモリ帯域は「**DRAM から1スレッドで流し読みしたら何 GB/s 出るか**」。キャッシュに収まると DRAM を測れないので、**256MB**(LLC を確実に溢れる)の配列を端から舐めます。`internal/vec/ceiling_mem_test.go`:
+
+```go
+const memN = 1 << 26  // 67,108,864 float32 = 256 MB(LLC 溢れ確実)
+
+// read 帯域: 8本の部分和でレイテンシ/発行律速を避け、純粋に DRAM 読みを飽和
+for b.Loop() {
+    for i := 0; i < memN; i += 8 {
+        a0 += memB[i]; a1 += memB[i+1]; /* … a7 まで … */
+    }
+}
+b.ReportMetric(gb, "read-GB/s")    // ← 5.92
+
+// Triad(STREAM 標準): a = b + s*c。read b + read c + write a で3配列ぶん
+for i := 0; i < memN; i++ { memA[i] = memB[i] + scalar*memC[i] }
+b.ReportMetric(gb, "triad-GB/s")   // ← 10.98
+```
+
+検索は「DB を順次ストリーム読み」するワークロードなので、効くのはこの帯域です。read が triad より低いのは、スカラ縮約の発行律速で**過小評価**になるため(真の壁は Triad 側の ~11 GB/s)。**検索はシングルスレッドなので天井もシングルコアで測る**(ソケット全体の〜307 GB/s ではない)のがポイントです。
+
+### 測った天井から上限を出す
+
+3つの実数で上限が決まります。演算天井は1本ではなく段階的です — **Go実測 39 / AVX2理論 ~120 / シリコン理論 ~240(AVX-512)**。最上段 240 が物理上限、39 と 120 はその下の**サブ天井**です。
+
+**リッジ**(演算律速とメモリ律速が切り替わる境目の AI)＝ **天井 ÷ 帯域** = 240 / 11 ≒ **22 flop/byte**(シリコン理論240基準。AVX2理論120基準なら ~11)。前章の内積 AI=0.5 はこれを大きく下回る ＝ やはり**メモリ律速**で、この AI での上限は **0.5 × 11 = 5.5 GFLOP/s** と確定します。
+
+これでこのマシンの天井(メモリ帯域 11 GB/s、演算ピーク 39/120/240、リッジ 22 flop/byte)が出そろいました。次章では、各 Stage の達成性能と AI を測り、これらの天井と突き合わせていきます。
+
+※ 実測環境: AWS c7i.large / Xeon 8488C / Go 1.26.4 / 10万ベクトル×384次元(2026-06-13)。演算ピークは Go実測39/シリコン理論240、持ち帰り章のみ卓上。Go を更新したら `make roofline-ceiling` で測り直します。
+
+## 06. 段階を追う
+
+下の図は **§05 で測った天井に各 Stage を重ねた、このマシンの実測ルーフライン**です(横軸=AI・縦軸=性能・斜線=メモリ天井・水平線=演算天井)。各 Stage がどの天井に当たっているか — メモリ律速か演算律速か、達成性能はいくつか — を、これから1つずつ測って確かめます(各 Stage の拡大図と Go コードは下の各節に)。
+
+![このマシンの実測ルーフライン全体像(各 Stage の点と天井)](../images/roofline-plot.png)
+
+図: このマシンの実測ルーフライン全体像。S0 スカラ → S1 SIMD(メモリ壁)→ kernel 単体(演算側)→ 量子化(右上へ)。各点の詳細は下の各 Stage で。
+
+ここからは**実際のコードと、動かして出る数字**です。掲載は擬似コードではなく `internal/vec` / `internal/index` の**実コードそのまま**。手元で動かす手順:
+
+```bash
+# amd64 実機 or Codespaces(arm64 Mac はスカラ版でテストのみ → §01注記・下のDockerコラム)
+GOEXPERIMENT=simd go test ./...   # 正しさの確認
+make roofline                     # 各Stageの GFLOP/s・AI・MB/query を一覧(=各Stageの座標を出す)
+make bench0 / bench1 / bench2      # Stage ごとのベンチ
+make roofline-batch               # Stage 2: B=1 vs B=32(バッチで SIMD が効く)
+make recall                       # Recall@10(binary vs rerank)
+```
+
+**計測のしくみ** — `make roofline` が各Stageの算術強度と達成性能を出す仕組みも Go のベンチだけで完結しています。Go の `testing` で `for b.Loop()`(Go 1.24+)を回し、`b.Elapsed()` の実時間から GFLOP/s を計算、`b.ReportMetric` で**自前の指標(AI・GFLOP/s)をベンチ出力の列として足す**だけ。出力の `AI` と `GFLOP/s` がそのまま、その Stage の**算術強度と達成性能**です。
+
+```go
+// internal/index/bench_test.go — 全探索Stageの「点」を出す
+func reportFloatRoofline(b *testing.B, iters int) {
+    sec := b.Elapsed().Seconds()
+    flop := float64(benchN) * benchDim * 2 * float64(iters)   // 2 flop/要素
+    bytes := float64(benchN) * benchDim * 4                    // 4 byte/要素
+    b.ReportMetric(flop/sec/1e9, "GFLOP/s")    // ← 点の y
+    b.ReportMetric(2.0/4.0, "AI(flop/byte)")    // ← 点の x (=0.5)
+    b.ReportMetric(bytes/1e6, "MB/query")
+}
+
+func BenchmarkSearchNaive(b *testing.B) {
+    benchSetup()
+    b.SetBytes(benchN * benchDim * 4)   // → 標準の MB/s 表示
+    iters := 0
+    for b.Loop() {                       // Go 1.24+ : 回数と計時を自動で面倒見る
+        benchIx.SearchNaive(benchQ, 10)
+        iters++
+    }
+    reportFloatRoofline(b, iters)
+}
+```
+
+同じ要領で天井そのものも実測します(`make roofline-ceiling`)— FMA をレジスタ上で連打する `BenchmarkPeakFLOP_AVX2` が演算ピーク、256MB を舐める `BenchmarkPeakReadBW`/`TriadBW` がメモリ帯域(詳しくは §05)。**各Stageの数値も天井も、特別なプロファイラ無しに Go の標準ベンチだけで出している**のがポイントです。
+
+### Stage 0 — スカラ基準(ベースライン)
+
+**なぜ:** 最適化はまず**基準値**から。素朴に「1要素ずつ」内積を回し、達成性能と算術強度を測ります。以降の手が効いたかは、この基準からの変化で判断します。検索は全ベクトルと内積して上位 k 件を返すだけ。
+
+```go
+// internal/vec/dot.go
+func DotNaive(a, b []float32) float32 {
+    var sum float32
+    for i := range a {
+        sum += a[i] * b[i]        // 1個ずつ かけて 足す(前の sum に依存=直列)
+    }
+    return sum
+}
+
+// internal/index/index.go — 全探索
+func (ix *Index) SearchNaive(q []float32, k int) []Result {
+    t := newTopK(k)
+    for id := 0; id < ix.N; id++ {              // 10万ベクトル全部と内積
+        t.push(id, vec.DotNaive(q, ix.Vec(id)))
+    }
+    return t.results()
+}
+```
+
+**どうなったか:** 全探索 27.0 ms = **2.85 GFLOP/s**、AI=0.5。達成 2.85 GFLOP/s は、メモリ天井(5.5 GF)にすら届きません。なぜ天井未満か? **依存連鎖律速** — `sum += ...` は前の足し算が終わるまで次へ進めず、待ち時間(レイテンシ)がそのまま表に出ます。1個ずつ処理＝**命令レベルの並列性ゼロ**です(384要素 × 加算レイテンシ約2サイクル ≒ 約190ns と概算でき、実測 188ns とほぼ一致します)。  
+**→ 次の一手:** ルーフラインの「どの天井にも未達なら命令並列性を上げる」に従い、**同時に複数(SIMD)**で命令並列性を上げ、達成性能を引き上げます。
+
+```bash
+$ make bench0
+BenchmarkSearchNaive   27.0 ms/op   2.85 GFLOP/s   0.5 AI(flop/byte)   153.6 MB/query
+```
+
+![ルーフライン上の Stage 0 の位置](../images/rl-stage0.png)
+
+図: いまルーフラインのここ — AI=0.5・2.85 GFLOP/s。メモリ天井(5.5)にすら届かない左下。
+
+### Stage 1 — AVX2 で SIMD化(2段階で理解する)
+
+**なぜ:** Stage 0 は命令並列性ゼロで天井にも未達でした。ルーフラインの指示は「**命令並列性を上げて達成性能を上げろ**」。SIMD 化はここで実は2つの工夫を一度にやりがちです。混乱しないよう、**1a「8個まとめて読む」→ 1b「待ち時間を隠す」**の順に分けて理解します。
+
+#### Stage 1a — まず「8個まとめて読む」(Float32x8)
+
+最初の一歩は、1個ずつの内積を **8個まとめて**に置き換えるだけです。`Float32x8` でスライスから8要素をベクトルレジスタにロードし、`MulAdd`(FMA＝掛けて足す)でアキュムレータに足し込みます。「1命令で8個」を体験するための最小形:
+
+```go
+// まず最小形:アキュムレータ1本で「8個まとめて」
+var acc archsimd.Float32x8                 // アキュムレータ1本
+for len(a) >= 8 {
+    va := archsimd.LoadFloat32x8Slice(a)   // float32 を8個ロード
+    vb := archsimd.LoadFloat32x8Slice(b)
+    acc = va.MulAdd(vb, acc)               // acc += va*vb を8レーン同時に(FMA)
+    a = a[8:]; b = b[8:]
+}
+// 最後に acc の8レーンを1個に足し込む(水平和)→ 端数処理
+```
+
+これで「1命令で8個」は動きます。ところが**まだ理論ほど速くなりません**。理由が次の 1b です。
+
+#### Stage 1b — なぜアキュムレータを2本にするのか(待ち時間を隠す)
+
+1a の `acc = va.MulAdd(vb, acc)` は、**前の acc が出来上がるまで次の MulAdd を始められません**(acc を読んで acc に書く=依存連鎖)。FMA は結果が出るまで数サイクルかかる(レイテンシ)ので、1本だとその待ち時間が毎回そのまま出ます — Stage 0 の `sum += ...` と同じ直列化です。
+
+そこで**独立したアキュムレータを2本**(acc0 / acc1)に分けます。互いに依存しないので、acc0 の FMA が計算中でも acc1 の FMA を走らせられる＝待ち時間を隠せます(命令レベル並列性)。最後に2本を足してから水平和します。仕上げに境界の `vzeroupper()` — SIMD→スカラ計算へ戻る前の1命令の掃除で、目立たないが効きます(理由と効果は §10 付録)。
+
+```go
+// internal/vec/dot_simd.go  (GOEXPERIMENT=simd, amd64)
+import "simd/archsimd"
+
+func Dot(a, b []float32) float32 {
+    if !hasSIMD {
+        return DotNaive(a, b)              // arm64 等はスカラに退避
+    }
+    var acc0, acc1 archsimd.Float32x8      // ★ 1b: アキュムレータ2本で待ち時間を隠す
+    for len(a) >= 16 {
+        acc0 = archsimd.LoadFloat32x8Slice(a).MulAdd(archsimd.LoadFloat32x8Slice(b), acc0)
+        acc1 = archsimd.LoadFloat32x8Slice(a[8:]).MulAdd(archsimd.LoadFloat32x8Slice(b[8:]), acc1)
+        a = a[16:]; b = b[16:]             // 前進(境界計算をループ条件に吸収)
+    }
+    var buf [8]float32
+    acc0.Add(acc1).StoreSlice(buf[:])
+    vzeroupper()                           // ★ SIMD→スカラ境界の掃除。Goは自動挿入しない(§10)
+    sum := buf[0]+buf[1]+buf[2]+buf[3]+buf[4]+buf[5]+buf[6]+buf[7]
+    for i := range a {                     // 8の倍数でない端数
+        sum += a[i] * b[i]
+    }
+    return sum
+}
+```
+
+**どうなったか:** カーネル単体は **188→41 ns = 4.6x** 速くなりました。**ところが全探索は 16.7 ms = 1.6x** しか上がりません。なぜこれほど差が出るのでしょうか。**カーネル単体と全探索は別物だから**です — カーネル単体はデータが L1 にあるため演算側にまだ余地があり、全探索は DRAM から流し読みで AI=0.5 のまま**メモリ帯域(9.2 GB/s)に達して頭打ち**になります。同じ内積でも、当たっている天井が違うのです。しかも途中には隠れ天井 VZEROUPPER があり、掃除すると 167→23ns まで改善します(§10 付録)。  
+**→ 結論:** 実装効率はもう頭打ちで、幅を 8→16(AVX-512)に広げても天井は変わりません。キャッシュブロッキングも効きません — DB ベクトルは各1回しか読まれず再利用が無いので、タイリングしても DRAM 読み出し総量は変わらないからです。**次は実装効率ではなく、算術強度(AI)を上げる番。**AI を上げる道は2つ — **①再利用(クエリのバッチ化・exact)** と **②バイト削減(量子化・近似)**。まず① を Stage 2 で。  
+※ 上は要点。長さガードと「8幅の端数処理」を含む完全版は `internal/vec/dot_simd.go`。
+
+```bash
+$ make bench1
+BenchmarkDotSIMD       41.0 ns/op                       ← カーネル単体 4.6x (DotNaive 187.8ns)
+BenchmarkSearchSIMD    16.7 ms/op   9.2 GB/s            ← 全探索 1.6x(メモリの壁)
+```
+
+![ルーフライン上の Stage 1 の位置](../images/rl-stage1.png)
+
+図: いまルーフラインのここ — 全探索はメモリ壁(9.2 GB/s)に張り付き、カーネル単体だけ右上の別の点。
+
+### Stage 2 — クエリのバッチ化：演算律速にして SIMD を効かせる(exact)
+
+**なぜ:** 全探索が メモリ律速なのは、DB ベクトル d を読んでも内積1回(2flop / 4byte)しかしないから。なら**d を1回ロードして B 本のクエリ全部と内積**すれば、同じ転送で計算が B 倍 → **AI ≈ 0.5×B**。B=32 で AI=16 となり**リッジを越えて演算律速側**へ。そこなら SIMD が効くはず — しかも**精度はそのまま(exact)**。事実上の GEMM(行列×行列)化(BLAS や Faiss のバッチ検索が速い理由)。
+
+```go
+// internal/index/index.go — B本のクエリを1パスで処理(d のロードを再利用)
+func (ix *Index) SearchBatchSIMD(qs [][]float32, k int) [][]Result {
+    tops := make([]*topK, len(qs))
+    for b := range tops { tops[b] = newTopK(k) }
+    for id := 0; id < ix.N; id++ {
+        d := ix.Vec(id)                          // ① d を1回ロード
+        for b := range qs {                      // ② B本のクエリで使い回す(d はキャッシュ常駐)
+            tops[b].push(id, vec.Dot(qs[b], d))   // SIMD内積
+        }
+    }
+    /* 各 tops[b].results() を返す */
+}
+```
+
+**どうなったか:** B=32 で **SIMD が exact 検索のまま 4.3x**(scalar batch 19.3ms/query ↔ **SIMD batch 4.49ms/query**)。GFLOP/s は **4.67 → 17.1**(3.7倍)、1クエリ **16.5ms → 4.49ms**。B=1 の 1.6x からの一変は、**再利用で AI を 0.5→16 に上げ演算律速にした**から — まさにルーフラインの「横(再利用)→縦(SIMD)が効く」。**精度は一切犠牲にしていません(exact)。**  
+(spill の 39GF 天井で 17GF 止まりだが、それでもスカラを 4.3x 引き離す)
+
+```bash
+$ make roofline-batch    # B=1(全探索) vs B=32(バッチ)、scalar vs SIMD (c7i 実測)
+B=1   SearchSIMD        16.5 ms/query   4.67 GF   ← SIMD 1.6x(メモリ壁)
+B=32  SearchBatchNaive  19.3 ms/query   3.98 GF   (scalar)
+B=32  SearchBatchSIMD    4.49 ms/query  17.1 GF   ← SIMD 4.3x! 演算律速・exact
+```
+
+![ルーフライン上の Stage 2 の位置](../images/rl-stage2.png)
+
+図: いまルーフラインのここ — バッチ化で AI が 0.5→16 と右へ動き、演算律速側に乗った(exact・精度そのまま)。
+
+### Stage 3 — バイナリ量子化(もう一つの道：バイトを削る・近似)
+
+**なぜ:** Stage 1 でメモリ帯域に張り付きました。ルーフラインの指示は「**算術強度(AI)を上げる＝1バイトあたりの仕事を増やす(バイトを削る)**」。キャッシュ戦略は再利用が無いので効きません → **データ表現そのもの**を変えます。float32 を**符号1bit**に量子化すると 1ベクトル 1536→48 byte(**1/32**)。距離は内積をやめ、XOR+popcount の**ハミング距離**(違うビット数)へ。
+
+```go
+// internal/vec/hamming.go
+func Quantize(v []float32, out []uint64) {   // float32 → 符号1bit
+    for i, x := range v {
+        if x > 0 {
+            out[i/64] |= 1 << (i % 64)
+        }
+    }
+}
+
+func Hamming(a, b []uint64) int {            // XOR + popcount = 違うビット数
+    var d int
+    for i := range a {
+        d += bits.OnesCount64(a[i] ^ b[i])   // OnesCount64 はスカラPOPCNT 1発=64次元/命令
+    }
+    return d
+}
+```
+
+**どうなったか:** 153MB→4.8MB で**キャッシュに乗り、DRAM の壁から脱出**。0.62 ms = **43x**。**速さの源泉は SIMD ではなく「データを 1/32 にした」こと**です。距離計算はスカラ POPCNT(64次元/命令)で足り、**ここで AVX-512 の VPOPCNT を使っても速くなりません** — 量子化後はキャッシュ常駐で popcount 律速ではなく、1ベクトルも6語と小さいから(実測 `SearchBinarySIMD` 0.75ms ≧ スカラ `SearchBinary` 0.68ms)。これは Stage 1 と同じ「**計算で詰まっていない所では SIMD は効かない**」というルーフラインの一貫した教訓です。  
+**しかも、これは無条件の勝利ではありません。** 1bit に潰した代償で精度が大きく落ち、**Recall@10 = 0.18**(正解10件のうち2件弱しか当たらない)。43x は「正確な検索」を速くしたのではなく、**近似**に問題をすり替えた数字で、**このままでは実用になりません**(exact な Stage 0/1/2 とは別タスク)。  
+**→ 次の一手:** 速さは保ったまま**精度を取り戻す**。そこで **SIMD が主役として戻ってきます**(Stage 4)。
+
+```bash
+$ make bench2
+BenchmarkSearchBinary  0.62 ms/op                       ← 43x。ただし…
+$ make recall
+Recall@10   binary(量子化のみ)  0.18                     ← 低い! このままでは使えない
+```
+
+![ルーフライン上の Stage 3 の位置](../images/rl-stage3.png)
+
+図: いまルーフラインのここ — 量子化で右上へ移動し DRAM 壁を脱出。ただし精度を犠牲にした近似(Recall 0.18)。
+
+### Stage 4 — fp32 SIMD で再採点(rerank)：精度を取り戻す
+
+**なぜ:** Stage 3(量子化)は速いが Recall 0.18 では使い物になりません。**速さは量子化で確保したまま、精度だけ取り戻したい**。作戦は2段構え — 1bit のハミング距離で**粗く候補を絞り**(速い)、その**少数の候補だけ**を fp32 の正確な内積で**採点し直す**(正確)。絞った後なので fp32 はキャッシュに乗り、追加コストは小さい。
+
+```go
+// internal/index/index.go
+func (ix *Index) SearchBinaryRerank(q []float32, k, factor int) []Result {
+    cands := ix.SearchBinary(q, k*factor)        // ① 1bitで粗く k×factor 件に絞る(速い・不正確)
+    t := newTopK(k)
+    for _, c := range cands {
+        t.push(c.ID, vec.Dot(q, ix.Vec(c.ID)))   // ② fp32 SIMD内積で採点し直す ← Stage 1 のカーネル!
+    }
+    return t.results()
+}
+```
+
+**どうなったか:** **Recall@10 0.18 → 0.87**、速度は **0.67 ms ≈ 40x**(ほぼ量子化のまま)。ここで効いている `vec.Dot` は**Stage 1 で書いた SIMD カーネルそのもの**。つまり **SIMD は「不要」だったのではなく、「速くて正確」を成立させる精度側の主役**でした。  
+これが実運用のベクトル検索の定石(量子化で粗く絞る → 高精度な距離で rerank。Faiss / Qdrant / ClickHouse QBit と同系統)。**速度(量子化＝横) × 精度(SIMD内積＝縦)の二本柱**で、はじめて「速くて正確」に届きます。
+
+```bash
+$ make recall
+SearchBinaryRerank  0.67 ms/op   ≈40x   Recall@10 0.87  ← 速くて正確(SIMD内積で精度復元)
+```
+
+![ルーフライン上の Stage 4 の位置](../images/rl-stage4.png)
+
+図: 速度の位置は Stage 3 と同じ。勝負は速度軸ではなく精度軸(Recall 0.18→0.87)で、ここで SIMD 内積が効く。
+
+### 持ち帰り — さらに演算律速側へ(このリポでは未実装)
+
+**なぜ:** Stage 2 でキャッシュに乗った後、**さらに演算律速側へ**進むには? 引き出しは3つ。**int8 量子化**(転送4→1byte で AI をもう一段上げる)、**クエリのバッチ化**(DB1本のロードを B回再利用 → AI≈0.5×B、リッジを越えて演算律速=実質 GEMM 化。ここで初めて幅・FMA が再び効く)、変えた表現の上でまた効く **AVX-512 VPOPCNT**(`Uint64x4.OnesCount`)。**どうなる(想定):** 算術強度がさらに上がる(数値は卓上)。本リポでは未実装で、ルーフラインモデルの延長として示します。
+
+## 07. まとめ
+
+全体を貫く判断軸が**ルーフライン**でした。**実装効率を上げる**(SIMD・アキュムレータ・VZEROUPPER)と**算術強度(AI)を上げる**(データ表現: 量子化)は別軸で、Stage 1 でメモリ帯域に達した時点で「次は実装効率ではなく AI」と手が決まりました。個別の学びは:
+
+1.  **ルーフラインで先に天井を見る** — AI=0.5 はリッジ(~22)を大きく下回る。1行も書く前から「メモリ律速・本命は量子化」が分かっていた
+2.  **ベースラインなしに最適化を始めない** — Stage 0 で素朴な数字をまず押さえる
+3.  **カーネル単体と全体の2粒度で測る** — 問題の切り分けはここから(= 2つを別々に測って当たる天井を見比べる)
+4.  **SIMD はデータが届いてこそ** — メモリの壁の前では、幅を広げても無力
+5.  **速度と精度を最初から2軸で測る** — 量子化 + rerank で両立(Recall 0.18→0.87)
+6.  **「差が出ない」は2通り** — 仮説が違うのか、介入が届いていないのか。objdump で確かめてから結論を出す
+7.  **同じ指標で測り直す** — ボトルネックは層状。1枚剥がすと次が出てくる(偽の壁 → 真の壁)
+
+そして核心 — SIMD は「だけ」でも「不要」でもなく、**“どこで効くか”が全て**。ルーフラインがその場所を当ててくれます:
+
+- **演算律速なら SIMD は強い** — カーネル単体 4.6x(unsafe＋VZEROUPPER で最大 8.7x)。さらに**クエリをバッチ化して exact 全探索を演算律速にすれば、精度そのままで 4.3x**(B=1 の 1.6x から一変・Stage 2)。**これが「Go+SIMD で速くなった」の本命。**
+- **メモリ律速では SIMD は無力** — 全探索 B=1 は 1.6x が限界。打つ手は SIMD を磨くことではなく **AI を上げる**こと(=再利用 or バイト削減)。
+- **データ表現を変える(量子化)と 43x** — ただし速いのは**データ削減**のおかげで、距離計算に SIMD(VPOPCNT)を足しても速くならない(キャッシュ律速＋小ブロック)。しかも近似で **Recall 0.18 = 単体では使えない**。その精度を **fp32 SIMD の rerank** で 0.87 に戻して初めて実用になる。
+
+まとめると速度は **「AI を上げて演算律速にして SIMD を効かせる」(再利用＝バッチ / バイト削減＝量子化)× 「精度は SIMD 内積」** の二本柱。実運用のベクトルDB(Faiss / Qdrant / ClickHouse QBit)と同じ設計で、ルーフラインがどちらの軸を攻めるべきかを教えてくれます。**SIMD 抜きでは「速いが使えない(Recall 0.18)」止まり** — 「速くて正確」は、exact なバッチ(Stage 2)と rerank(Stage 4)の **SIMD があって初めて成立**します。
+
+## 08. 原典・参照
+
+- 原典: Williams, Waterman, Patterson, *"Roofline: An Insightful Visual Performance Model for Multicore Architectures"*, CACM 52(4), 2009. [[論文 (ACM)]](https://dl.acm.org/doi/10.1145/1498765.1498785)
+- STREAM(メモリ帯域ベンチの定番), J. McCalpin. [cs.virginia.edu/stream](https://www.cs.virginia.edu/stream/)
+- Empirical Roofline Toolkit / NERSC ルーフライン解説. [docs.nersc.gov](https://docs.nersc.gov/tools/performance/roofline/)
+- Intel Advisor(自動ルーフライン作図). [intel.com](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-advisor-roofline.html)
+- golang/go issues: [#76969 (spill)](https://github.com/golang/go/issues/76969) / [#78753 (regalloc, Go1.27)](https://github.com/golang/go/issues/78753)
+
+## 09. 環境メモ
+
+**Apple Silicon 参加者向け：** Go 1.26 の `archsimd` は AMD64 専用。ARM64 では `//go:build amd64` でSIMD実装を分け、スカラ版へフォールバックさせる構成にします。当日は AMD64 ランナー(Codespaces / AWS c7i)上の共有環境を一つ用意しておくと、手元のアーキ差を気にせず全員が同じ条件で達成性能と AI を測れます。
+
+> **コラム: なぜ Docker で「amd64」を指定してもダメか**  
+Apple Silicon でも `docker run --platform linux/amd64` を使えば実際の x86 で測れる——と思いがちですが、これは落とし穴です。中身は **QEMU エミュレーション**(または Rosetta 経由)で、**実際の x86 CPU ではありません**。具体的には:  
+① CPU の機能問い合わせ(CPUID)を正しく真似ないので archsimd.X86.\*() が**すべて false** → SIMD ガードがスカラ実装にフォールバックして、SIMD パスがそもそも走りません。  
+② QEMU が不安定で、ビルド中に SIGSEGV で落ちることもあります。  
+③ Rosetta 経由にしても翻訳されるのは AVX/AVX2 まで。**FMA・AVX-512 は使えません**(=内積 SIMD も VPOPCNT も不可)。  
+つまり **linux/amd64 コンテナ ≠ 実際の amd64**。SIMD のベンチは **Codespaces(amd64 ホスト)か amd64 実機**(AWS c7i など)で測りましょう。詳細は [`../dev/ENVIRONMENT_SURVEY.md`](../dev/ENVIRONMENT_SURVEY.md)。
+
+## 10. (付録)Go の SIMD の2つの隠れ天井
+
+> 付録: ここは深掘りです。40分の本編は §06 Stage 0〜4 と §07 まとめで完結します。「SIMD は万能ではない」という核心を持ち帰ったうえで、**Go のコード生成の今**まで踏み込みたい人向けの章です。
+
+本文で何度か「(§10)」と先送りした2つの**隠れ天井**を片付けます。どちらもハードの限界ではなく **Go 1.26 archsimd のコード生成がまだ若い**ことの表れで、**同根**です。
+
+### 隠れ天井①: VZEROUPPER 税 — SIMD→スカラ境界の遷移ペナルティ
+
+**症状:** Stage 1 で内積カーネルを SIMD 化したのに、全探索の**見かけの帯域が妙に低い(5.7 GB/s)**。カーネル単体も 167ns で頭打ち。ところが境界に**たった1命令 `VZEROUPPER` を置くだけで 167→23ns = 7.1x** 速くなり、帯域の見かけの壁も消えました。
+
+![VZEROUPPER 税のあり/なし比較](../images/vzeroupper.png)
+
+図: 同じコードでも、SIMD→スカラ境界に `VZEROUPPER` を1命令置くかどうかで 167ns→23ns(7.1x)。左(税あり)は dirty な YMM 上位とレガシー SSE の衝突でペナルティが命令ごとに蓄積し、右(税なし)は `VZEROUPPER` で上位128bitを掃除して衝突そのものを消す。
+
+**なぜ起きるか:** AVX2 命令(`Float32x8` の FMA など)を使うと YMM レジスタの**上位128bitが「dirty(汚れた)」状態**になります。その直後、水平和の `sum = buf\[0\]+buf\[1\]+…` は**スカラの float32 計算**で、Go はこれを**レガシー SSE 命令**で出力します。この「dirty な YMM 上位 × レガシー SSE」の組み合わせが CPU にペナルティを発生させる。`VZEROUPPER` は上位128bitをゼロに掃除する1命令で、境界で一度呼べばこの税金が消えます(命令自体のコストは小さく、差し引きで大きく得をする — ただし後述のとおりベンダー差はある)。
+
+**ペナルティの正体(世代で違う・ここ重要):** 教科書でよく語られる「**一度きりの大きな遷移ペナルティ(上位状態をセーブ/リストアするモード切替)**」は Sandy/Ivy Bridge〜Haswell 世代の挙動です。**Skylake 以降の modern Intel では仕組みが変わり**、もう上位状態を保存せず、dirty 状態で実行する**レガシー SSE 命令1個ごとに false dependency(上位ビットへの偽の依存)+ マージ(blend)μop が挿入される**形になっています。本ページのテスト機 `AWS c7i`(4th Gen Xeon Scalable = Sapphire Rapids)はまさにこの後者で、実測した「呼び出しごとの固定費 ≒145ns(550cyc)」は、この per-instruction ペナルティの蓄積を VZEROUPPER がまとめて消していると読むのが正確です。
+
+**Go 固有の事情:** Go 1.26 の archsimd は**この VZEROUPPER を自動挿入しません**。本来コンパイラが境界を管理して入れてくれることを期待したいところで、実際 [golang/go#77647](https://github.com/golang/go/issues/77647) でも「intrinsics はコンパイラ管理だから VEX 遷移は面倒を見てくれるはず…?」という**未解決の問い**として挙がっています。現状 `objdump` で生成コードを見ても VZEROUPPER は1個もなく、**3行のアセンブリ `vzeroupper_amd64.s` を自作して境界で呼ぶ**のが回避策。下の register spill と**同根のコード生成の未熟さ**で、これも将来 Go 側で解消される見込みです。
+
+**どこまで確かか(正直に)** — : 「VZEROUPPER 1命令で同一コードが 7倍速くなった」は実測で確認済み(167→23ns)。ただし**効果の大きさはベンダー・世代依存**で、本ページの値は modern Intel(Sapphire Rapids)のもの。**AMD Zen には Intel 型の遷移ペナルティが基本的に無く**、むしろ VZEROUPPER 自体が高コストな世代もある(=同じ7倍は出ない)。また 550cyc の固定費を命令単位まで分解したわけではなく、**dim スケーリングで固定費を分離 → VZEROUPPER 投入で7倍を確認**、という状況証拠による特定です。生ログは [`../dev/OPTIMIZATION_LOG.md`](../dev/OPTIMIZATION_LOG.md) の Step 4。
+
+### 隠れ天井②: なぜ FMA は AVX2ピークの約1/3か — register spill
+
+演算天井(AVX2)は理論 **~120 GFLOP/s**(2 FMA/cyc × 8レーン × 2flop × 3.75GHz)。実測は **39 GF = その約1/3(33%、0.65 FMA/cyc)**。AI=0.5 の深いメモリ律速なのでこの低さは結論を変えませんが、原因は面白いところです。`objdump` で内側ループを見ると、独立なはずのアキュムレータ12本(4本版でも同様)が**全部レジスタに置けず、毎回スタックへ退避(register spill)**され、同じ1本のレジスタを使い回していました。**FMA 1個ごとに load+store が必ず付く**ので、(1) load/store ポートが先に飽和し、(2) 次の周回の load が今回の store を待つ(store-to-load forwarding 〜5〜7cyc)。アキュムレータを増やすほど隠れるので **4本=23GF \< 12本=39GF** と増えます — 「待ち時間律速」の指紋です。これを図にすると次のとおりです。
+
+![register spill: 理想(レジスタ常駐)vs 実際(スタック往復)](../images/register-spill.png)
+
+図: 理想はアキュムレータをレジスタに置いたまま回す。実際は毎回スタックへ退避(register spill)し、FMA ごとに load+store が付く。
+
+register spill = レジスタに収まらない/置けない値をメモリ(スタック)へ追い出すこと。これはハードの限界ではなく **Go 1.26 archsimd のレジスタ割り当ての未熟さ**(VZEROUPPER を自動挿入しないのと同根のコード生成課題)。既知 issue [golang/go#76969](https://github.com/golang/go/issues/76969) と同件で、レジスタ割り当ての改善は [#78753](https://github.com/golang/go/issues/78753) など **Go 1.27 で進行中** — **将来この 39GF は上がる見込み**。生ログは [`../dev/OPTIMIZATION_LOG.md`](../dev/OPTIMIZATION_LOG.md) の Step 6/6b。
+
+**どこまで確かか(正直に)** — : 確認できたのは **「spill が存在する」**(objdump で 4本・12本とも FMA に load+store が付く ＋ 上流 issue [#76969](https://github.com/golang/go/issues/76969))と、メモリポート律速の見積り(〜0.6 FMA/cyc)が実測 0.65 とほぼ一致する点まで。**「spill さえ消せば理論ピークに届く」は未検証** — Go 1.26 archsimd は常に spill し Go コードでは消せないため、VZEROUPPER のような「1命令足したら7倍」の決定的な介入実験ができていません。よって本節は**強い状況証拠による推定**であって断定ではありません。
+
+```text
+// go tool objdump で見た内側ループ(アキュムレータ1本ぶん)
+0x..e3   c5fe6f9424...   VMOVDQU 0x398(SP), X2   ← スタックから レジスタへ load
+0x..74   c4e27da8d1      TESTL $0xd1, AL         ← 実は VFMADD213PS(=FMA)。go の誤訳
+0x..79   c5fe7f9424...   VMOVDQU X2, 0x398(SP)   ← レジスタから スタックへ store
+```
+
+**objdump の読み方(3点だけ)** — : ①1行は「アドレス / 命令バイト列 / ニーモニック(命令名) オペランド」。`(SP)` はスタック上の場所。②`VMOVDQU`=ベクトルのコピー(メモリ⇄レジスタ)、`VFMADD…PS`=FMA。③**落とし穴**: `go tool objdump` は新しめの命令(VEX系)を誤訳し、FMA が `TESTL \$0xd1, AL` のような化けで表示されます — **正体は左のバイト列**(`c4e2…`)を見れば分かります。Linux の `objdump -d` なら正しく表示されます。
+
+**スピルの見分け方** — : ループ内で**演算ごとに**「`(SP)→レジスタ` の load」と「`レジスタ→(SP)` の store」がセットで並んでいたら、値をレジスタに保持できず毎回スタックを往復している証拠 = register spill。理想は load/store が消えて**FMA だけが並ぶ**。
+

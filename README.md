@@ -3,7 +3,7 @@
 Go Conference 2026 ショートワークショップ
 **「ルーフラインで読み解く Pure Go × SIMD ベクトル検索」** の教材リポジトリ。
 
-> 🚧 現在は CFP 応募用の実測フェーズ。ワークショップ教材は **[`docs/workshop/workshop.html`](docs/workshop/workshop.html)**(読んで動かす形式・穴埋めなし)。
+> 🚧 現在は CFP 応募用の実測フェーズ。ワークショップ教材は **[`docs/workshop/workshop.md`](docs/workshop/workshop.md)**(読んで動かす形式・穴埋めなし)。
 
 ## 何をするか
 
@@ -29,7 +29,7 @@ Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 そして横に動いた先でまた SIMD が効く。**
 
 ワークショップの進め方・本物のルーフライン(c7i 実測)・各 Stage の点と天井・計測方法・原典は、
-インタラクティブな教材 **[`docs/workshop/workshop.html`](docs/workshop/workshop.html)** に集約(図の点をクリックすると当たっている天井と Go コードが切り替わる)。
+教材 **[`docs/workshop/workshop.md`](docs/workshop/workshop.md)** に集約(各 Stage の点と当たっている天井を静止画のルーフラインで示し、Go コードと計測コマンドを併記)。
 
 ## 動かし方
 
@@ -78,7 +78,7 @@ make isa-report GO=$(go env GOPATH)/bin/go1.26.4
 ```
 internal/vec/    距離カーネル(ワークショップで穴埋めする場所)
 internal/index/  ミニ検索エンジン(Index / Search API)+ ベンチ + roofline 計測
-docs/workshop/   参加者教材 workshop.html(SIMD/ベクトル検索の基礎+進め方+図+計測方法+まとめ+原典)
+docs/workshop/   参加者教材 workshop.md(SIMD/ベクトル検索の基礎+進め方+図+計測方法+まとめ+原典)
 docs/dev/        開発記録(OPTIMIZATION_LOG / ENVIRONMENT_SURVEY)
 docs/images/     図(SVG+PNG)
 docs/README.md   ドキュメント索引

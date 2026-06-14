@@ -27,17 +27,17 @@ bench3:
 bench: bench3
 
 ## ルーフライン: 各 Stage の GFLOP/s・AI・MB/query を表示して図に「点を打つ」
-## (Stage 0 naive → 1 SIMD → 2 binary の3点。docs/workshop/workshop.html 参照)
+## (Stage 0 naive → 1 SIMD → 2 binary の3点。docs/workshop/workshop.md 参照)
 roofline:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
 ## バッチ化の効き: B=1(全探索) vs B=32(バッチ)で scalar/SIMD を比較
-## 演算律速にすると SIMD が exact 検索でも効くことを見る(docs/workshop/workshop.html Stage 2)
+## 演算律速にすると SIMD が exact 検索でも効くことを見る(docs/workshop/workshop.md Stage 2)
 roofline-batch:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s
 
 ## ルーフラインの天井そのものを実測: 演算ピーク(FMA飽和) + メモリ帯域(read/triad)
-## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.html §04)
+## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §04)
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP|ReadBW|TriadBW)' -benchtime 2s
 

@@ -145,5 +145,5 @@ CPU feature を確認したい
 
 - `cmd/isa-report/main.go` — 環境調査ツール
 - `Makefile` — `isa-report` ターゲット
-- `../workshop/workshop.html` — Docker / Rosetta コラム（AVX-512 非対応 / FMA 制約）
+- `../workshop/workshop.md` — Docker / Rosetta コラム（AVX-512 非対応 / FMA 制約）
 - `OPTIMIZATION_LOG.md` — c7i 上の最適化実測
