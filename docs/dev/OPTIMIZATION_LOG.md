@@ -368,12 +368,23 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
   EPYC は **naive がレイテンシ律速で帯域を使い切れず(4.3 GB/s)**、SIMD が 18.3 GB/s まで
   伸ばすので差 4.2x。同じ「SIMD はメモリ天井で止まる」でも、naive の出発点が違うと倍率が変わる。
   → **「点を各自のベンチで打って確かめる(数値を約束しない)」というワークショップ設計の良い実例**。
-- **天井ベンチの過小**: PeakReadBW 6.13 / PeakTriad 4.18 GB/s は、SIMD 全探索の実達成
-  18.3 GB/s を下回る。Step 6 と同じ「縮約ベンチがハードを飽和できていない」問題で、
-  EPYC ではより顕著。真の単コア DRAM 帯域は ≥18 GB/s 側。天井ベンチも疑ってかかる教材ポイント。
-- ⚠️ **影響注意**: 本編環境を Codespaces に一本化したため、Stage 1 の「全探索は 1.6x 止まり=
-  メモリ律速」という**具体的な数字の演出は EPYC では 4.2x になり弱まる**。README / workshop.md の
-  数値例と「メモリ斜線に張り付く」注記は c7i 前提なので、要すり合わせ(別途検討)。
+- **天井ベンチの過小 → SIMD 化で解消(対応済み)**: 上の生ログのスカラ版 PeakReadBW 6.13 /
+  PeakTriad 4.18 GB/s は、SIMD 全探索の実達成 18.3 GB/s を下回っていた(Step 6 と同じ「縮約ベンチが
+  ハードを飽和できていない」問題で EPYC ではより顕著)。**天井ベンチを検索カーネルと同じ 256bit
+  SIMD ロードに作り直して測り直した**(`ceiling_mem_{simd,scalar}_test.go`):
+  - **PeakReadBW 6.13 → 18.39 GB/s、PeakTriad 4.18 → 16.26 GB/s**。
+  - 検索は読むだけ(書き戻さない)なので壁は **read 帯域 18.4**。SearchSIMD 18.3 GB/s = read 天井の
+    ~99%、達成 9.2 GFLOP/s = 0.5×18.4 と一致 → **ルーフライン上で点が壁に張り付く**(c7i より綺麗)。
+  - これで「点が屋根の上に来てルーフラインが破綻」する問題も解消。リッジ = 25.5/18.4 ≈ 1.4。
+
+### Step 7b: workshop を Codespaces ネイティブに改稿(対応済み・2026-06-15)
+
+上の「c7i 前提の数字・演出」と Codespaces(EPYC) のズレを、教材側を直して解消した(commit `b4576af`):
+- workshop.md の数値・ルーフライン図を EPYC 基準に統一(read 帯域=壁、リッジ 1.4、Stage1=4.2x で壁到達、
+  Stage2 バッチ内 SIMD 5.8x、量子化 47x、rerank 43x)。図 6 枚(rl-stage0〜4 / roofline-plot)も再描画。
+- c7i 前提の付録(VZEROUPPER 税 / register spill)は本編から外し [`HIDDEN_CEILINGS.md`](HIDDEN_CEILINGS.md) へ分離。
+- Stage 1 の演出は「1.6x 止まり=無力」→「効いた(4.2x)が壁に張り付く・倍率は CPU 次第」に再フレーム。
+  倍率は機械依存だが「最後はメモリ壁で頭打ち/量子化が本命」という骨格は不変。
 
 ## 高速化の階段(最終形)
 
