@@ -3,6 +3,7 @@
 読者別に整理してある。各ファイルの役割は1つだけ。
 
 ## 参加者(ワークショップ受講者)向け
+- **[workshop/SETUP.md](workshop/SETUP.md)** — まずここ。Codespaces ワンクリック起動・マシンサイズ・費用・フォールバック。
 - **[workshop/workshop.md](workshop/workshop.md)** — 教材本体(これ一つ)。
   ルーフライン(進め方: 測る→AI→当たる天井→その天井を狙う手) +
   各 Stage の点と天井(静止画) + Go コードと計測コマンド + 天井の計測方法 + 原典。

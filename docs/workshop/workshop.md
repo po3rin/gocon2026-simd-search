@@ -121,7 +121,7 @@ SIMDとベクトル検索の概要が分かったところで、一度動かし�
 
 SIMD が走るのは **amd64(Intel/AMD)実機**。一番楽なのは **GitHub Codespaces**(amd64・ゼロインストール)で、手元が Apple Silicon でもこれなら同じ数字が出ます。必要なものは **Go 1.26** と **make** だけです(`GOEXPERIMENT=simd` は Makefile が自動で付きます)。
 
-**① Codespaces(推奨)** — リポジトリの `Code → Codespaces → Create`。`.devcontainer/` に Go 1.26 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。
+**① Codespaces(推奨)** — リポジトリの `Code → Codespaces → Create`。`.devcontainer/` に Go 1.26 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。**手順の詳細（マシンサイズの選び方・費用・困ったときのフォールバック）は [SETUP.md](SETUP.md) にまとめてあります。**
 
 **② ローカル(amd64 Linux / Windows)**
 
