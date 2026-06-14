@@ -21,8 +21,9 @@ Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 | 0 | スカラー全探索(ベースライン) | AI 0.5・どの天井にも未達 | `vec.DotNaive` |
 | 1 | 内積の SIMD 化(`Float32x8` + FMA) | **縦に上る** → メモリ斜線に張り付く | `vec.Dot` |
 | 2 | バイナリ量子化 + ハミング距離(byte 1/32) | **横に動く** → DRAM 律速を脱出 | `vec.Quantize` + `vec.Hamming` |
-| Bonus | AVX-512 VPOPCNT で popcount も SIMD 化 | 変えた表現の上で再び縦に上る | `vec.HammingSIMD` |
 | 仕上げ | binary で粗く絞って float32 で rerank | 精度軸(Recall@10 0.18→0.87) | `Index.SearchBinaryRerank` |
+
+> 本編で使う SIMD は **AVX2 + FMA だけ**(Stage 1 と仕上げの内積)。だから **GitHub Codespaces にどの CPU が当たっても全ステージ再現します**。AVX-512 VPOPCNT は Stage 2 で見たとおり量子化後は速くならないので本編では扱いません(AVX-512 機で試したい人向けの付録 `vec.HammingSIMD` のみ残置)。
 
 中核メッセージ: **SIMD だけが高速化じゃない。ルーフラインで天井を見れば、
 「縦に上る(実装効率)」と「横に動く(データ表現)」のどちらを打つべきかが図から決まる。
@@ -38,10 +39,11 @@ Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 `.devcontainer/` に Go 1.26 + `GOEXPERIMENT=simd` 環境を定義済み。開いてそのまま:
 
 ```sh
-make test      # 正しさの確認
-make roofline  # 各 Stage の GFLOP/s・AI・MB/query を表示して「図に点を打つ」
-make bench     # 全ステージのベンチ
-make recall    # Recall@10(binary vs rerank)
+make test       # 正しさの確認
+make roofline   # 各 Stage の GFLOP/s・AI・MB/query を表示して「図に点を打つ」
+make bench      # 本編フル(Stage 0/1/2 + rerank)。AVX2+FMA だけで完結
+make recall     # Recall@10(binary vs rerank)
+make bench-bonus # (付録) AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
 ```
 
 `make roofline` の出力例(点を打つ = ルーフラインの①②):

@@ -8,14 +8,14 @@
 
 ## 結論（先に）
 
-| 環境 | 正しさのテスト | Stage 0/2 (スカラー) | Stage 1 SIMD 内積 | Bonus AVX-512 | 本番ベンチ再現 |
+| 環境 | 正しさのテスト | Stage 0/2 (スカラー) | Stage 1 SIMD 内積 | 付録 AVX-512 | 本編ベンチ再現 |
 |---|---|---|---|---|---|
 | **arm64 ネイティブ** (Apple M3 Pro) | ✅ `make test` | ✅ フォールバック | ❌ | ❌ | ❌ 絶対値は参考程度 |
 | **Rosetta** (`GOARCH=amd64`) | ✅ | ✅ | ❌ **FMA=false** | ❌ AVX-512 非対応 | △ 量子化は再現、SIMD 内積は不可 |
 | **Docker `linux/amd64`** (Apple Silicon 上) | ❌ ビルドクラッシュ / CPUID 全 false | △ バイナリ実行のみ | ❌ | ❌ | ❌ 使わない |
 | **amd64 実機** (Codespaces / AWS c7i) | ✅ | ✅ | ✅ | ✅ | ✅ `make remote-bench` |
 
-**推奨**: 教材・記事の数字は **amd64 実機** で取る。Apple Silicon では **arm64 で `make test`**（正しさ）、**Rosetta で Stage 2 まで動作確認**が現実的。
+**推奨**: 本編(Stage 0/1/2 + rerank)で使う SIMD は **AVX2 + FMA だけ**なので、参加者・記事の数字は **GitHub Codespaces 一本**で全ステージ取れる(当たる CPU の Intel/AMD・世代を問わず再現)。AVX-512 VPOPCNT は本編フロー外の**付録**で、`infra/` の AWS c7i でだけ実機確認する。Apple Silicon の手元では **arm64 で `make test`**（正しさ）、**Rosetta で Stage 2 まで動作確認**が現実的。
 
 ## 調査方法
 
@@ -43,7 +43,7 @@ make isa-report    → 全 archsimd.X86 = false
 ```
 
 - `simd/archsimd` は **amd64 専用**だが、ビルドタグでスカラーフォールバックに切り替わりテストは通る
-- Stage 1 / Bonus の SIMD コードはコンパイルされない（`goexperiment.simd && amd64`）
+- Stage 1 / 付録 の SIMD コードはコンパイルされない（`goexperiment.simd && amd64`）
 
 ベンチ参考 (1 クエリ, 10万件):
 
@@ -74,7 +74,7 @@ BenchmarkSearchNaive  33.1 ms/op  (arm64 スカラー)
 | 1 | `Float32x8.MulAdd` | **FMA** | ❌ |
 | 1 | `vzeroupper` | AVX | ✅ (到達前にガードで落ちる) |
 | 2 | `Hamming` | スカラー POPCNT | ✅ |
-| Bonus | `Uint64x4.OnesCount` | AVX512VPOPCNTDQ | ❌ |
+| 付録 | `Uint64x4.OnesCount` | AVX512VPOPCNTDQ | ❌ |
 | 仕上げ | `SearchBinaryRerank` | binary ✅ + Dot は Naive | △ |
 
 ### ベンチ参考 (Rosetta, 1 クエリ)
@@ -132,9 +132,12 @@ SearchBinaryRerank    0.73 ms  (39x, Recall@10=0.87)
 量子化 Stage まで手元で触りたい
   → GOARCH=amd64 GOEXPERIMENT=simd go test ./...  (Rosetta)
 
-SIMD 内積・AVX-512・記事のベンチ数字を再現したい
-  → Codespaces / devcontainer (amd64 ホスト)
-  → make remote-bench  (AWS c7i)
+本編(Stage 0/1/2 + rerank)を再現したい = SIMD 内積・量子化・記事の数字
+  → Codespaces / devcontainer (amd64 ホスト)  ← AVX2+FMA だけなのでどの CPU でも再現
+  → make bench
+
+(付録) AVX-512 VPOPCNT を実機で確かめたい
+  → make remote-bench / make bench-bonus  (AWS c7i = AVX-512 + VPOPCNTDQ)
 
 CPU feature を確認したい
   → make isa-report  (Rosetta 上で GOARCH=amd64)

@@ -3,7 +3,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 roofline roofline-batch roofline-ceiling recall cpuinfo isa-report
+.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus roofline roofline-batch roofline-ceiling recall cpuinfo isa-report
 
 test:
 	$(GO) test ./...
@@ -20,11 +20,17 @@ bench1:
 bench2:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
-## Bonus: AVX-512 VPOPCNT + rerank
+## 仕上げ: Stage 0/1/2 + float32 rerank(本編の最終形。AVX2+FMA だけで完結)
 bench3:
-	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch' -benchtime 2s
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary|BinaryRerank)$$' -benchtime 2s
 
 bench: bench3
+
+## (付録) AVX-512 VPOPCNT で popcount を SIMD 化。Stage 2 で見たとおり量子化後はキャッシュ
+## 律速で速くならない(SearchBinarySIMD ≧ SearchBinary)ことの確認用。本編フロー外。
+## AVX-512 + VPOPCNTDQ 機(AWS c7i 等)以外ではスカラにフォールバックする。
+bench-bonus:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchBinarySIMD$$' -benchtime 2s
 
 ## ルーフライン: 各 Stage の GFLOP/s・AI・MB/query を表示して図に「点を打つ」
 ## (Stage 0 naive → 1 SIMD → 2 binary の3点。docs/workshop/workshop.md 参照)

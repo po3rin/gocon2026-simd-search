@@ -367,6 +367,13 @@ VMOVDQU X2, 0x398(SP)     # acc をスタックへ書き戻し
   ガードは `X86.AVX2() && X86.FMA()` の2段で書く
 - **`Uint64x4.OnesCount`(VPOPCNTQ)は AVX512VPOPCNTDQ が必要**。AVX2 のみの CPU には
   SIMD popcount が存在しないため、本編はスカラー `math/bits.OnesCount64` を採用
-- AWS c7i(Sapphire Rapids / Xeon 8488C)は AVX-512 + VPOPCNTDQ をフル装備。
-  ベンチ環境は `infra/` の Terraform 一式 + `make remote-bench` で再現できる
-- GitHub Codespaces を本番環境にする予定のため、応募後に同条件で再計測する
+- **本編(Stage 0/1/2 + rerank)で使う SIMD は AVX2 + FMA だけ**。これは過去10年の x86
+  (Intel Haswell 2013+ / AMD 2015+)がほぼ全て持つので、**参加者環境は GitHub Codespaces
+  一本で全ステージ再現できる**(当たる CPU の Intel/AMD・世代を問わない)。`make bench` がこれ。
+- **AVX-512 VPOPCNT(`SearchBinarySIMD`)は本編フロー外の付録に降格**。量子化後はキャッシュ
+  律速で popcount を SIMD 化しても速くならない(本ログ Step 5: SearchBinarySIMD 0.75ms ≧
+  スカラ SearchBinary 0.68ms)うえ、全 CPU にあるとも限らないため。コードとこの実測は
+  証拠として残置(`make bench-bonus`)。
+- AWS c7i(Sapphire Rapids / Xeon 8488C)は AVX-512 + VPOPCNTDQ をフル装備。**付録の AVX-512
+  を実機で確かめる用**として `infra/` の Terraform 一式 + `make remote-bench` を残す。
+  本ログの Step 実測はこの c7i 上の記録(=史実)。Codespaces で本編を取り直す際は別途追記する。

@@ -21,8 +21,8 @@
 - Stage 1完了直後に `go build -gcflags=-S` で `VFMADD231PS` が出ていることを30秒見せる(「あなたのGoコードがこのCPU命令になった」)
 - Stage 1の「全探索1.6x止まり」で、図のメモリ斜線に点が張り付くのを見せてから「幅を倍にしても天井は動かない」を予言→確認の順で出す(ルーフラインの予言力の山場)
 - 量子化のrecall劣化は「具体的な誤ヒット例」を1つ仕込んでスクリーンに出す(数字より笑いと納得)
-- 早く終わった人向けの改造ネタ: アキュムレータ本数を変える、`Float32x16`(AVX-512)に差し替え、`Uint64x4.OnesCount`、int8量子化でAIを右へ
-- AVX-512デモ用に AWS c7i / GCP c3 など Sapphire Rapids世代のVMを1台用意
+- 早く終わった人向けの改造ネタ: アキュムレータ本数を変える、クエリのバッチ化でAIを右へ、int8量子化でAIを右へ、`Float32x16`/`Uint64x4.OnesCount`(どちらも AVX-512 機のみ・付録)に差し替え
+- (付録) AVX-512 を見せたい場合のみ AWS c7i / GCP c3 など Sapphire Rapids世代のVMを1台用意(本編はCodespacesだけで完結)
 
 ## 実測値(AWS c7i / Xeon 8488C、Go 1.26.4、10万ベクトル×384次元)
 
@@ -36,5 +36,5 @@
 | 仕上げ: + float32 SIMD rerank(精度回復) | 精度軸(Recall@10 0.18→0.87) | 0.67 ms/query | **40x** |
 | bonus: unsafe + VZEROUPPER 最適化 | sub-ceilingを掃除しメモリ天井へ | 23.5 ns(カーネル) | 8.7x |
 
-※ **上の倍率はこの c7i 固有の実測例**。CPU・キャッシュ・帯域で変わるため、当日は各自のベンチで点を打って確かめる(=数値を約束しない設計)。Codespaces(本番環境)での再計測は応募後に実施。
+※ **上の倍率はこの c7i 固有の実測例**。CPU・キャッシュ・帯域で変わるため、当日は各自のベンチで点を打って確かめる(=数値を約束しない設計)。本編(AVX2+FMA)はCodespacesだけで全ステージ再現でき、Codespacesでの本編再計測は応募後に実施。
 ※ 調査の副産物として「Go 1.26 simd は VZEROUPPER を自動挿入せず、SIMD関数の呼び出しごとに〜550cycleの隠れ税が発生しうる」という(おそらく)未報告の知見を得た(modern Intel = Sapphire Rapids での実測)。ルーフライン上では「メモリ天井に届く前に越えるべき隠れ sub-ceiling」として現れる。詳細は docs/dev/OPTIMIZATION_LOG.md。golang/go への issue 報告予定(関連: #77647)。

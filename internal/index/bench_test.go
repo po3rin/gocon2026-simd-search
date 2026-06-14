@@ -107,7 +107,8 @@ func BenchmarkSearchBinary(b *testing.B) {
 	reportBinaryRoofline(b, iters)
 }
 
-// Bonus: バイナリ量子化 + AVX-512 VPOPCNT(変えた表現の上で再び SIMD)。
+// 付録(本編フロー外): バイナリ量子化 + AVX-512 VPOPCNT。量子化後はキャッシュ律速で
+// 速くならない(≧ SearchBinary)ことの確認用。make bench-bonus。
 func BenchmarkSearchBinarySIMD(b *testing.B) {
 	benchSetup()
 	b.SetBytes(benchN * benchDim / 8)

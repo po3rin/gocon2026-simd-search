@@ -81,7 +81,10 @@ func (ix *Index) SearchBinary(q []float32, k int) []Result {
 	return t.results()
 }
 
-// SearchBinarySIMD is the bonus stage: Hamming with AVX-512 VPOPCNT.
+// SearchBinarySIMD is an appendix path (本編フロー外): Hamming with AVX-512 VPOPCNT.
+// 量子化後はキャッシュ律速で popcount を SIMD 化しても速くならない(計測上 SearchBinarySIMD
+// ≧ SearchBinary)ため、本編 Stage には含めず付録として残置。AVX-512 機向け(make bench-bonus)。
+// 非対応 CPU では vec.HammingSIMD がスカラ Hamming にフォールバックする。
 func (ix *Index) SearchBinarySIMD(q []float32, k int) []Result {
 	code := make([]uint64, ix.Words)
 	vec.Quantize(q, code)
