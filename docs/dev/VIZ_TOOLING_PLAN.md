@@ -141,7 +141,25 @@
   ホットスポットが自明で得るものが薄かった(上記)。撤去済み。
 - **採用済み**: `cmd/roofline-decompose` + `make roofline-decompose`(メモリ時間 vs 演算時間の反転図、
   go test の実測天井から計算)。workshop §06 Stage 2 に掲載。
-- **未着手(任意)**: 施策3(`make roofline-plot` 対話ルーフライン) / 施策2(`make ssa` / `make disasm` codegen 可視化)。
+- **施策3 = ✅ 採用(2026-06-15 実装)**: `cmd/roofline-plot`(Pure Go・依存ゼロ、手書き HTML+SVG)+
+  `make roofline-plot` / `remote-roofline-plot`。`go test -bench` 出力を自前パースし、`AI(flop/byte)`+
+  `GFLOP/s` を持つ点(Naive / SIMD / BatchNaive / BatchSIMD)を log-log ルーフラインにプロット。各点から
+  天井へ点線を引き「天井の何%」を表示、hover ツールチップ付き。`-peak`/`-bw`/`-tpeak` で天井を渡す。
+  **go-echarts / x-perf は採用しなかった**: このリポは go.mod 依存ゼロが売り(workshop「外部ライブラリ
+  なし」)で、roofline-decompose と同じ手書き SVG 方式に揃えた。workshop §06 冒頭に差し込み済み。
+- **施策2 = ✅ 採用(2026-06-15 実装, 06-15 修正)**: `make spill`(`go test -gcflags=-S`, amd64 クロスコンパイル)。
+  workshop §05 の「コラム: register spill を見る」に注釈付き機械語抜粋で差し込み。
+  - **当初 `make ssa`(GOSSAFUNC=Dot)/ `make disasm`(objdump Dot)で実装したが、実機検証で対象が誤りと判明**:
+    `Dot` はアキュムレータ2本で **hot loop は spill しない**(Y レジスタ常駐)。`ssa.html` の `StoreReg`×12 は
+    末尾の水平和/ポインタ退避で、§05 が言う spill ではなかった。**spill は 12本アキュムレータの
+    `BenchmarkPeakFLOP_AVX2` ループで起きる**(25.5 GFLOP/s 天井の正体)。→ `Dot` ではなくこちらを対象に修正。
+  - **採用ツールは `go test -gcflags=-S`**: コンパイラ自身の Plan9 アセンブリは `VFMADD213PS` を正名で出し、
+    spill が `VMOVDQU aN+NNN(SP),Y → VFMADD → VMOVDQU Y,aN+NNN(SP)` の三つ組として1行ずつ読める。
+    `go tool objdump` は 3-byte VEX の `VFMADD` を誤デコードし(ymm を X 表示・OUTL/ROLL 化)、SIMD acc の
+    spill も明瞭に出ないため**不採用**。GOSSAFUNC の `ssa.html` は HTML テーブルでテキスト抜粋しづらく、かつ
+    対象が `Dot` だと spill が出ないので**不採用**。
+  - llvm-mca / uiCA はポート圧の深掘り脚注(本編 40 分の範囲外)として workshop に明記。
+- **未着手(任意)**: godbolt セルフホスト(`GOEXPERIMENT=simd` 対応の公開鯖が無い問題)。
 
 ## あえて入れないもの(理由)
 

@@ -3,7 +3,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus roofline roofline-batch roofline-ceiling roofline-decompose recall cpuinfo isa-report
+.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report
 
 test:
 	$(GO) test ./...
@@ -58,6 +58,28 @@ roofline-decompose:
 	  && rsvg-convert -w 1920 docs/images/memory-vs-compute-roofline.svg -o docs/images/memory-vs-compute-roofline.png \
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
+## 実測値から対話的ルーフライン HTML を生成(docs/workshop §06)。叩くたびに点が打たれ、
+## Stage 1(AI=0.5)はメモリ壁に張り付き、Stage 2 バッチ(AI=16)はリッジを越えて演算側へ動く。
+## 自分のマシンの天井で: make roofline-plot PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
+## 理論ピークの線も出すなら TPEAK=100(AVX2 理論値・CPU 依存なので既定は off)。
+## ※ amd64 (Codespaces/AWS) で実行して初めて意味のある数字になる。arm64 はスカラ退避で潰れる。
+TPEAK ?= 0
+roofline-plot:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s \
+	  | $(GO) run ./cmd/roofline-plot -peak $(PEAK) -bw $(BW) -tpeak $(TPEAK) > /tmp/roofline.html
+	@echo "open /tmp/roofline.html"
+
+## register spill を見る(docs/workshop §05)。演算ピーク(12本アキュムレータ)ループ
+## BenchmarkPeakFLOP_AVX2 の機械語をコンパイラ -S で出し、各アキュムレータ aN が毎回
+## 「ロード(SP)→VFMADD→ストア(SP)」= Go 1.26 archsimd が SIMD 値をレジスタに保てず退避(spill)
+## している様子を表示する(12本+m+c=14 で 16本の Y レジスタに本来収まる=本数圧ではない)。
+## amd64 用にクロスコンパイルするので mac でも可(objdump と違い -S は VFMADD を正名で出す)。
+spill:
+	GOARCH=amd64 $(GO) test -gcflags=-S -c -o /dev/null ./internal/vec 2>&1 \
+	  | awk '/\tTEXT\t.*BenchmarkPeakFLOP_AVX2\(SB\)/{f=1;next} /\tTEXT\t/{f=0} f' \
+	  | grep -E 'VFMADD|a[0-9]+\+[0-9]+\(SP\)' \
+	  | sed -E 's#\(/[^)]*\)##; s#github\.com/[^ ]*/internal/vec\.##g'
+
 ## Recall@10 の計測(binary vs binary+rerank)
 recall:
 	$(GO) test ./internal/index -run TestRecall -v
@@ -79,7 +101,7 @@ REMOTE      := ubuntu@$(REMOTE_HOST)
 REMOTE_DIR  := simd-search
 REMOTE_RUN  = ssh $(SSH_OPTS) $(REMOTE) 'cd $(REMOTE_DIR) && GOEXPERIMENT=simd go
 
-.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-batch remote-roofline-ceiling remote-recall remote-cpuinfo
+.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-batch remote-roofline-ceiling remote-roofline-plot remote-recall remote-cpuinfo
 
 remote-sync:
 	@test -n "$(REMOTE_HOST)" || (echo "VM がない: cd infra && terraform apply" && exit 1)
@@ -103,6 +125,12 @@ remote-roofline-batch: remote-sync
 ## AVX-512 VM で天井そのもの(演算ピーク + メモリ帯域)を実測
 remote-roofline-ceiling: remote-sync
 	$(REMOTE_RUN) test ./internal/vec -run - -bench "BenchmarkPeak(FLOP|ReadBW|TriadBW)" -benchtime 2s'
+
+## AVX-512 VM の実測でルーフライン HTML を生成(描画はローカルで)。天井は PEAK/BW で渡す。
+remote-roofline-plot: remote-sync
+	$(REMOTE_RUN) test ./internal/index -run - -bench "BenchmarkSearch(Naive|SIMD|BatchNaive|BatchSIMD)$$" -benchtime 2s' \
+	  | $(GO) run ./cmd/roofline-plot -peak $(PEAK) -bw $(BW) -tpeak $(TPEAK) > /tmp/roofline.html
+	@echo "open /tmp/roofline.html"
 
 remote-recall: remote-sync
 	$(REMOTE_RUN) test ./internal/index -run TestRecall -v'
