@@ -14,14 +14,19 @@ type Result struct {
 	Score float32
 }
 
-// Index holds the vectors in two representations:
-// float32(正確・重い)と binary code(粗い・1/32 サイズ)。
+// Index holds the vectors in multiple representations:
+// float32(正確・重い)、binary code(粗い・1/32 サイズ)、
+// int8 code(付録A: 1/4 サイズ・BuildInt8 で構築)。
 type Index struct {
 	Dim   int
 	Words int
 	N     int
 	Data  []float32 // N*Dim, row-major
 	Codes []uint64  // N*Words, sign-bit quantized
+
+	// 付録A(int8 量子化)。BuildInt8() を呼ぶまで空。
+	Codes8 []int8    // N*Dim, symmetric int8 quantized
+	Scales []float32 // N, per-vector scale(復元は q8*scale ≈ fp32)
 }
 
 // New creates an empty index for dim-dimensional vectors.

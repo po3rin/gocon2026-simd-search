@@ -3,7 +3,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report
+.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report
 
 test:
 	$(GO) test ./...
@@ -32,6 +32,29 @@ bench: bench3
 ## AVX-512 + VPOPCNTDQ 機(AWS c7i 等)以外ではスカラにフォールバックする。
 bench-bonus:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchBinarySIMD$$' -benchtime 2s
+
+## 寄り道: goroutine 並列はどの天井に効くか(workshop.md 寄り道節)。
+## メモリ律速の全探索(B=1)はコアが DRAM 帯域を取り合うのでサブリニア、
+## 演算律速のバッチ(B=32)はほぼリニアに伸びる。
+bench-parallel:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Parallel|BatchParallel)$$' -benchtime 2s
+
+## N スイープ(workshop.md Stage 1 コラム): DB サイズを 1k→1M と振り、
+## キャッシュに収まる間は SIMD が効き、DRAM に溢れると倍率が崩れるのを見る。
+## 1M の index 構築(数秒)が初回に走る。
+bench-nsweep:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchSweep$$' -benchtime 1s -timeout 30m
+
+## 付録A: int8 量子化(1/4 サイズ)。カーネル(VPMOVSXBW+VPMADDWD)と全探索。
+## 精度は make recall(TestRecallInt8 も走る)で確認。
+bench-int8:
+	$(GO) test ./internal/vec -run - -bench 'BenchmarkDotInt8(Naive|SIMD)$$' -benchtime 2s
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchInt8$$' -benchtime 2s
+
+## 付録B: MaxSim(late interaction)。1ロードに多数の内積がタスクに内在
+## = 最初から演算律速で、SIMD が最初から効く検索方式。
+bench-maxsim:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s
 
 ## ルーフライン: 各 Stage の GFLOP/s・AI・MB/query を表示して図に「点を打つ」
 ## (Stage 0 naive → 1 SIMD → 2 binary の3点。docs/workshop/workshop.md 参照)
@@ -82,7 +105,7 @@ spill:
 	  | grep -E 'VFMADD|a[0-9]+\+[0-9]+\(SP\)' \
 	  | sed -E 's#\(/[^)]*\)##; s#github\.com/[^ ]*/internal/vec\.##g'
 
-## Recall@10 の計測(binary vs binary+rerank)
+## Recall@10 の計測(binary vs binary+rerank、付録A の int8 も)
 recall:
 	$(GO) test ./internal/index -run TestRecall -v
 
