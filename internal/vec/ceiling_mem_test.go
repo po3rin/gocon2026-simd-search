@@ -10,7 +10,7 @@ import "sync"
 //     単コアが DRAM から実際に引ける帯域を測れるので、これが天井の実測値。
 //   - ceiling_mem_scalar_test.go : amd64/SIMD 以外向けのスカラー fallback。
 //
-// 配列は LLC を確実に溢れさせる 256MB。GB/s を ReportMetric で出す。
+// 配列は L3 キャッシュを確実に溢れさせる 256MB。GB/s を ReportMetric で出す。
 // 詳細は docs/workshop/workshop.md。
 //
 // ※ スカラー縮約(a += x[i])でこれを測ると、float 加算の発行/レイテンシで律速して
@@ -18,7 +18,7 @@ import "sync"
 //    達成する帯域すら下回ってしまい、ルーフライン上で点が屋根の上に来てしまう。
 //    そのため天井ベンチも検索と同じ SIMD ロードで測る。詳細は OPTIMIZATION_LOG.md。
 
-const memN = 1 << 26 // 67,108,864 float32 = 256 MB(LLC 溢れ確実)。64/32 で割り切れる
+const memN = 1 << 26 // 67,108,864 float32 = 256 MB(L3 溢れ確実)。64/32 で割り切れる
 
 var (
 	memOnce       sync.Once
