@@ -41,7 +41,7 @@ func HammingSIMD(a, b []uint64) int {
 	var buf [4]uint64
 	acc0.Add(acc1).StoreSlice(buf[:])
 	// 呼び出し元のスカラー float コード(topK の比較など)を遷移ペナルティから守る
-	vzeroupper()
+	archsimd.ClearAVXUpperBits()
 	d := int(buf[0] + buf[1] + buf[2] + buf[3])
 	for i := range a {
 		d += bits.OnesCount64(a[i] ^ b[i])
