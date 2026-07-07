@@ -72,7 +72,7 @@ BenchmarkSearchNaive  33.1 ms/op  (arm64 スカラー)
 | 0 | `bits.OnesCount64` | スカラー POPCNT | ✅ |
 | 1 | `LoadFloat32x8Slice` | AVX2 | ✅ |
 | 1 | `Float32x8.MulAdd` | **FMA** | ❌ |
-| 1 | `vzeroupper` | AVX | ✅ (到達前にガードで落ちる) |
+| 1 | `archsimd.ClearAVXUpperBits` | AVX | ✅ (到達前にガードで落ちる) |
 | 2 | `Hamming` | スカラー POPCNT | ✅ |
 | 付録 | `Uint64x4.OnesCount` | AVX512VPOPCNTDQ | ❌ |
 | 仕上げ | `SearchBinaryRerank` | binary ✅ + Dot は Naive | △ |

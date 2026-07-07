@@ -95,7 +95,7 @@ func BenchmarkSearchSIMD(b *testing.B) {
 	reportFloatRoofline(b, iters)
 }
 
-// Stage 2: バイナリ量子化 + スカラー popcount。横に動いて DRAM 律速を脱出。
+// Stage 4: バイナリ量子化 + スカラー popcount。右上に動いて DRAM 律速を脱出。
 func BenchmarkSearchBinary(b *testing.B) {
 	benchSetup()
 	b.SetBytes(benchN * benchDim / 8)
@@ -107,7 +107,7 @@ func BenchmarkSearchBinary(b *testing.B) {
 	reportBinaryRoofline(b, iters)
 }
 
-// 付録(本編フロー外): バイナリ量子化 + AVX-512 VPOPCNT。量子化後はキャッシュ律速で
+// 付録B(本編フロー外): バイナリ量子化 + AVX-512 VPOPCNT。量子化後はキャッシュ律速で
 // 速くならない(≧ SearchBinary)ことの確認用。make bench-bonus。
 func BenchmarkSearchBinarySIMD(b *testing.B) {
 	benchSetup()
@@ -120,7 +120,7 @@ func BenchmarkSearchBinarySIMD(b *testing.B) {
 	reportBinaryRoofline(b, iters)
 }
 
-// 仕上げ: バイナリ検索 + float32 rerank(精度軸。Recall@10 0.18→0.87)。
+// Stage 5(仕上げ): バイナリ検索 + float32 rerank(精度軸。Recall@10 0.18→0.87)。
 func BenchmarkSearchBinaryRerank(b *testing.B) {
 	benchSetup()
 	for b.Loop() {

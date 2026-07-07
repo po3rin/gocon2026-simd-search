@@ -3,7 +3,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report
+.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report
 
 test:
 	$(GO) test ./...
@@ -12,28 +12,56 @@ test:
 bench0:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchNaive$$' -benchtime 2s
 
-## Stage 1: SIMD 内積
+## Stage 1: SIMD 内積(カーネル単体 + 全探索の2粒度。workshop.md Stage 1 の 6.3x / 4.5x を再現)
 bench1:
+	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD)$$' -benchtime 2s
 
-## Stage 2: バイナリ量子化
+## Stage 4: バイナリ量子化(1bit・1/32)
 bench2:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
-## 仕上げ: Stage 0/1/2 + float32 rerank(本編の最終形。AVX2+FMA だけで完結)
+## Stage 5(仕上げ): スカラ/SIMD/バイナリ + float32 rerank(本編の最終形。AVX2+FMA だけで完結)
 bench3:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary|BinaryRerank)$$' -benchtime 2s
 
 bench: bench3
 
-## (付録) AVX-512 VPOPCNT で popcount を SIMD 化。Stage 2 で見たとおり量子化後はキャッシュ
+## (付録B) AVX-512 VPOPCNT で popcount を SIMD 化。Stage 4 で見たとおり量子化後はキャッシュ
 ## 律速で速くならない(SearchBinarySIMD ≧ SearchBinary)ことの確認用。本編フロー外。
 ## AVX-512 + VPOPCNTDQ 機(AWS c7i 等)以外ではスカラにフォールバックする。
 bench-bonus:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchBinarySIMD$$' -benchtime 2s
 
+## 寄り道: goroutine 並列はどの天井に効くか(workshop.md 寄り道節)。
+## メモリ律速の全探索(B=1)はコアが DRAM 帯域を取り合うのでサブリニア、
+## 演算律速のバッチ(B=32)はほぼリニアに伸びる。
+bench-parallel:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Parallel|BatchParallel)$$' -benchtime 2s
+
+## N スイープ(workshop.md Stage 1 コラム): DB サイズを 1k→1M と振り、
+## キャッシュに収まる間は SIMD が効き、DRAM に溢れると倍率が崩れるのを見る。
+## 1M の index 構築(数秒)が初回に走る。
+bench-nsweep:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchSweep$$' -benchtime 1s -timeout 30m
+
+## Stage 3: int8 量子化(1/4 サイズ)。カーネル(VPMOVSXBW+VPMADDWD)と全探索。
+## 精度は make recall(TestRecallInt8 も走る)で確認。
+bench-int8:
+	$(GO) test ./internal/vec -run - -bench 'BenchmarkDotInt8(Naive|SIMD)$$' -benchtime 2s
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchInt8$$' -benchtime 2s
+
+## Stage 3 の精度: int8 単体の Recall@10(本編の進行用 — binary/rerank の行は Stage 4/5 で見る)
+recall-int8:
+	$(GO) test ./internal/index -run 'TestRecallInt8$$' -v
+
+## 付録A: MaxSim(late interaction)。1ロードに多数の内積がタスクに内在
+## = 最初から演算律速で、SIMD が最初から効く検索方式。
+bench-maxsim:
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s
+
 ## ルーフライン: 各 Stage の GFLOP/s・AI・MB/query を表示して図に「点を打つ」
-## (Stage 0 naive → 1 SIMD → 2 binary の3点。docs/workshop/workshop.md 参照)
+## (Stage 0 naive → 1 SIMD → 4 binary の3点。docs/workshop/workshop.md 参照)
 roofline:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
@@ -43,15 +71,15 @@ roofline-batch:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s
 
 ## ルーフラインの天井そのものを実測: 演算ピーク(FMA飽和) + メモリ帯域(read/triad)
-## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §04)
+## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §05)
 roofline-ceiling:
-	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP|ReadBW|TriadBW)' -benchtime 2s
+	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|ReadBW|TriadBW)$$' -benchtime 2s
 
 ## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(docs/workshop §06 Stage 2)
 ## 自分のマシンの天井で: make roofline-decompose PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
 ## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
-PEAK ?= 25.51
-BW   ?= 18.39
+PEAK ?= 25.59
+BW   ?= 20.80
 roofline-decompose:
 	$(GO) run ./cmd/roofline-decompose -peak $(PEAK) -bw $(BW) > docs/images/memory-vs-compute-roofline.svg
 	@command -v rsvg-convert >/dev/null 2>&1 \
@@ -71,8 +99,9 @@ roofline-plot:
 
 ## register spill を見る(docs/workshop §05)。演算ピーク(12本アキュムレータ)ループ
 ## BenchmarkPeakFLOP_AVX2 の機械語をコンパイラ -S で出し、各アキュムレータ aN が毎回
-## 「ロード(SP)→VFMADD→ストア(SP)」= Go 1.26 archsimd が SIMD 値をレジスタに保てず退避(spill)
-## している様子を表示する(12本+m+c=14 で 16本の Y レジスタに本来収まる=本数圧ではない)。
+## 「ロード(SP)→VFMADD→ストア(SP)」とスタックへ退避(spill)している様子を表示する。
+## 12本+m+c=14 は使える 15本の Y レジスタ(Y15 は Go ABI の予約ゼロレジスタ:
+## golang/go#76969)に収まる数なので、本数圧ではなく Go 1.26 のコード生成の問題。
 ## amd64 用にクロスコンパイルするので mac でも可(objdump と違い -S は VFMADD を正名で出す)。
 spill:
 	GOARCH=amd64 $(GO) test -gcflags=-S -c -o /dev/null ./internal/vec 2>&1 \
@@ -80,7 +109,7 @@ spill:
 	  | grep -E 'VFMADD|a[0-9]+\+[0-9]+\(SP\)' \
 	  | sed -E 's#\(/[^)]*\)##; s#github\.com/[^ ]*/internal/vec\.##g'
 
-## Recall@10 の計測(binary vs binary+rerank)
+## Recall@10 の計測(binary / binary+rerank / int8)
 recall:
 	$(GO) test ./internal/index -run TestRecall -v
 
@@ -101,7 +130,7 @@ REMOTE      := ubuntu@$(REMOTE_HOST)
 REMOTE_DIR  := simd-search
 REMOTE_RUN  = ssh $(SSH_OPTS) $(REMOTE) 'cd $(REMOTE_DIR) && GOEXPERIMENT=simd go
 
-.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-batch remote-roofline-ceiling remote-roofline-plot remote-recall remote-cpuinfo
+.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-batch remote-roofline-ceiling remote-roofline-plot remote-recall remote-cpuinfo remote-dotlab remote-dotlab-v3 remote-steps
 
 remote-sync:
 	@test -n "$(REMOTE_HOST)" || (echo "VM がない: cd infra && terraform apply" && exit 1)
@@ -124,7 +153,7 @@ remote-roofline-batch: remote-sync
 
 ## AVX-512 VM で天井そのもの(演算ピーク + メモリ帯域)を実測
 remote-roofline-ceiling: remote-sync
-	$(REMOTE_RUN) test ./internal/vec -run - -bench "BenchmarkPeak(FLOP|ReadBW|TriadBW)" -benchtime 2s'
+	$(REMOTE_RUN) test ./internal/vec -run - -bench "BenchmarkPeak(FLOP_AVX2|ReadBW|TriadBW)$$" -benchtime 2s'
 
 ## AVX-512 VM の実測でルーフライン HTML を生成(描画はローカルで)。天井は PEAK/BW で渡す。
 remote-roofline-plot: remote-sync

@@ -386,6 +386,139 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
 - Stage 1 の演出は「1.6x 止まり=無力」→「効いた(4.2x)が壁に張り付く・倍率は CPU 次第」に再フレーム。
   倍率は機械依存だが「最後はメモリ壁で頭打ち/量子化が本命」という骨格は不変。
 
+## Step 8: レビュー反映 — 自作 asm を標準 API へ・教材とコマンドの整合(2026-07-07)
+
+計測ではなく、ワークショップ資料レビューを受けたコード/教材の洗練。数値の変更はない。
+
+- **`vzeroupper_amd64.s`(自作3行アセンブリ)を削除**し、全呼び出しを Go 1.26 標準の
+  `archsimd.ClearAVXUpperBits()`(中身は同じ VZEROUPPER 1命令)に置換。
+  「アセンブリも cgo も書かない」という教材の主張が完全になった。
+  amd64 クロスコンパイルの `-S` 出力で VZEROUPPER が同数(7箇所)生成されることを確認済み。
+- **register spill の説明を正確化**: 「16本の Y レジスタ」は誤りで、Y15 は Go 内部 ABI の
+  予約ゼロレジスタのため**使えるのは15本**([golang/go#76969](https://github.com/golang/go/issues/76969)
+  で not planned としてクローズ)。12本+m+c=14 は 15 本に収まる数、という論旨は変わらず。
+- **`make bench1` にカーネル単体ベンチ(`BenchmarkDot(Naive|SIMD)`)を追加**。
+  資料の 339ns → 55.9ns(6.1x)を参加者が再現できるコマンドが無かったため。
+- **`make roofline-ceiling` の -bench 正規表現をアンカー**(`FLOP_AVX2|...$`)。
+  従来は `_4acc` にもマッチして4本走っていた(資料は「3つの数字」と説明)。
+- **`cmd/isa-report` をビルドタグで分割**(`report_amd64.go` + stub)。
+  arm64 で `go test ./...` が isa-report の archsimd import で FAIL していたのを解消。
+- 資料(workshop.md)側: 47x/43x の取り違え修正、Xor が整数ベクトル専用である旨の明記、
+  持ち帰り節の書き直し(int8 量子化は `DotProductPairs(Saturated)` + `SaturateToInt8` で
+  Go 1.26 でも実装可能・Go 1.27 の portable simd / arm64 対応に言及)、
+  出力例を実コマンドの出力形式に整合、roofline-batch の数値を本ログ Step 7 の記録値に統一。
+
+## Step 9: 4コア Codespace(参加者と同条件)で全編を再計測(2026-07-07)
+
+SETUP.md は参加者に **4-core** を指定しているのに、資料の実測例は 8コア機の記録だった。
+参加者と同じ **standardLinux32gb(4-core / 16GB)** の Codespace(AMD EPYC 7763 / Zen3、
+Go 1.26.4、GOEXPERIMENT=simd は devcontainer 済み)で全コマンドを流し、教材の正本数値を
+この 4コア実測に置き換えた。devcontainer はそのままで動作、`make test` は初回ビルド込み約10秒。
+
+| 計測 | 結果 |
+|---|---|
+| `make bench0` SearchNaive | 35.86 ms/op・2.142 GFLOP/s(AI 0.5・153.6 MB/query) |
+| `make bench1` DotNaive / DotSIMD | 347.7 ns / 55.22 ns = **6.3x**(かねて資料に載っていた 339/55.9 の出所を今回の記録で確定) |
+| `make bench1` SearchSIMD | 7.92 ms・9.70 GF・19.4 GB/s = **4.5x** |
+| `make roofline-ceiling` | **25.59 GFLOP/s** / **20.80 read-GB/s** / 17.36 triad-GB/s(4acc は 13.35) |
+| `make roofline-batch` | B=1 7.95 ms/q 9.66 GF、BatchNaive 34.24 ms/q 2.243 GF、BatchSIMD 5.79 ms/q 13.26 GF = **5.9x** |
+| `make bench2` SearchBinary | 0.768 ms = **46x** |
+| `make bench3` SearchBinaryRerank | 0.825 ms = **43x** |
+| `make recall` | Recall@10: binary=0.180 binary+rerank=0.868(不変) |
+| `make bench-bonus` SearchBinarySIMD | 1.008 ms — VPOPCNT の無い EPYC ではフォールバック分岐のせいで **スカラ SearchBinary(0.77ms)より遅い** |
+| `make spill` / `make isa-report` / `make roofline-plot` | いずれも動作確認済み(spill は従来どおり三つ組を表示) |
+
+**変動幅の記録(重要):** 同一マシン・同一コマンドでも共有VMのノイズで
+read 帯域は **19.31〜20.80 GB/s**、SearchSIMD は **7.90〜8.91 ms**(9.7〜8.6 GF)まで揺れた。
+8コア機の旧記録(read 18.39・達成 18.26 = 99.3%)の「ぴたり一致」は毎回は再現しない。
+→ workshop.md に「±5% 揺れる・**9割を超えていれば壁に到達と読む**」の注記を追加し、
+資料の主張を揺れに対して頑健な形に直した。
+
+**反映:** workshop.md の数値と図(`rl-stage0〜4` / `roofline-plot` / `memory-vs-compute-roofline` /
+`roofline-plot-example`※)を
+4コア実測へ更新(リッジ 1.4→1.3、メモリ上限 9.2→≈10 GF、達成 9.7 GF 等)。
+Makefile の既定天井を `PEAK=25.59` / `BW=20.80` に変更。8コア表記は撤去し SETUP.md の
+4-core 指定と条件を一致させた。
+※ roofline-plot-example.png は、記録済みベンチ出力を `cmd/roofline-plot` に食わせて HTML を再生成し、
+ヘッドレス Chrome(`--window-size=960,600 --force-device-scale-factor=2`)で撮影。再計測不要で再現できる。
+
+## Step 10: 構成拡張 — 並列・N スイープ・int8・MaxSim を実装して実測(2026-07-08)
+
+レビュー第2弾「もっと打てる手は? もっと SIMD が効く題材は?」への回答として、
+本章2つ(寄り道=goroutine 並列、N スイープコラム)と付録2つ(int8、MaxSim)を追加。
+計測は前回と同型の 4-core Codespace(EPYC 7763・物理2コア×SMT2・Go 1.26.4)の別インスタンス。
+このインスタンスは前回より全体に1割ほど遅かった(共有VMの揺れ。資料の注記どおり)。
+
+### 寄り道: goroutine 並列はどの天井に効くか(make bench-parallel)
+
+| workers | 全探索 B=1(メモリ律速) | バッチ B=32(演算律速) |
+|---|---|---|
+| 1 | 9.36 ms(16.4 GB/s) | 6.72 ms/query |
+| 2 | 5.74 ms(26.8 GB/s)= 1.63x | 4.48 ms/query = 1.50x |
+| 4 | 5.20 ms(29.5 GB/s)= **1.80x 頭打ち** | 3.52 ms/query = **1.91x** |
+
+- メモリ律速は合算 ~30 GB/s で**マシン全体の DRAM 帯域**に飽和(2→4 workers で +10% のみ)。
+- 演算律速は 1.9x — この 4 vCPU は `lscpu` で **物理2コア × SMT2** と判明。SMT 兄弟は
+  実行ユニットを共有するので、演算律速は物理コア数の壁に当たる。
+- 教訓: 並列の効きも「何律速か」で決まり、足す前に予測できる。当初の想定
+  (演算律速はほぼリニア)は物理4コア機でのみ成立する点に注意 — 資料には
+  SMT の壁として正直に記載した。Go カンファレンスで必ず出る「goroutine で
+  並列化すれば?」への実測回答。
+
+### N スイープ(make bench-nsweep)
+
+| N | データ量 | naive | SIMD | 倍率 |
+|---|---|---|---|---|
+| 1,000 | 1.5 MB | 351 µs | 60.9 µs | **5.8x** |
+| 10,000 | 15.4 MB | 3.47 ms | 609 µs | **5.7x** |
+| 100,000 | 154 MB | 34.8 ms | 8.83 ms | **3.9x** |
+| 1,000,000 | 1.5 GB | 347 ms | 89.5 ms | **3.9x** |
+
+L3 に収まる間はカーネル並み(5.7〜5.8x)、DRAM に溢れると 3.9x で一定。
+「SIMD が効く境界」がデータサイズ軸にもあることの直接可視化。Stage 1 コラムに採用。
+
+### 付録A: int8 量子化(make bench-int8 / make recall)
+
+- カーネル: DotInt8Naive 364 ns → DotInt8SIMD **34.6 ns = 10.5x**。
+  fp32 SIMD(55 ns)より速い — VPMOVSXBW + VPMADDWD で1命令16要素(fp32 の2倍幅)。
+  signed×signed なので飽和トリック(VPMADDUBSW 系)が不要になり、コードが素直。
+- 全探索: **4.19 ms**(38.4 MB/query・達成 9.2 GB/s)。fp32 SIMD 比 ~2x。
+  転送 1/4 なのに 4x にならないのは、壁が遠のいた分カーネルが新しい律速になったため
+  (AI = 2 flop/byte でリッジの右)— 「律速は消えず移動する」の追加実例。
+- **Recall@10 = 0.948**(binary 0.180 との対比。rerank 不要の実用域)。
+  クラスタ合成データは TestRecall と同一生成器。
+
+### 付録B: MaxSim / late interaction(make bench-maxsim)
+
+1万文書 × 4トークン、クエリ16トークン(AI = Tq/2 = 8 flop/byte が方式に内在):
+naive 239 ms(2.06 GF)→ SIMD **42 ms(11.7 GF)= 5.7x**。
+「バッチ構造が検索方式の仕様として最初から存在する」現代的な題材で、
+Stage 2 の正当化に使える。ColBERT / Qdrant マルチベクトルと同系。
+
+### 実装メモ
+
+- SearchParallel / SearchBatchParallel: DB チャンク分割 + worker ローカル topK をマージ
+  (チャンクが互いに素なので重複処理不要)。
+- bench-bonus の再確認: VPOPCNT 無し機ではフォールバック分岐で SearchBinarySIMD(1.0ms)が
+  スカラ(0.77ms)より遅い — 付録Cに「効かない SIMD」の証拠として記載。
+
+## Step 11: int8 を本編 Stage 3 に昇格 — 「バイト削減のエスカレーション」構成へ(2026-07-08)
+
+計測ではなく構成変更。「SIMD が主役で律速を突破し続ける資料」として、②バイト削減を
+**int8(1/4・Stage 3)→ 1bit(1/32・Stage 4)の2段のエスカレーション**に再構成した。
+
+- 新番号: Stage 3 = int8、Stage 4 = バイナリ量子化、Stage 5 = rerank。
+  付録は A = MaxSim、B = AVX-512 VPOPCNT に再番号。
+- 物語上の利得: (1) 量子化の第一歩で SIMD が主役のまま(整数カーネル 10.5x)、
+  (2) int8 で「律速がメモリ→カーネルへ移動する」というルーフラインの追加ビート、
+  (3) 1bit の Recall 崩壊が「int8 では保てた精度が」という前振り付きで際立つ、
+  (4) Stage 5 末尾に fp32 / int8 / 1bit / 1bit+rerank の**速度×精度の設計空間**表。
+- 図: rl-stage3(int8・新規、AI=2 でリッジ右の点)を作成し、旧 stage3/4 を
+  rl-stage4/5 にリネーム。overview(roofline-plot)に S3 int8 の点を追加。
+- Makefile コメント・isa-report(Stage 3 の int8 API 3行を追加)・README・
+  コードコメントの番号もすべて追随。make ターゲット名は互換のため変更せず
+  (bench2=Stage 4、bench3=Stage 5。対応は workshop.md のコマンド一覧に明記)。
+
 ## 高速化の階段(最終形)
 
 > 倍率は **AWS c7i** の史実。Codespaces(EPYC 7763)の実測は Step 7 を参照(SIMD 全探索の倍率が
@@ -395,8 +528,12 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
 |---|---|---|---|
 | Stage 0 | スカラー全探索 | 28.6 ms | 1.0x |
 | Stage 1 | 内積を SIMD 化(+VZEROUPPER) | 18.0 ms | 1.6x(カーネル単体は 4.6x) |
-| Stage 2 | バイナリ量子化 + スカラー popcount | 0.68 ms | **42x** |
-| 仕上げ | + float32 rerank(精度回復 0.18→0.87) | 0.73 ms | **39x** |
+| Stage 4 | バイナリ量子化 + スカラー popcount | 0.68 ms | **42x** |
+| Stage 5 | + float32 rerank(精度回復 0.18→0.87) | 0.73 ms | **39x** |
+
+> ※ Stage 番号は Step 11 の再構成後のもの(旧 Stage 2=バイナリ、旧 仕上げ=rerank)。
+> Stage 2(バッチ)・Stage 3(int8)・寄り道(並列)は後の構成拡張で追加され、
+> c7i では未計測(EPYC 4-core の実測は Step 9/10)。
 
 ## 付録: 各 Step のコードの場所
 
@@ -411,7 +548,7 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
 | Step 3 | `Quantize` / `Hamming` / `SearchBinary*` | `internal/vec` / `internal/index` |
 | Step 4 | `dotIdx2` / `dotArr2` / `dotUnsafe2` / `dotUnsafe4` / `dotUnsafeVZ2` | `internal/vec/dot_lab_test.go` |
 | Step 4c | `GOAMD64=v3` 実験 | `make remote-dotlab-v3` |
-| Step 5 | `Dot` / `HammingSIMD`(VZEROUPPER入り本実装)+ `vzeroupper_amd64.s` | `internal/vec/dot_simd.go` 等 |
+| Step 5 | `Dot` / `HammingSIMD`(VZEROUPPER入り本実装)| `internal/vec/dot_simd.go` 等(当初の自作 `vzeroupper_amd64.s` は Step 8 で `archsimd.ClearAVXUpperBits()` に置換)|
 
 ※ 罠③(recall を壊す合成データ)だけはコードを残していない。再現したい場合は
 `internal/index/index_test.go` の TestRecall で、センター生成を「正規化してから使う」
@@ -430,7 +567,7 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
   ガードは `X86.AVX2() && X86.FMA()` の2段で書く
 - **`Uint64x4.OnesCount`(VPOPCNTQ)は AVX512VPOPCNTDQ が必要**。AVX2 のみの CPU には
   SIMD popcount が存在しないため、本編はスカラー `math/bits.OnesCount64` を採用
-- **本編(Stage 0/1/2 + rerank)で使う SIMD は AVX2 + FMA だけ**。これは過去10年の x86
+- **本編で使う SIMD は AVX2 + FMA だけ**(int8 カーネルは AVX2 のみ)。これは過去10年の x86
   (Intel Haswell 2013+ / AMD 2015+)がほぼ全て持つので、**参加者環境は GitHub Codespaces
   一本で全ステージ再現できる**(当たる CPU の Intel/AMD・世代を問わない)。`make bench` がこれ。
 - **AVX-512 VPOPCNT(`SearchBinarySIMD`)は本編フロー外の付録に降格**。量子化後はキャッシュ

@@ -20,10 +20,13 @@ Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 |---|---|---|---|
 | 0 | スカラー全探索(ベースライン) | AI 0.5・どの天井にも未達 | `vec.DotNaive` |
 | 1 | 内積の SIMD 化(`Float32x8` + FMA) | **縦に上る** → メモリ斜線に張り付く | `vec.Dot` |
-| 2 | バイナリ量子化 + ハミング距離(byte 1/32) | **横に動く** → DRAM 律速を脱出 | `vec.Quantize` + `vec.Hamming` |
-| 仕上げ | binary で粗く絞って float32 で rerank | 精度軸(Recall@10 0.18→0.87) | `Index.SearchBinaryRerank` |
+| 2 | クエリのバッチ化(B=32・exact) | **横に動く**(AI 16)→ リッジを越えて演算側 | `vec.Dot`(DB ロードを再利用) |
+| 寄り道 | goroutine 並列(workers=1/2/4) | 別の天井(帯域 / 物理コア)に当たる | `Index.SearchParallel` |
+| 3 | int8 量子化(byte 1/4) | **右へ**(AI 2)→ リッジ越え・カーネル律速へ | `vec.QuantizeInt8` + `vec.DotInt8` |
+| 4 | バイナリ量子化 + ハミング距離(byte 1/32) | **右上へ** → DRAM 律速を脱出(Recall 0.18) | `vec.Quantize` + `vec.Hamming` |
+| 5 | binary で粗く絞って float32 で rerank | 精度軸(Recall@10 0.18→0.87) | `Index.SearchBinaryRerank` |
 
-> 本編で使う SIMD は **AVX2 + FMA だけ**(Stage 1 と仕上げの内積)。だから **GitHub Codespaces にどの CPU が当たっても全ステージ再現します**。AVX-512 VPOPCNT は Stage 2 で見たとおり量子化後は速くならないので本編では扱いません(AVX-512 機で試したい人向けの付録 `vec.HammingSIMD` のみ残置)。
+> 本編で使う SIMD は **AVX2 + FMA だけ**(Stage 3 の int8 カーネルは AVX2 のみ)。だから **GitHub Codespaces にどの CPU が当たっても全ステージ再現します**。AVX-512 VPOPCNT は Stage 4 で見たとおり量子化後は速くならないので本編では扱いません(AVX-512 機で試したい人向けの付録 `vec.HammingSIMD` のみ残置)。
 
 中核メッセージ: **SIMD だけが高速化じゃない。ルーフラインで天井を見れば、
 「縦に上る(実装効率)」と「横に動く(データ表現)」のどちらを打つべきかが図から決まる。
@@ -41,17 +44,21 @@ Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 ```sh
 make test       # 正しさの確認
 make roofline   # 各 Stage の GFLOP/s・AI・MB/query を表示して「図に点を打つ」
-make bench      # 本編フル(Stage 0/1/2 + rerank)。AVX2+FMA だけで完結
-make recall     # Recall@10(binary vs rerank)
-make bench-bonus # (付録) AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
+make bench      # 本編フル(スカラ/SIMD/バイナリ/rerank)。AVX2+FMA だけで完結
+make recall     # Recall@10(binary vs rerank vs int8)
+make bench-parallel # 寄り道: goroutine 並列はどの天井に効くか
+make bench-nsweep   # Stage 1 コラム: DB サイズで SIMD 倍率が崩れる境界
+make bench-int8     # Stage 3: int8 量子化(カーネル 10x・Recall 0.948)
+make bench-maxsim   # 付録A: MaxSim(late interaction・最初から演算律速)
+make bench-bonus    # 付録B: AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
 ```
 
 `make roofline` の出力例(点を打つ = ルーフラインの①②):
 
 ```
-# 例: 8コア Codespace(AMD EPYC 7763)。数値は当たった CPU で変わります
+# 例: 4コア Codespace(AMD EPYC 7763)。数値は当たった CPU・実行ごとの揺れで変わります
 BenchmarkSearchNaive   ... ns/op   ... MB/s   0.5 AI(flop/byte)   2.15 GFLOP/s   153.6 MB/query
-BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   9.2 GFLOP/s    153.6 MB/query  ← メモリ斜線(read天井)に張り付く
+BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   9.7 GFLOP/s    153.6 MB/query  ← メモリ斜線(read天井)に張り付く
 BenchmarkSearchBinary  ... ns/op   ... MB/s                                       4.8 MB/query  ← 横に動いて 1/32
 ```
 

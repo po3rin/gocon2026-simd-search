@@ -39,7 +39,7 @@ func BenchmarkPeakReadBW(b *testing.B) {
 		}
 		sum := a0.Add(a1).Add(a2.Add(a3)).Add(a4.Add(a5).Add(a6.Add(a7)))
 		// ベクトル→スカラー境界(OPTIMIZATION_LOG.md の VZEROUPPER 税対策)
-		vzeroupper()
+		archsimd.ClearAVXUpperBits()
 		var buf [8]float32
 		sum.StoreSlice(buf[:])
 		sink += buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
@@ -75,7 +75,7 @@ func BenchmarkPeakTriadBW(b *testing.B) {
 		}
 		iters++
 	}
-	vzeroupper()
+	archsimd.ClearAVXUpperBits()
 	ceilSinkFloat = memA[memN-1]
 	sec := b.Elapsed().Seconds()
 	gb := float64(memN) * 3 * 4 * float64(iters) / sec / 1e9
