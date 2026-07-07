@@ -38,7 +38,7 @@ func TestMaxSimAgreement(t *testing.T) {
 	}
 }
 
-// 付録B: MaxSim(late interaction)。文書トークン1ロードにつきクエリトークン
+// 付録A: MaxSim(late interaction)。文書トークン1ロードにつきクエリトークン
 // Tq 本と内積する構造がタスクに内在 = 最初から演算律速で SIMD が最初から効く。
 const (
 	maxsimDocs = 10_000

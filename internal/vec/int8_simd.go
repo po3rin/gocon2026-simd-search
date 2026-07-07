@@ -8,7 +8,7 @@ import "simd/archsimd"
 // すべて AVX2 で足りる(FMA 不要)。
 var hasInt8SIMD = archsimd.X86.AVX2()
 
-// DotInt8 は int8 ベクトルの内積を AVX2 で計算する(付録A)。
+// DotInt8 は int8 ベクトルの内積を AVX2 で計算する(Stage 3)。
 //
 // 1イテレーションで int8 を16個: sign-extend で int16x16 に広げ(VPMOVSXBW)、
 // DotProductPairs(VPMADDWD)が「隣り合う2要素の積和」を int32x8 で返すので

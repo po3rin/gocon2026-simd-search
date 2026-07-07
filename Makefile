@@ -17,17 +17,17 @@ bench1:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD)$$' -benchtime 2s
 
-## Stage 2: バイナリ量子化
+## Stage 4: バイナリ量子化(1bit・1/32)
 bench2:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
-## 仕上げ: Stage 0/1/2 + float32 rerank(本編の最終形。AVX2+FMA だけで完結)
+## Stage 5(仕上げ): スカラ/SIMD/バイナリ + float32 rerank(本編の最終形。AVX2+FMA だけで完結)
 bench3:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary|BinaryRerank)$$' -benchtime 2s
 
 bench: bench3
 
-## (付録) AVX-512 VPOPCNT で popcount を SIMD 化。Stage 2 で見たとおり量子化後はキャッシュ
+## (付録B) AVX-512 VPOPCNT で popcount を SIMD 化。Stage 4 で見たとおり量子化後はキャッシュ
 ## 律速で速くならない(SearchBinarySIMD ≧ SearchBinary)ことの確認用。本編フロー外。
 ## AVX-512 + VPOPCNTDQ 機(AWS c7i 等)以外ではスカラにフォールバックする。
 bench-bonus:
@@ -45,19 +45,19 @@ bench-parallel:
 bench-nsweep:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchSweep$$' -benchtime 1s -timeout 30m
 
-## 付録A: int8 量子化(1/4 サイズ)。カーネル(VPMOVSXBW+VPMADDWD)と全探索。
+## Stage 3: int8 量子化(1/4 サイズ)。カーネル(VPMOVSXBW+VPMADDWD)と全探索。
 ## 精度は make recall(TestRecallInt8 も走る)で確認。
 bench-int8:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDotInt8(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchInt8$$' -benchtime 2s
 
-## 付録B: MaxSim(late interaction)。1ロードに多数の内積がタスクに内在
+## 付録A: MaxSim(late interaction)。1ロードに多数の内積がタスクに内在
 ## = 最初から演算律速で、SIMD が最初から効く検索方式。
 bench-maxsim:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s
 
 ## ルーフライン: 各 Stage の GFLOP/s・AI・MB/query を表示して図に「点を打つ」
-## (Stage 0 naive → 1 SIMD → 2 binary の3点。docs/workshop/workshop.md 参照)
+## (Stage 0 naive → 1 SIMD → 4 binary の3点。docs/workshop/workshop.md 参照)
 roofline:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
@@ -105,7 +105,7 @@ spill:
 	  | grep -E 'VFMADD|a[0-9]+\+[0-9]+\(SP\)' \
 	  | sed -E 's#\(/[^)]*\)##; s#github\.com/[^ ]*/internal/vec\.##g'
 
-## Recall@10 の計測(binary vs binary+rerank、付録A の int8 も)
+## Recall@10 の計測(binary / binary+rerank / int8)
 recall:
 	$(GO) test ./internal/index -run TestRecall -v
 

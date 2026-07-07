@@ -46,11 +46,13 @@
 <text x="292.7" y="335.0" font-size="12" font-weight="700" fill="#16a34a" text-anchor="end">S1 SIMD 9.7GF(壁)</text>
 <circle cx="693.8" cy="314.6" r="6.5" fill="#0ea5e9" stroke="#fff" stroke-width="1.5"/>
 <text x="705.8" y="318.6" font-size="12" font-weight="700" fill="#0ea5e9" text-anchor="start">kernel単体 13.9GF</text>
+<circle cx="455.3" cy="297.4" r="6.5" fill="#9333ea" stroke="#fff" stroke-width="1.5"/>
+<text x="464.3" y="291.4" font-size="12" font-weight="700" fill="#9333ea" text-anchor="start">S3 int8 18.3Gop/s</text>
 <circle cx="681.0" cy="210.0" r="6.5" fill="#ea580c" stroke="#fff" stroke-width="1.5"/>
-<text x="693.0" y="214.0" font-size="12" font-weight="700" fill="#ea580c" text-anchor="start">量子化 46x</text>
+<text x="693.0" y="214.0" font-size="12" font-weight="700" fill="#ea580c" text-anchor="start">S4 量子化 46x</text>
 <rect x="498" y="498" width="430" height="80" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
 <text x="512" y="518" font-size="12" class="t" font-weight="600">読み方</text>
 <text x="512" y="536" font-size="11.5" class="m">・AI=0.5 はリッジ1.3の遥か左 = 構造的にメモリ律速</text>
 <text x="512" y="553" font-size="11.5" class="m">・S0→S1 は縦に上る(SIMD)。だが天井≈10GF(壁)で頭打ち</text>
-<text x="512" y="570" font-size="11.5" class="m">・S1→S2 は横に動く(量子化でバイト1/32 → 壁を越える)</text>
+<text x="512" y="570" font-size="11.5" class="m">・S1→右へは量子化(S3 int8 1/4 → S4 1bit 1/32 → 壁を越える)</text>
 </svg>

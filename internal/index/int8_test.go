@@ -6,7 +6,7 @@ import (
 )
 
 // TestRecallInt8 measures Recall@10 of the int8 stage on clustered data
-// (付録A)。binary(0.18)と違い、大きさの情報が残るので単体で実用域に入るはず。
+// (Stage 3)。binary(0.18)と違い、大きさの情報が残るので単体で実用域に入るはず。
 func TestRecallInt8(t *testing.T) {
 	const (
 		n        = 20_000
@@ -55,7 +55,7 @@ func TestRecallInt8(t *testing.T) {
 	}
 }
 
-// 付録A: int8 量子化(1/4 サイズ)での全探索。
+// Stage 3: int8 量子化(1/4 サイズ)での全探索。
 func BenchmarkSearchInt8(b *testing.B) {
 	benchSetup()
 	benchIx.BuildInt8()

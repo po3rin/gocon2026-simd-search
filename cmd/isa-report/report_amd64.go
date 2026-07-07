@@ -44,8 +44,13 @@ var apis = []api{
 	{"Stage 1", "Float32x8.MulAdd", "VFMADD213PS", "FMA", archsimd.X86.FMA},
 	{"Stage 1", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
 
-	// Stage 2 — binary search (scalar path in production)
-	{"Stage 2", "vec.Hamming (same as Stage 0)", "POPCNT", "(scalar)", func() bool { return true }},
+	// Stage 3 — int8 dot (AVX2 only)
+	{"Stage 3", "LoadInt8x16Slice", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
+	{"Stage 3", "Int8x16.ExtendToInt16", "VPMOVSXBW", "AVX2", archsimd.X86.AVX2},
+	{"Stage 3", "Int16x16.DotProductPairs", "VPMADDWD", "AVX2", archsimd.X86.AVX2},
+
+	// Stage 4 — binary search (scalar path in production)
+	{"Stage 4", "vec.Hamming (same as Stage 0)", "POPCNT", "(scalar)", func() bool { return true }},
 
 	// Bonus — Uint64x4 Hamming SIMD
 	{"Bonus", "LoadUint64x4Slice", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
@@ -125,6 +130,10 @@ func stageSummaries(hasSIMD, hasVPOPCNT bool) []stageSummary {
 	if hasSIMD {
 		dot = "yes"
 	}
+	dot8 := "no → DotInt8Naive fallback"
+	if archsimd.X86.AVX2() {
+		dot8 = "yes"
+	}
 	bonus := "no → Hamming fallback"
 	if hasVPOPCNT {
 		bonus = "yes"
@@ -132,7 +141,8 @@ func stageSummaries(hasSIMD, hasVPOPCNT bool) []stageSummary {
 	return []stageSummary{
 		{"Stage 0: scalar baseline", "(always)", "yes"},
 		{"Stage 1: SIMD dot", "archsimd.X86.AVX2() && FMA()", dot},
-		{"Stage 2: binary quantization", "scalar Hamming (POPCNT)", "yes"},
+		{"Stage 3: int8 quantization", "archsimd.X86.AVX2()", dot8},
+		{"Stage 4: binary quantization", "scalar Hamming (POPCNT)", "yes"},
 		{"Bonus: AVX-512 Hamming", "AVX512() && AVX512VPOPCNTDQ()", bonus},
 		{"Finish: binary + rerank", "Hamming + Dot guard", rerank},
 	}
@@ -143,7 +153,7 @@ func sortedKeys(m map[string][]api) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	order := map[string]int{"Stage 0": 0, "Stage 1": 1, "Stage 2": 2, "Bonus": 3, "Finish": 4}
+	order := map[string]int{"Stage 0": 0, "Stage 1": 1, "Stage 3": 2, "Stage 4": 3, "Bonus": 4, "Finish": 5}
 	sort.Slice(keys, func(i, j int) bool {
 		oi, oj := order[keys[i]], order[keys[j]]
 		if oi != oj {

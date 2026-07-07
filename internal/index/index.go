@@ -16,7 +16,7 @@ type Result struct {
 
 // Index holds the vectors in multiple representations:
 // float32(正確・重い)、binary code(粗い・1/32 サイズ)、
-// int8 code(付録A: 1/4 サイズ・BuildInt8 で構築)。
+// int8 code(Stage 3: 1/4 サイズ・BuildInt8 で構築)。
 type Index struct {
 	Dim   int
 	Words int
@@ -24,7 +24,7 @@ type Index struct {
 	Data  []float32 // N*Dim, row-major
 	Codes []uint64  // N*Words, sign-bit quantized
 
-	// 付録A(int8 量子化)。BuildInt8() を呼ぶまで空。
+	// Stage 3(int8 量子化)。BuildInt8() を呼ぶまで空。
 	Codes8 []int8    // N*Dim, symmetric int8 quantized
 	Scales []float32 // N, per-vector scale(復元は q8*scale ≈ fp32)
 }
@@ -74,7 +74,7 @@ func (ix *Index) SearchSIMD(q []float32, k int) []Result {
 	return t.results()
 }
 
-// SearchBinary is Stage 2: scan over binary codes with Hamming distance.
+// SearchBinary is Stage 4: scan over binary codes with Hamming distance.
 // Score は -距離(距離が小さいほど良い)。
 func (ix *Index) SearchBinary(q []float32, k int) []Result {
 	code := make([]uint64, ix.Words)

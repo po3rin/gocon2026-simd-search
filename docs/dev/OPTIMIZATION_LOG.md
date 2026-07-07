@@ -502,6 +502,23 @@ Stage 2 の正当化に使える。ColBERT / Qdrant マルチベクトルと同�
 - bench-bonus の再確認: VPOPCNT 無し機ではフォールバック分岐で SearchBinarySIMD(1.0ms)が
   スカラ(0.77ms)より遅い — 付録Cに「効かない SIMD」の証拠として記載。
 
+## Step 11: int8 を本編 Stage 3 に昇格 — 「バイト削減のエスカレーション」構成へ(2026-07-08)
+
+計測ではなく構成変更。「SIMD が主役で律速を突破し続ける資料」として、②バイト削減を
+**int8(1/4・Stage 3)→ 1bit(1/32・Stage 4)の2段のエスカレーション**に再構成した。
+
+- 新番号: Stage 3 = int8、Stage 4 = バイナリ量子化、Stage 5 = rerank。
+  付録は A = MaxSim、B = AVX-512 VPOPCNT に再番号。
+- 物語上の利得: (1) 量子化の第一歩で SIMD が主役のまま(整数カーネル 10.5x)、
+  (2) int8 で「律速がメモリ→カーネルへ移動する」というルーフラインの追加ビート、
+  (3) 1bit の Recall 崩壊が「int8 では保てた精度が」という前振り付きで際立つ、
+  (4) Stage 5 末尾に fp32 / int8 / 1bit / 1bit+rerank の**速度×精度の設計空間**表。
+- 図: rl-stage3(int8・新規、AI=2 でリッジ右の点)を作成し、旧 stage3/4 を
+  rl-stage4/5 にリネーム。overview(roofline-plot)に S3 int8 の点を追加。
+- Makefile コメント・isa-report(Stage 3 の int8 API 3行を追加)・README・
+  コードコメントの番号もすべて追随。make ターゲット名は互換のため変更せず
+  (bench2=Stage 4、bench3=Stage 5。対応は workshop.md のコマンド一覧に明記)。
+
 ## 高速化の階段(最終形)
 
 > 倍率は **AWS c7i** の史実。Codespaces(EPYC 7763)の実測は Step 7 を参照(SIMD 全探索の倍率が
