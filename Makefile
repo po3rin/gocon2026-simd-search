@@ -3,7 +3,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report
+.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report
 
 test:
 	$(GO) test ./...
@@ -51,6 +51,10 @@ bench-int8:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDotInt8(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchInt8$$' -benchtime 2s
 
+## Stage 3 の精度: int8 単体の Recall@10(本編の進行用 — binary/rerank の行は Stage 4/5 で見る)
+recall-int8:
+	$(GO) test ./internal/index -run 'TestRecallInt8$$' -v
+
 ## 付録A: MaxSim(late interaction)。1ロードに多数の内積がタスクに内在
 ## = 最初から演算律速で、SIMD が最初から効く検索方式。
 bench-maxsim:
@@ -67,7 +71,7 @@ roofline-batch:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s
 
 ## ルーフラインの天井そのものを実測: 演算ピーク(FMA飽和) + メモリ帯域(read/triad)
-## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §04)
+## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §05)
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|ReadBW|TriadBW)$$' -benchtime 2s
 
@@ -126,7 +130,7 @@ REMOTE      := ubuntu@$(REMOTE_HOST)
 REMOTE_DIR  := simd-search
 REMOTE_RUN  = ssh $(SSH_OPTS) $(REMOTE) 'cd $(REMOTE_DIR) && GOEXPERIMENT=simd go
 
-.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-batch remote-roofline-ceiling remote-roofline-plot remote-recall remote-cpuinfo
+.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-batch remote-roofline-ceiling remote-roofline-plot remote-recall remote-cpuinfo remote-dotlab remote-dotlab-v3 remote-steps
 
 remote-sync:
 	@test -n "$(REMOTE_HOST)" || (echo "VM がない: cd infra && terraform apply" && exit 1)

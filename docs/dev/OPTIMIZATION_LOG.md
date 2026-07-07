@@ -528,8 +528,12 @@ Stage 2 の正当化に使える。ColBERT / Qdrant マルチベクトルと同�
 |---|---|---|---|
 | Stage 0 | スカラー全探索 | 28.6 ms | 1.0x |
 | Stage 1 | 内積を SIMD 化(+VZEROUPPER) | 18.0 ms | 1.6x(カーネル単体は 4.6x) |
-| Stage 2 | バイナリ量子化 + スカラー popcount | 0.68 ms | **42x** |
-| 仕上げ | + float32 rerank(精度回復 0.18→0.87) | 0.73 ms | **39x** |
+| Stage 4 | バイナリ量子化 + スカラー popcount | 0.68 ms | **42x** |
+| Stage 5 | + float32 rerank(精度回復 0.18→0.87) | 0.73 ms | **39x** |
+
+> ※ Stage 番号は Step 11 の再構成後のもの(旧 Stage 2=バイナリ、旧 仕上げ=rerank)。
+> Stage 2(バッチ)・Stage 3(int8)・寄り道(並列)は後の構成拡張で追加され、
+> c7i では未計測(EPYC 4-core の実測は Step 9/10)。
 
 ## 付録: 各 Step のコードの場所
 
@@ -563,7 +567,7 @@ Stage 2 の正当化に使える。ColBERT / Qdrant マルチベクトルと同�
   ガードは `X86.AVX2() && X86.FMA()` の2段で書く
 - **`Uint64x4.OnesCount`(VPOPCNTQ)は AVX512VPOPCNTDQ が必要**。AVX2 のみの CPU には
   SIMD popcount が存在しないため、本編はスカラー `math/bits.OnesCount64` を採用
-- **本編(Stage 0/1/2 + rerank)で使う SIMD は AVX2 + FMA だけ**。これは過去10年の x86
+- **本編で使う SIMD は AVX2 + FMA だけ**(int8 カーネルは AVX2 のみ)。これは過去10年の x86
   (Intel Haswell 2013+ / AMD 2015+)がほぼ全て持つので、**参加者環境は GitHub Codespaces
   一本で全ステージ再現できる**(当たる CPU の Intel/AMD・世代を問わない)。`make bench` がこれ。
 - **AVX-512 VPOPCNT(`SearchBinarySIMD`)は本編フロー外の付録に降格**。量子化後はキャッシュ

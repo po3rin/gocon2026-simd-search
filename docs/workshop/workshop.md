@@ -142,7 +142,7 @@ make bench0     # スカラ実装の全探索(=ベースライン)を測る
 # BenchmarkSearchNaive   35.7 ms/op
 ```
 
-※ 実際の画面には `35856977 ns/op  4283 MB/s  0.5 AI(flop/byte)  2.142 GFLOP/s  153.6 MB/query` のように **ns 単位+指標つき**で出ます(35,856,977 ns ≒ 35.9 ms)。本資料の出力例は読みやすさのため ms に整形してあります。右側の指標(GFLOP/s・AI)はこのあと §04〜05 で使う主役なので、いまは「そういう列がある」だけ覚えておけば十分です。
+※ 実際の画面には `35856977 ns/op  4283 MB/s  0.5 AI(flop/byte)  2.142 GFLOP/s  153.6 MB/query` のように **ns 単位+指標つき**で出ます(この回は ≒35.9 ms。実行ごとに 35〜36 ms 程度で揺れます — 本資料の例は、その中の1回分 35.7 ms を読みやすく整形したものです)。右側の指標(GFLOP/s・AI)はこのあと §04〜05 で使う主役なので、いまは「そういう列がある」だけ覚えておけば十分です。
 
 10万件のベクトルから上位を返すのに **1クエリ 35ms**(全探索・1スレッドの前提)。素朴に書くとこのくらいかかります(数字は当たった CPU 次第)。本資料がこれからやることは、たったひとつ — **この全探索をどう速くするか**です。
 
@@ -307,7 +307,7 @@ b.ReportMetric(gb, "triad-GB/s")   // ← 17.36
 
 ![このマシンの実測ルーフライン全体像](../images/roofline-plot.png)
 
-図: スカラ → SIMD(メモリ壁)→ カーネル単体(演算側)→ 量子化(右上へ)。各点の詳細は下の各節で。
+図: スカラ → SIMD(メモリ壁)→ カーネル単体(演算側)→ int8(リッジの右)→ 1bit 量子化(右上へ)。各点の詳細は下の各節で。
 
 > **この図を自分の実測で動かす(任意):** `make roofline-plot` を叩くと、**いま測った数字**から下のような対話ルーフライン(`/tmp/roofline.html`)が出ます。各点から天井へ点線を引いて「天井の何%か」を出すので、Stage 1 がメモリ壁に張り付き、バッチ化でリッジを越えて演算側へ動くのが一目で分かります(点にカーソルで AI・GFLOP/s・達成率)。
 >
@@ -332,9 +332,10 @@ make bench1          # Stage 1: SIMD 化(カーネル単体 + 全探索の2粒�
 make roofline-batch  # Stage 2: バッチ化の比較
 make bench-parallel  # 寄り道: goroutine 並列はどの天井に効くか
 make bench-int8      # Stage 3: int8 量子化(1/4)
+make recall-int8     # Stage 3: int8 の精度(Recall@10)
 make bench2          # Stage 4: バイナリ量子化(1/32)
 make bench3          # Stage 5: 仕上げ(rerank の速度)
-make recall          # 精度(binary / rerank / int8 の Recall@10)
+make recall          # Stage 4/5: 精度まとめ(binary / rerank / int8)
 make roofline        # 上の結果をルーフライン図用に一覧
 make roofline-plot   # 実測から対話的ルーフライン HTML を生成(点が天井に当たるのを見る)
 ```
@@ -537,7 +538,7 @@ SearchBatchParallel/workers=4   3.5 ms/query            ← 1.9x = 物理コア�
 
 ### Stage 3 — int8 量子化(もう一つの道：バイトを削る・その1)
 
-**なぜ:** Stage 1 の壁からの脱出路は2つありました — **①再利用**(Stage 2 で実測済み)と、ここから入る**②バイト削減**です。ルーフラインの指示は同じく「**算術強度(AI)を上げる＝1バイトあたりの仕事を増やす**」。ただし今度は再利用ではなく、**データ表現そのもの**を変えてバイトを削ります。まず穏当な一歩から — fp32(4 byte)を **int8(1 byte)** に量子化すれば転送が 1/4、AI は 0.5→**2 flop/byte** でリッジ(1.3)を越えて**演算律速側**に乗るはずです。しかも距離カーネルは**整数の積和**なので、量子化しても **SIMD が主役のまま**です。
+**なぜ:** Stage 1 の壁からの脱出路は2つありました — **①再利用**(Stage 2 で実測済み)と、ここから入る**②バイト削減**です。ルーフラインの指示は同じく「**算術強度(AI)を上げる＝1バイトあたりの仕事を増やす**」。ただし今度は再利用ではなく、**データ表現そのもの**を変えてバイトを削ります。まず穏当な一歩から — fp32(4 byte)を **int8(1 byte)** に量子化すれば転送が 1/4、AI は 0.5→**2 flop/byte** でリッジ(1.3)を越えて**演算律速側**に乗るはずです(int8 の演算は整数ですが、数え方は flop と同じです。図では Gop/s と表記)。しかも距離カーネルは**整数の積和**なので、量子化しても **SIMD が主役のまま**です。
 
 ```go
 // internal/vec/int8.go — 対称量子化: q = round(v/scale)、scale = maxAbs/127
@@ -559,7 +560,7 @@ $ make bench-int8
 BenchmarkDotInt8Naive    364  ns/op                     ← カーネル: スカラ
 BenchmarkDotInt8SIMD      34.6 ns/op                    ← カーネル 10.5x!(fp32 SIMD の 55ns より速い)
 BenchmarkSearchInt8        4.2 ms/op   38.4 MB/query    ← 全探索: fp32 SIMD 比 ~2x
-$ make recall
+$ make recall-int8
 Recall@10: int8=0.948                                   ← rerank なしで実用域
 ```
 
@@ -569,7 +570,7 @@ Recall@10: int8=0.948                                   ← rerank なしで実�
 
 ### Stage 4 — バイナリ量子化(バイト削減を極限まで・近似)
 
-**なぜ:** int8 で 1/4 にしても、10万件 × 384 byte = **38.4 MB は L3 に収まりません**。②バイト削減の極限 — **符号1bit** まで潰せば 1ベクトル 1536→48 byte(**1/32**)、全体 4.8 MB で**キャッシュに丸ごと乗ります**。距離は内積をやめ、XOR+popcount の**ハミング距離**(違うビット数)へ。
+**なぜ:** int8 で 1/4 にしても、10万件 × 384 byte = **38.4 MB は L3 に収まりません**。②バイト削減の極限 — **符号1bit** まで潰せば 1ベクトル 1536→48 byte(**1/32**)、全体 4.8 MB で**キャッシュに丸ごと乗ります**。距離は内積をやめ、XOR+popcount の**ハミング距離**(違うビット数)へ。1bit の利得は転送 1/32 だけではありません — 距離カーネルも popcount(**1命令で64次元**)に変わって激安になり、int8 で現れた「カーネルの壁」ごと壊せます。
 
 ```go
 // internal/vec/hamming.go
@@ -728,7 +729,7 @@ Stage 4 で述べたとおり、量子化後の Hamming 距離を AVX-512 VPOPCN
 
 ## 09. 環境メモ
 
-**Apple Silicon 参加者向け：** Go 1.26 の `archsimd` は AMD64 専用(Go 1.27 で arm64 Neon / Wasm 対応が予定されています)。ARM64 では `//go:build amd64` でSIMD実装を分け、スカラ版へフォールバックさせる構成にします。当日は **GitHub Codespaces** を共有環境にすれば、手元のアーキ差を気にせず全員が同じ条件で達成性能と AI を測れます。**本編で使う SIMD は AVX2 + FMA だけ**(Stage 1 と仕上げの内積)で、これは過去10年の x86(Intel Haswell 2013+ / AMD 2015+)がほぼ全て持つため、**Codespaces にどの CPU が当たっても本編は再現します**。AVX-512(VPOPCNT)は本編では使いません(Stage 2 で見たとおり量子化後は速くならないため)。AVX-512 を実機で確かめたい人だけ、`infra/` の AWS c7i(Sapphire Rapids)を使ってください。
+**Apple Silicon 参加者向け：** Go 1.26 の `archsimd` は AMD64 専用(Go 1.27 で arm64 Neon / Wasm 対応が予定されています)。ARM64 では `//go:build amd64` でSIMD実装を分け、スカラ版へフォールバックさせる構成にします。当日は **GitHub Codespaces** を共有環境にすれば、手元のアーキ差を気にせず全員が同じ条件で達成性能と AI を測れます。**本編で使う SIMD は AVX2 + FMA だけ**(Stage 1/2/5 の内積。Stage 3 の int8 カーネルは AVX2 のみ)で、これは過去10年の x86(Intel Haswell 2013+ / AMD 2015+)がほぼ全て持つため、**Codespaces にどの CPU が当たっても本編は再現します**。AVX-512(VPOPCNT)は本編では使いません(Stage 4 で見たとおり量子化後は速くならないため)。AVX-512 を実機で確かめたい人だけ、`infra/` の AWS c7i(Sapphire Rapids)を使ってください。
 
 > **コラム: なぜ Docker で「amd64」を指定してもダメか**  
 Apple Silicon でも `docker run --platform linux/amd64` を使えば実際の x86 で測れる——と思いがちですが、これは落とし穴です。中身は **QEMU エミュレーション**(または Rosetta 経由)で、**実際の x86 CPU ではありません**。具体的には:  

@@ -52,14 +52,14 @@ var apis = []api{
 	// Stage 4 — binary search (scalar path in production)
 	{"Stage 4", "vec.Hamming (same as Stage 0)", "POPCNT", "(scalar)", func() bool { return true }},
 
-	// Bonus — Uint64x4 Hamming SIMD
-	{"Bonus", "LoadUint64x4Slice", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
-	{"Bonus", "Uint64x4.Xor", "VPXOR", "AVX2", archsimd.X86.AVX2},
-	{"Bonus", "Uint64x4.OnesCount", "VPOPCNTQ", "AVX512VPOPCNTDQ", archsimd.X86.AVX512VPOPCNTDQ},
-	{"Bonus", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
+	// 付録B — Uint64x4 Hamming SIMD
+	{"付録B", "LoadUint64x4Slice", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
+	{"付録B", "Uint64x4.Xor", "VPXOR", "AVX2", archsimd.X86.AVX2},
+	{"付録B", "Uint64x4.OnesCount", "VPOPCNTQ", "AVX512VPOPCNTDQ", archsimd.X86.AVX512VPOPCNTDQ},
+	{"付録B", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
 
-	// Finish — rerank calls vec.Dot (Stage 1 guard)
-	{"Finish", "vec.Dot in SearchBinaryRerank", "(Stage 1 APIs)", "AVX2+FMA", func() bool {
+	// Stage 5 — rerank calls vec.Dot (Stage 1 guard)
+	{"Stage 5", "vec.Dot in SearchBinaryRerank", "(Stage 1 APIs)", "AVX2+FMA", func() bool {
 		return archsimd.X86.AVX2() && archsimd.X86.FMA()
 	}},
 }
@@ -141,10 +141,11 @@ func stageSummaries(hasSIMD, hasVPOPCNT bool) []stageSummary {
 	return []stageSummary{
 		{"Stage 0: scalar baseline", "(always)", "yes"},
 		{"Stage 1: SIMD dot", "archsimd.X86.AVX2() && FMA()", dot},
+		{"Stage 2: batch (same APIs as Stage 1)", "archsimd.X86.AVX2() && FMA()", dot},
 		{"Stage 3: int8 quantization", "archsimd.X86.AVX2()", dot8},
 		{"Stage 4: binary quantization", "scalar Hamming (POPCNT)", "yes"},
-		{"Bonus: AVX-512 Hamming", "AVX512() && AVX512VPOPCNTDQ()", bonus},
-		{"Finish: binary + rerank", "Hamming + Dot guard", rerank},
+		{"Stage 5: binary + rerank", "Hamming + Dot guard", rerank},
+		{"付録B: AVX-512 Hamming", "AVX512() && AVX512VPOPCNTDQ()", bonus},
 	}
 }
 
@@ -153,7 +154,7 @@ func sortedKeys(m map[string][]api) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	order := map[string]int{"Stage 0": 0, "Stage 1": 1, "Stage 3": 2, "Stage 4": 3, "Bonus": 4, "Finish": 5}
+	order := map[string]int{"Stage 0": 0, "Stage 1": 1, "Stage 3": 2, "Stage 4": 3, "Stage 5": 4, "付録B": 5}
 	sort.Slice(keys, func(i, j int) bool {
 		oi, oj := order[keys[i]], order[keys[j]]
 		if oi != oj {

@@ -22,7 +22,7 @@ func Quantize(v []float32, out []uint64) {
 //
 // Stage 4 の穴埋め対象。XOR + popcount だけで距離が出る。
 // math/bits.OnesCount64 はスカラーの POPCNT 命令にコンパイルされる。
-// SIMD 版 popcount(VPOPCNTQ)は AVX512VPOPCNTDQ が必要なので bonus 章で扱う。
+// SIMD 版 popcount(VPOPCNTQ)は AVX512VPOPCNTDQ が必要なので付録B(make bench-bonus)で扱う。
 func Hamming(a, b []uint64) int {
 	var d int
 	for i := range a {
