@@ -42,8 +42,12 @@ Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 make test       # 正しさの確認
 make roofline   # 各 Stage の GFLOP/s・AI・MB/query を表示して「図に点を打つ」
 make bench      # 本編フル(Stage 0/1/2 + rerank)。AVX2+FMA だけで完結
-make recall     # Recall@10(binary vs rerank)
-make bench-bonus # (付録) AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
+make recall     # Recall@10(binary vs rerank vs int8)
+make bench-parallel # 寄り道: goroutine 並列はどの天井に効くか
+make bench-nsweep   # Stage 1 コラム: DB サイズで SIMD 倍率が崩れる境界
+make bench-int8     # 付録A: int8 量子化(カーネル 10x・Recall 0.948)
+make bench-maxsim   # 付録B: MaxSim(late interaction・最初から演算律速)
+make bench-bonus    # 付録C: AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
 ```
 
 `make roofline` の出力例(点を打つ = ルーフラインの①②):

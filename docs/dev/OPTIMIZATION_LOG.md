@@ -442,6 +442,66 @@ Makefile の既定天井を `PEAK=25.59` / `BW=20.80` に変更。8コア表記�
 ※ roofline-plot-example.png は、記録済みベンチ出力を `cmd/roofline-plot` に食わせて HTML を再生成し、
 ヘッドレス Chrome(`--window-size=960,600 --force-device-scale-factor=2`)で撮影。再計測不要で再現できる。
 
+## Step 10: 構成拡張 — 並列・N スイープ・int8・MaxSim を実装して実測(2026-07-08)
+
+レビュー第2弾「もっと打てる手は? もっと SIMD が効く題材は?」への回答として、
+本章2つ(寄り道=goroutine 並列、N スイープコラム)と付録2つ(int8、MaxSim)を追加。
+計測は前回と同型の 4-core Codespace(EPYC 7763・物理2コア×SMT2・Go 1.26.4)の別インスタンス。
+このインスタンスは前回より全体に1割ほど遅かった(共有VMの揺れ。資料の注記どおり)。
+
+### 寄り道: goroutine 並列はどの天井に効くか(make bench-parallel)
+
+| workers | 全探索 B=1(メモリ律速) | バッチ B=32(演算律速) |
+|---|---|---|
+| 1 | 9.36 ms(16.4 GB/s) | 6.72 ms/query |
+| 2 | 5.74 ms(26.8 GB/s)= 1.63x | 4.48 ms/query = 1.50x |
+| 4 | 5.20 ms(29.5 GB/s)= **1.80x 頭打ち** | 3.52 ms/query = **1.91x** |
+
+- メモリ律速は合算 ~30 GB/s で**マシン全体の DRAM 帯域**に飽和(2→4 workers で +10% のみ)。
+- 演算律速は 1.9x — この 4 vCPU は `lscpu` で **物理2コア × SMT2** と判明。SMT 兄弟は
+  実行ユニットを共有するので、演算律速は物理コア数の壁に当たる。
+- 教訓: 並列の効きも「何律速か」で決まり、足す前に予測できる。当初の想定
+  (演算律速はほぼリニア)は物理4コア機でのみ成立する点に注意 — 資料には
+  SMT の壁として正直に記載した。Go カンファレンスで必ず出る「goroutine で
+  並列化すれば?」への実測回答。
+
+### N スイープ(make bench-nsweep)
+
+| N | データ量 | naive | SIMD | 倍率 |
+|---|---|---|---|---|
+| 1,000 | 1.5 MB | 351 µs | 60.9 µs | **5.8x** |
+| 10,000 | 15.4 MB | 3.47 ms | 609 µs | **5.7x** |
+| 100,000 | 154 MB | 34.8 ms | 8.83 ms | **3.9x** |
+| 1,000,000 | 1.5 GB | 347 ms | 89.5 ms | **3.9x** |
+
+L3 に収まる間はカーネル並み(5.7〜5.8x)、DRAM に溢れると 3.9x で一定。
+「SIMD が効く境界」がデータサイズ軸にもあることの直接可視化。Stage 1 コラムに採用。
+
+### 付録A: int8 量子化(make bench-int8 / make recall)
+
+- カーネル: DotInt8Naive 364 ns → DotInt8SIMD **34.6 ns = 10.5x**。
+  fp32 SIMD(55 ns)より速い — VPMOVSXBW + VPMADDWD で1命令16要素(fp32 の2倍幅)。
+  signed×signed なので飽和トリック(VPMADDUBSW 系)が不要になり、コードが素直。
+- 全探索: **4.19 ms**(38.4 MB/query・達成 9.2 GB/s)。fp32 SIMD 比 ~2x。
+  転送 1/4 なのに 4x にならないのは、壁が遠のいた分カーネルが新しい律速になったため
+  (AI = 2 flop/byte でリッジの右)— 「律速は消えず移動する」の追加実例。
+- **Recall@10 = 0.948**(binary 0.180 との対比。rerank 不要の実用域)。
+  クラスタ合成データは TestRecall と同一生成器。
+
+### 付録B: MaxSim / late interaction(make bench-maxsim)
+
+1万文書 × 4トークン、クエリ16トークン(AI = Tq/2 = 8 flop/byte が方式に内在):
+naive 239 ms(2.06 GF)→ SIMD **42 ms(11.7 GF)= 5.7x**。
+「バッチ構造が検索方式の仕様として最初から存在する」現代的な題材で、
+Stage 2 の正当化に使える。ColBERT / Qdrant マルチベクトルと同系。
+
+### 実装メモ
+
+- SearchParallel / SearchBatchParallel: DB チャンク分割 + worker ローカル topK をマージ
+  (チャンクが互いに素なので重複処理不要)。
+- bench-bonus の再確認: VPOPCNT 無し機ではフォールバック分岐で SearchBinarySIMD(1.0ms)が
+  スカラ(0.77ms)より遅い — 付録Cに「効かない SIMD」の証拠として記載。
+
 ## 高速化の階段(最終形)
 
 > 倍率は **AWS c7i** の史実。Codespaces(EPYC 7763)の実測は Step 7 を参照(SIMD 全探索の倍率が
