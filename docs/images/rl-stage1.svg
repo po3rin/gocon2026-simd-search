@@ -26,15 +26,15 @@
 <line x1="448.7" y1="190.0" x2="722.0" y2="190.0" stroke="#94a3b8" stroke-width="1.1" stroke-dasharray="2 4"/>
 <text x="720.0" y="185.0" font-size="10" fill="#64748b" text-anchor="end">AVX2理論 ~100</text>
 <path d="M 74.0 380.9 L 320.6 255.3 L 722.0 255.3" stroke="#dc2626" stroke-width="2.4" fill="none"/>
-<text x="196.0" y="318.0" font-size="10.5" fill="#dc2626" font-weight="600" transform="rotate(-27 196 318)">DRAM 18.4 GB/s (read)</text>
+<text x="196.0" y="318.0" font-size="10.5" fill="#dc2626" font-weight="600" transform="rotate(-27 196 318)">DRAM ~20 GB/s (read)</text>
 <text x="720.0" y="248.3" font-size="10" fill="#dc2626" text-anchor="end">Go実測 25.5</text>
 <circle cx="320.6" cy="255.3" r="3.5" fill="none" stroke="#dc2626"/>
-<text x="320.6" y="246.3" font-size="10" fill="#dc2626" text-anchor="middle">リッジ 1.4</text>
+<text x="320.6" y="246.3" font-size="10" fill="#dc2626" text-anchor="middle">リッジ 1.3</text>
 <line x1="225.0" y1="373.4" x2="225.0" y2="304.0" stroke="#1d4ed8" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#mv)"/>
 <circle cx="225.0" cy="373.4" r="4" fill="#cbd5e1"/>
 <text x="232.0" y="376.4" font-size="9.5" fill="#94a3b8">Stage 0 全探索</text>
 <circle cx="225.0" cy="304.0" r="6.5" fill="#dc2626" stroke="#fff" stroke-width="1.5"/>
-<text x="234.0" y="307.0" font-size="11.5" font-weight="700" class="t">Stage 1 全探索 9.2GF(壁)</text>
+<text x="234.0" y="307.0" font-size="11.5" font-weight="700" class="t">Stage 1 全探索 9.7GF(壁)</text>
 <circle cx="561.1" cy="285.0" r="6.5" fill="#dc2626" stroke="#fff" stroke-width="1.5"/>
-<text x="570.1" y="288.0" font-size="11.5" font-weight="700" class="t">カーネル単体(L1) 13.7GF</text>
+<text x="570.1" y="288.0" font-size="11.5" font-weight="700" class="t">カーネル単体(L1) 13.9GF</text>
 </svg>

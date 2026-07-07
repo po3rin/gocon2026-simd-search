@@ -49,9 +49,9 @@ make bench-bonus # (付録) AVX-512 VPOPCNT。AVX-512機向け・速くならな
 `make roofline` の出力例(点を打つ = ルーフラインの①②):
 
 ```
-# 例: 8コア Codespace(AMD EPYC 7763)。数値は当たった CPU で変わります
+# 例: 4コア Codespace(AMD EPYC 7763)。数値は当たった CPU・実行ごとの揺れで変わります
 BenchmarkSearchNaive   ... ns/op   ... MB/s   0.5 AI(flop/byte)   2.15 GFLOP/s   153.6 MB/query
-BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   9.2 GFLOP/s    153.6 MB/query  ← メモリ斜線(read天井)に張り付く
+BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   9.7 GFLOP/s    153.6 MB/query  ← メモリ斜線(read天井)に張り付く
 BenchmarkSearchBinary  ... ns/op   ... MB/s                                       4.8 MB/query  ← 横に動いて 1/32
 ```
 
