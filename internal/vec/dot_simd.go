@@ -13,8 +13,6 @@ func HasSIMD() bool { return hasSIMD }
 
 // Dot computes the dot product using 256-bit SIMD (8 float32 lanes).
 //
-// Stage 1 の穴埋め対象。ワークショップ版ではループ本体が TODO になる。
-//
 // 性能上のポイント2つ:
 //   - スライスは a[i:] でインデックスせず a = a[16:] と前進させる。
 //     インデックス式だと境界計算がループ毎に再実行されて支配的になる

@@ -16,9 +16,9 @@ import (
 // バッチ化(Stage 2)と同じ「1ロードに対し多数の計算」がタスクの仕様として内在する
 // = 最初から演算律速で、SIMD が最初から効く。
 type MultiIndex struct {
-	Dim int
-	Tok int // 文書あたりのトークンベクトル数
-	N   int
+	Dim  int
+	Tok  int // 文書あたりのトークンベクトル数
+	N    int
 	Data []float32 // N*Tok*Dim, row-major
 }
 

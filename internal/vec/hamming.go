@@ -20,7 +20,7 @@ func Quantize(v []float32, out []uint64) {
 
 // Hamming returns the number of differing bits between a and b.
 //
-// Stage 4 の穴埋め対象。XOR + popcount だけで距離が出る。
+// Stage 4 のカーネル。XOR + popcount だけで距離が出る。
 // math/bits.OnesCount64 はスカラーの POPCNT 命令にコンパイルされる。
 // SIMD 版 popcount(VPOPCNTQ)は AVX512VPOPCNTDQ が必要なので付録B(make bench-bonus)で扱う。
 func Hamming(a, b []uint64) int {
