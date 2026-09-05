@@ -13,7 +13,7 @@ import (
 // Apple Silicon はスカラ縮約だと帯域を大きく過小評価する(M3 Pro 実測: スカラ 10.7 GB/s に
 // 対して SIMD 全探索が 33 GB/s を達成してしまい、点が屋根を突き抜ける)ので、
 // 天井ベンチも検索と同じ SIMD ロードで測る。詳細は ceiling_mem_test.go と
-// docs/dev/OPTIMIZATION_LOG.md Step 12。
+// docs/appendix/optimization-log.md Step 12。
 
 // BenchmarkPeakReadBW は読み取り専用の逐次ストリーム帯域を Neon で測る。
 //

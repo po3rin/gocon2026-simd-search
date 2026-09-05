@@ -10,7 +10,7 @@ import (
 	"simd/archsimd"
 )
 
-// docs/dev/OPTIMIZATION_LOG.md の各 Step の実装をコードとして保存したもの。
+// docs/appendix/optimization-log.md の各 Step の実装をコードとして保存したもの。
 // `make remote-steps` で「高速化の階段」を Step 順に一気に再現できる。
 //
 //   Step 1: dotStep1     — 素朴な SIMD 化(インデックス式スライス + アキュムレータ1本)
@@ -22,7 +22,7 @@ import (
 //   本実装:      vec.HammingSIMD
 
 // dotStep1 は最初に書いた素朴な SIMD 内積。
-// 実測 219ns(naive 205ns より遅い)。OPTIMIZATION_LOG の罠②を再現するもの。
+// 実測 219ns(naive 205ns より遅い)。docs/appendix/optimization-log.md の罠②を再現するもの。
 func dotStep1(a, b []float32) float32 {
 	var acc archsimd.Float32x8
 	i := 0
@@ -108,7 +108,7 @@ func TestStepsMatchNaive(t *testing.T) {
 }
 
 // 「高速化の階段」を Step 順に再現するベンチ群。
-// BenchmarkStepDot0〜3 を順に見ると OPTIMIZATION_LOG.md の数字をなぞれる。
+// BenchmarkStepDot0〜3 を順に見ると docs/appendix/optimization-log.md の数字をなぞれる。
 
 func BenchmarkStepDot0Naive(b *testing.B) {
 	for b.Loop() {

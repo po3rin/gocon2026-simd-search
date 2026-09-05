@@ -10,7 +10,7 @@ import (
 
 // メモリ天井(AVX2 ストリーミング版)。検索カーネルと同じ 256bit ロードで
 // 単コアが DRAM から引ける帯域を飽和させる。スカラー縮約版(_scalar)が
-// 帯域を過小評価する問題への対処。詳細は ceiling_mem_test.go / OPTIMIZATION_LOG.md。
+// 帯域を過小評価する問題への対処。詳細は ceiling_mem_test.go / docs/appendix/optimization-log.md。
 
 // BenchmarkPeakReadBW は読み取り専用の逐次ストリーム帯域を SIMD で測る。
 // 256bit ロード×8本のアキュムレータで発行/レイテンシ律速を避け、純粋に
@@ -38,7 +38,7 @@ func BenchmarkPeakReadBW(b *testing.B) {
 			x = x[64:]
 		}
 		sum := a0.Add(a1).Add(a2.Add(a3)).Add(a4.Add(a5).Add(a6.Add(a7)))
-		// ベクトル→スカラー境界(OPTIMIZATION_LOG.md の VZEROUPPER 税対策)
+		// ベクトル→スカラー境界(docs/appendix/optimization-log.md の VZEROUPPER 税対策)
 		archsimd.ClearAVXUpperBits()
 		var buf [8]float32
 		sum.Store(buf[:])

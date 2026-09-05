@@ -44,7 +44,7 @@ func Dot(a, b []float32) float32 {
 	// ベクトルからスカラーへ戻る境界。Go は 1.27 でも VZEROUPPER を自動挿入しないため、
 	// 標準 API の archsimd.ClearAVXUpperBits()(= VZEROUPPER)を自分で呼ぶ。
 	// これを忘れると dirty ymm × レガシーSSE の遷移ペナルティで呼び出しごとに
-	// 〜550サイクル失う(詳細: docs/dev/OPTIMIZATION_LOG.md)
+	// 〜550サイクル失う(詳細: docs/appendix/optimization-log.md)
 	archsimd.ClearAVXUpperBits()
 	sum := buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
 	// 端数(dim が 8 の倍数でない場合)

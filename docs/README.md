@@ -10,10 +10,11 @@
   本編は GitHub Codespaces(AMD EPYC 7763 で実測)前提。
   > 数値の正本はこの教材と、`make roofline` / `make roofline-ceiling`(実測・再現可能)。
 
-## 開発・運営向け
-- **[dev/OPTIMIZATION_LOG.md](dev/OPTIMIZATION_LOG.md)** — 実験の作業ログ(つまずきと診断、Step 0〜12、objdump、上限の実測、Codespaces 再計測)。
-- **[dev/HIDDEN_CEILINGS.md](dev/HIDDEN_CEILINGS.md)** — (深掘り)VZEROUPPER の遷移ペナルティ / register spill の調査(Intel c7i 実測。本編からは外した読み物)。
-- **[dev/ENVIRONMENT_SURVEY.md](dev/ENVIRONMENT_SURVEY.md)** — 実行環境リファレンス(arm64 / Rosetta / Docker / amd64)。
+## 付録(本編を読んだあとに)
+- **[appendix/README.md](appendix/README.md)** — 付録の索引。
+- **[appendix/hidden-ceilings.md](appendix/hidden-ceilings.md)** — Go の SIMD の 2 つの隠れた性能上限(VZEROUPPER の遷移ペナルティ、register spill)。
+- **[appendix/environment-survey.md](appendix/environment-survey.md)** — 実行環境の調査(Apple Silicon、Rosetta、Docker、amd64 実機)。
+- **[appendix/optimization-log.md](appendix/optimization-log.md)** — 最適化の記録(Step 0〜12。つまずきと診断、本編の数字の出どころ)。
 
 ## 共有
 - **images/** — 図(SVG + PNG)。教材・記事から参照。

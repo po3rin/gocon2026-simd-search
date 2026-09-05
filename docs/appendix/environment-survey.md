@@ -1,8 +1,8 @@
-# 実行環境調査 — Apple Silicon / Rosetta / Docker / amd64 実機
+# 付録: 実行環境の調査(Apple Silicon、Rosetta、Docker、amd64 実機)
 
 2026-06-11 実施(Go 1.26.4)。調査コマンド: `make isa-report`, `make test`, ベンチ 1 回実行。
 
-> **2026-09-05 追記(Go 1.27.1):** `archsimd` が arm64(Neon・128bit)に対応したので、下表の「arm64 ネイティブ」列は **Stage 1 SIMD 内積 ✅(Neon 版 `dot_arm64.go`)、Stage 3 int8 ✅(`int8_arm64.go`)** に変わった。M3 Pro 実測は [OPTIMIZATION_LOG.md Step 12](OPTIMIZATION_LOG.md)。Rosetta の `FMA=false` は Go 1.27.1 + macOS 26 でも変わらず(再確認済み)。API 名は 1.27 で `LoadFloat32x8Slice`→`LoadFloat32x8`、`StoreSlice`→`Store` に改訂(下表は新名で記載)。
+> **2026-09-05 追記(Go 1.27.1):** `archsimd` が arm64(Neon・128bit)に対応したので、下表の「arm64 ネイティブ」列は **Stage 1 SIMD 内積 ✅(Neon 版 `dot_arm64.go`)、Stage 3 int8 ✅(`int8_arm64.go`)** に変わった。M3 Pro 実測は [optimization-log.md Step 12](optimization-log.md)。Rosetta の `FMA=false` は Go 1.27.1 + macOS 26 でも変わらず(再確認済み)。API 名は 1.27 で `LoadFloat32x8Slice`→`LoadFloat32x8`、`StoreSlice`→`Store` に改訂(下表は新名で記載)。
 
 参照:
 - [simd/archsimd (pkg.go.dev)](https://pkg.go.dev/simd/archsimd) — API ごとの `CPU Feature` と `archsimd.X86` ランタイムチェック
@@ -111,7 +111,7 @@ isa-report-linux  → 実行はできるが archsimd.X86 は **すべて false**
 
 ## 4. amd64 実機 (記事・教材の本番環境)
 
-AWS c7i (Sapphire Rapids) 上の実測値（`OPTIMIZATION_LOG.md` / `make remote-bench`）:
+AWS c7i (Sapphire Rapids) 上の実測値（`optimization-log.md` / `make remote-bench`）:
 
 | Feature | c7i |
 |---|---|
@@ -151,4 +151,4 @@ CPU feature を確認したい
 - `cmd/isa-report/main.go` — 環境調査ツール
 - `Makefile` — `isa-report` ターゲット
 - `../workshop/workshop.md` — Docker / Rosetta コラム（AVX-512 非対応 / FMA 制約）
-- `OPTIMIZATION_LOG.md` — c7i 上の最適化実測
+- `optimization-log.md` — c7i 上の最適化実測

@@ -196,7 +196,7 @@ remote-recall: remote-sync
 remote-dotlab: remote-sync
 	$(REMOTE_RUN) test ./internal/vec -run TestDotVariants -v -bench "BenchmarkDot" -benchtime 2s'
 
-## OPTIMIZATION_LOG.md の「高速化の階段」を Step 順に再現
+## docs/appendix/optimization-log.md の「高速化の階段」を Step 順に再現
 remote-steps: remote-sync
 	$(REMOTE_RUN) test ./internal/vec -run TestStepsMatchNaive -v -bench BenchmarkStep -benchtime 2s'
 

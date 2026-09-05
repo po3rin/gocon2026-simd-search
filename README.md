@@ -105,7 +105,7 @@ make isa-report-amd64 GO=$(go env GOPATH)/bin/go1.27.1   # Rosetta で amd64 側
 internal/vec/    距離カーネル(Stage ごとの内積・ハミング距離の実装)
 internal/index/  ミニ検索エンジン(Index / Search API)+ ベンチ + roofline 計測
 docs/workshop/   参加者教材 workshop.md(SIMD/ベクトル検索の基礎+進め方+図+計測方法+まとめ+原典)
-docs/dev/        開発記録(OPTIMIZATION_LOG / HIDDEN_CEILINGS / ENVIRONMENT_SURVEY)
+docs/appendix/   付録(隠れた性能上限 / 実行環境の調査 / 最適化の記録)
 docs/images/     図(SVG+PNG)
 docs/README.md   ドキュメント索引
 ```

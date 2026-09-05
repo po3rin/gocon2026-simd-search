@@ -279,7 +279,7 @@ b.ReportMetric(gb, "triad-GB/s")   // ← 17.36
 
 帯域の 2 つの測り方を確認します。`BenchmarkPeakReadBW`(約 20 GB/s)は読み専用で、検索カーネルと同じ SIMD ロードなので DRAM の読み出し帯域をそのまま測れます。`BenchmarkPeakTriadBW`(17.4 GB/s)は業界標準の STREAM ベンチで、read+write を含むぶん少し低くなります。今回の検索は DB ベクトルを読むだけで書き戻さないので、メモリ帯域の上限には **read 帯域 約 20 GB/s** を使います。実際、SIMD 全探索(先頭から順番に読む)が 19.4 GB/s とほぼ一致するので、この数字をメモリ帯域の上限と見ます。
 
-> ⚠️ スカラ縮約(`a0 += memB[i]` と 1 個ずつ足すだけの実装)で read を測ると、足し算側の制約(1 サイクルに発行できる命令数とレイテンシ)で律速し、SIMD 全探索が達成する帯域すら下回ってしまいます(特に単コア帯域の高い AMD で顕著で、ルーフライン上で点が上限の線より上に来てしまう)。そのため上限を測るベンチも検索と同じ SIMD ロードで測ります。詳細は [`../dev/OPTIMIZATION_LOG.md`](../dev/OPTIMIZATION_LOG.md)。
+> ⚠️ スカラ縮約(`a0 += memB[i]` と 1 個ずつ足すだけの実装)で read を測ると、足し算側の制約(1 サイクルに発行できる命令数とレイテンシ)で律速し、SIMD 全探索が達成する帯域すら下回ってしまいます(特に単コア帯域の高い AMD で顕著で、ルーフライン上で点が上限の線より上に来てしまう)。そのため上限を測るベンチも検索と同じ SIMD ロードで測ります。詳細は [付録の最適化の記録](../appendix/optimization-log.md)。
 
 **比較ルール:** 検索は 1 クエリ・1 スレッドで測るので、上限も 1 コアの帯域(約 20 GB/s)と突き合わせます。CPU 全体・全コア合計の帯域(数百 GB/s 級)は使いません。
 
@@ -805,4 +805,4 @@ Apple Silicon でも `docker run --platform linux/amd64` を使えば実際の x
 ① CPU の機能問い合わせ(CPUID)を正しく真似ないので archsimd.X86.\*() がすべて false になり、SIMD ガードがスカラ実装にフォールバックして、SIMD パスがそもそも走りません。  
 ② QEMU が不安定で、ビルド中に SIGSEGV で落ちることもあります。  
 ③ Rosetta 経由にしても翻訳されるのは AVX/AVX2 までで、FMA が使えません(`X86.FMA()=false`。macOS 26 + Go 1.27.1 でも同じ)。本編の内積 SIMD は AVX2 + FMA が要るので、ここで落ちてスカラにフォールバックします。  
-linux/amd64 コンテナは実際の amd64 ではありません。SIMD のベンチは GitHub Codespaces(amd64 ホスト)で測ってください。本編は AVX2+FMA だけなのでこれで全ステージ足ります。詳細は [`../dev/ENVIRONMENT_SURVEY.md`](../dev/ENVIRONMENT_SURVEY.md)。
+linux/amd64 コンテナは実際の amd64 ではありません。SIMD のベンチは GitHub Codespaces(amd64 ホスト)で測ってください。本編は AVX2+FMA だけなのでこれで全ステージ足ります。詳細は [付録の実行環境の調査](../appendix/environment-survey.md)。

@@ -1,15 +1,8 @@
-# SIMD 最適化の記録 — 「速くならない」を一つずつ潰す
+# 付録: 最適化の記録(つまずきと診断のログ)
 
-ワークショップ教材用メモ。Go 1.26 `simd/archsimd` でベクトル検索を高速化する過程で
-実際に踏んだ罠と、その診断・修正の記録。すべて実測ベース。
+本ワークショップの実装を作る過程で実際に踏んだつまずきと、その診断と修正を時系列で記録したものです。すべて実測にもとづきます。各 Step がルーフライン上のどこにあたるかは本編([workshop.md](../workshop/workshop.md))に整理してあり、ここは「なぜそうなったか」と「どう測ったか」の側です。
 
-> **読み方**: このファイルは「罠と診断の生ログ」。各 Step が**ルーフライン上で
-> どの天井に当たっていたか**は [参加者教材 workshop.md](../workshop/workshop.md) に整理してある。
-> 対応の目安: Step 0/1 = AI 0.5 でメモリ斜線に張り付く(縦に上る)、Step 3 = byte を
-> 削って横に動く、Step 4(VZEROUPPER) = メモリ天井に届く前の隠れ sub-ceiling の掃除。
-
-測定環境: AWS c7i.large(Xeon Platinum 8488C / Sapphire Rapids、AVX-512 + VPOPCNTDQ あり)、
-Go 1.26.4、`GOEXPERIMENT=simd`。ベンチは 384 次元 float32、検索は 10 万ベクトル。
+Step 0〜6 の測定環境は AWS c7i.large(Xeon Platinum 8488C / Sapphire Rapids、AVX-512 と VPOPCNTDQ あり)、Go 1.26.4、`GOEXPERIMENT=simd`。Step 7 以降は GitHub Codespaces(AMD EPYC 7763)、Step 12 は Go 1.27.1 と Apple M3 Pro も含みます。ベンチは 384 次元 float32、検索は 10 万ベクトルです。
 
 ---
 
@@ -382,7 +375,7 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
 上の「c7i 前提の数字・演出」と Codespaces(EPYC) のズレを、教材側を直して解消した(commit `b4576af`):
 - workshop.md の数値・ルーフライン図を EPYC 基準に統一(read 帯域=壁、リッジ 1.4、Stage1=4.2x で壁到達、
   Stage2 バッチ内 SIMD 5.8x、量子化 47x、rerank 43x)。図 6 枚(rl-stage0〜4 / roofline-plot)も再描画。
-- c7i 前提の付録(VZEROUPPER 税 / register spill)は本編から外し [`HIDDEN_CEILINGS.md`](HIDDEN_CEILINGS.md) へ分離。
+- c7i 前提の付録(VZEROUPPER 税 / register spill)は本編から外し [`hidden-ceilings.md`](hidden-ceilings.md) へ分離。
 - Stage 1 の演出は「1.6x 止まり=無力」→「効いた(4.2x)が壁に張り付く・倍率は CPU 次第」に再フレーム。
   倍率は機械依存だが「最後はメモリ壁で頭打ち/量子化が本命」という骨格は不変。
 
