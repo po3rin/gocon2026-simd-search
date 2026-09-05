@@ -3,7 +3,15 @@
 Go Conference 2026 ショートワークショップ
 **「ルーフラインで読み解く Pure Go × SIMD ベクトル検索」** の教材リポジトリ。
 
-> 🚧 現在は CFP 応募用の実測フェーズ。ワークショップ教材は **[`docs/workshop/workshop.md`](docs/workshop/workshop.md)**(読んで動かす形式・穴埋めなし)。
+## 参加者の方へ
+
+必要なのは GitHub アカウントとブラウザだけです。
+
+1. **環境を用意する**: [docs/workshop/SETUP.md](docs/workshop/SETUP.md) の手順で GitHub Codespaces を起動します(`Code` → `Codespaces` → `Create codespace`、マシンは 4-core)。ブラウザで VS Code が開けば準備完了です
+2. **動作確認**: Codespace のターミナルで `make test` と `make bench0` を実行します
+3. **教材を読みながら進める**: [docs/workshop/workshop.md](docs/workshop/workshop.md) を上から順に読み、各 Stage の `make` コマンドを実行して自分の数字を見ます
+
+手元の PC で動かす場合(amd64 Linux / Windows、Apple Silicon の Mac)の手順は [この下の「動かし方」](#動かし方) にあります。
 
 ## 何をするか
 
@@ -37,6 +45,7 @@ Go 1.27 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 
 ワークショップの進め方、Codespaces(AMD EPYC 7763)で実測したルーフライン、各 Stage の位置、計測方法、原典は
 教材 [`docs/workshop/workshop.md`](docs/workshop/workshop.md) にまとめてある(各 Stage の位置を図で示し、Go コードと計測コマンドを併記)。
+ドキュメントの一覧は [`docs/README.md`](docs/README.md)。
 
 ## 動かし方
 
