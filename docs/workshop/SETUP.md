@@ -33,7 +33,7 @@ make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 **全員 `4-core`（16 GB RAM）を指定してください。** 起動時のマシン選択で `4-core` を選ぶだけです。
 バラバラのサイズだと比較しづらくなるので、条件を揃えるために統一します。8-core 以上は無料枠を早く消費するだけで不要、2-core はベンチが不安定になりがちなので避けます。
 
-> ⚠️ ただし **Codespaces は当たる CPU（Intel/AMD・世代）を選べません**。同じ 4-core でも CPU が違えば**出る数字は変わります** — それが本ワークショップの狙い（各自のベンチで「自分の点」を打つ）。サイズを揃えるのは比較を少しでも揃えるためで、絶対値は約束しません。
+> ⚠️ ただし **Codespaces は当たる CPU（Intel/AMD・世代）を選べません**。同じ 4-core でも CPU が違えば**出る数字は変わります** 
 
 ## 費用：かかりません
 
@@ -52,9 +52,7 @@ Codespaces は当たる CPU（Intel/AMD・世代）を選べませんが、**本
 
 | 状況 | 対処 |
 |---|---|
-| **会社/組織アカウントで Codespaces が無効**（組織ポリシー） | 個人の GitHub アカウントで参加するか、講師に共有環境を相談。または下の「ローカル devcontainer」 |
-| Codespaces をどうしても使えない | **ローカル devcontainer**: VS Code + Docker Desktop で「Reopen in Container」。※本編と同じ数字を出すには **amd64 マシン**が必要（Apple Silicon は次項） |
-| 手元が **Apple Silicon (Mac)** | Go 1.27 なら `make test` も `make bench1` も **Neon(128bit)版の SIMD** で動きます。ただし本編の数字（AVX2・256bit）とは**別物の「自分の Mac の点」**になるので、みんなで見比べる数字は Codespaces で取ってください（workshop.md §09） |
-| 起動が遅い / 失敗する | 一度 Codespace を削除して作り直す。それでもダメなら講師へ |
+| **会社/組織アカウントで Codespaces が無効**（組織ポリシー） | 個人の GitHub アカウントで参加するか、Apple Silicon (Mac)環境を利用 |
+| 手元が **Apple Silicon (Mac)** | Go 1.27 なら `make test` も `make bench1` も **Neon(128bit)版の SIMD** で動きます。ただし本編の数字（AVX2・256bit）とは結果の数値は変わります |
 
 困ったら早めに講師に声をかけてください。当日は会場ネットワーク障害時に講師画面でのライブ進行に切り替えます。
