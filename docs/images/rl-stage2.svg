@@ -2,7 +2,7 @@
 <style>text{font-family:'Helvetica Neue',Helvetica,Arial,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;fill:#111827}</style>
 <rect width="960" height="600" fill="#ffffff"/>
 <text x="480" y="32" font-size="18" font-weight="600" text-anchor="middle">Stage 2: クエリのバッチ化(B=32)</text>
-<text x="480" y="52" font-size="11.5" fill="#6b7280" text-anchor="middle">AI が 0.5 から 16 に動き、リッジを越えて演算律速側へ。exact のまま SIMD がスカラより 5.9x 速い</text>
+<text x="480" y="52" font-size="11.5" fill="#6b7280" text-anchor="middle">算術強度 が 0.5 から 16 に動き、リッジを越えて演算律速側へ。exact のまま SIMD がスカラより 5.9x 速い</text>
 <line x1="80.0" y1="70.0" x2="80.0" y2="510.0" stroke="#eef2f7"/>
 <text x="80.0" y="526.0" font-size="10.5" fill="#6b7280" text-anchor="middle">0.25</text>
 <line x1="182.5" y1="70.0" x2="182.5" y2="510.0" stroke="#eef2f7"/>
@@ -35,11 +35,11 @@
 <text x="72.0" y="170.0" font-size="10.5" fill="#6b7280" text-anchor="end">50</text>
 <line x1="80.0" y1="105.6" x2="900.0" y2="105.6" stroke="#eef2f7"/>
 <text x="72.0" y="109.1" font-size="10.5" fill="#6b7280" text-anchor="end">100</text>
-<text x="490.0" y="550.0" font-size="12" fill="#374151" text-anchor="middle">算術強度 AI (flop/byte)、対数</text>
+<text x="490.0" y="550.0" font-size="12" fill="#374151" text-anchor="middle">算術強度 (flop/byte)、対数</text>
 <text transform="translate(22,290.0) rotate(-90)" font-size="12" fill="#374151" text-anchor="middle">性能 (GFLOP/s)、対数</text>
 <polyline fill="none" stroke="#9ca3af" stroke-width="2.5" points="80.0,365.2 315.6,225.3 900.0,225.3"/>
-<text x="88.0" y="383.2" font-size="11" fill="#60a5fa" text-anchor="start">メモリ律速(read 帯域 20.8 GB/s の斜線)</text>
-<text x="894.0" y="217.3" font-size="11" fill="#fb923c" text-anchor="end">演算律速(Go 実測の演算ピーク 25.6 GFLOP/s)</text>
+<text x="88.0" y="383.2" font-size="11" fill="#60a5fa" text-anchor="start">メモリ律速(メモリ帯域 20.8 GB/s で決まる斜線)</text>
+<text x="894.0" y="217.3" font-size="11" fill="#fb923c" text-anchor="end">演算律速(演算ピーク 25.6 GFLOP/s で決まる水平線)</text>
 <line x1="315.6" y1="225.3" x2="315.6" y2="510.0" stroke="#9ca3af" stroke-dasharray="3 3"/>
 <circle cx="315.6" cy="225.3" r="4" fill="#ffffff" stroke="#9ca3af" stroke-width="2"/>
 <text x="315.6" y="217.3" font-size="10" fill="#6b7280" text-anchor="middle">リッジ 1.23</text>

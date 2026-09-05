@@ -40,8 +40,8 @@ func main() {
 	flag.Parse()
 
 	stages := []stage{
-		{"全探索 (B=1)", "AI=0.5", bytePerElem, 130},      // no reuse
-		{"バッチ (B=32)", "AI=16", bytePerElem / 32, 280}, // d loaded once for 32 queries
+		{"全探索 (B=1)", "算術強度=0.5", bytePerElem, 130},      // no reuse
+		{"バッチ (B=32)", "算術強度=16", bytePerElem / 32, 280}, // d loaded once for 32 queries
 	}
 
 	tc := flopPerElem / *peak // compute time per element (same for every stage)

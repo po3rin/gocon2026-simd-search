@@ -76,7 +76,7 @@ func main() {
 func figures(peak, ridge float64) []fig {
 	s0 := pt{name: "Stage 0 スカラ全探索", ai: 0.5, gf: 2.15}
 	s1 := pt{name: "Stage 1 SIMD 全探索", ai: 0.5, gf: 9.7}
-	k1 := pt{name: "カーネル単体(L1 常駐)", ai: 16, gf: 13.9, note: "13.9 GF・AI は目安", vague: true}
+	k1 := pt{name: "カーネル単体(L1 常駐)", ai: 16, gf: 13.9, note: "13.9 GF・算術強度 は目安", vague: true}
 	s2 := pt{name: "Stage 2 SIMD バッチ(B=32)", ai: 16, gf: 13.3}
 	s2s := pt{name: "Stage 2 スカラ バッチ(B=32)", ai: 16, gf: 2.24, side: "below"}
 	s3 := pt{name: "Stage 3 int8", ai: 2, gf: 18.3, note: "18.3 Gop/s・上限の 72%"}
@@ -90,7 +90,7 @@ func figures(peak, ridge float64) []fig {
 			subtitle: "横軸は算術強度 AI(1 バイト運ぶごとに何回計算するか)、縦軸は性能。どのコードもこの線より上には行けない"},
 		{file: "rl-stage0",
 			title:    "Stage 0: スカラ全探索",
-			subtitle: "AI 0.5、2.15 GFLOP/s。メモリ帯域から決まる上限(約 10)にも届いていない",
+			subtitle: "算術強度 0.5、2.15 GFLOP/s。メモリ帯域から決まる上限(約 10)にも届いていない",
 			points:   []pt{s0}},
 		{file: "rl-stage1",
 			title:    "Stage 1: SIMD 化",
@@ -98,11 +98,11 @@ func figures(peak, ridge float64) []fig {
 			points:   []pt{ghost(s0), s1, k1}},
 		{file: "rl-stage2",
 			title:    "Stage 2: クエリのバッチ化(B=32)",
-			subtitle: "AI が 0.5 から 16 に動き、リッジを越えて演算律速側へ。exact のまま SIMD がスカラより 5.9x 速い",
+			subtitle: "算術強度 が 0.5 から 16 に動き、リッジを越えて演算律速側へ。exact のまま SIMD がスカラより 5.9x 速い",
 			points:   []pt{ghost(s1), s2, s2s}},
 		{file: "rl-stage3",
 			title:    "Stage 3: int8 量子化",
-			subtitle: "AI が 0.5 から 2 に動きリッジを越える。ただし演算の上限の下(カーネル律速)。Recall 0.948",
+			subtitle: "算術強度 が 0.5 から 2 に動きリッジを越える。ただし演算ピークの下(カーネル律速)。Recall 0.948",
 			points:   []pt{ghost(s1), s3}},
 		{file: "rl-stage4",
 			title:    "Stage 4: 1bit 量子化",
@@ -114,11 +114,11 @@ func figures(peak, ridge float64) []fig {
 			points:   []pt{s5}},
 		{file: "roofline-plot",
 			title:    "実測ルーフライン全体像(Codespaces / AMD EPYC 7763)",
-			subtitle: "演算ピーク " + ftoa(peak) + " GFLOP/s、read 帯域 20.8 GB/s、リッジ " + strconv.FormatFloat(ridge, 'f', 2, 64) + " flop/byte",
-			points:   []pt{s0, s1, {name: "カーネル単体(L1)", ai: 32, gf: 13.9, note: "AI は目安", vague: true, side: "below"}, s2, s3, s4},
+			subtitle: "演算ピーク " + ftoa(peak) + " GFLOP/s、メモリ帯域 20.8 GB/s、リッジ " + strconv.FormatFloat(ridge, 'f', 2, 64) + " flop/byte",
+			points:   []pt{s0, s1, {name: "カーネル単体(L1)", ai: 32, gf: 13.9, note: "算術強度 は目安", vague: true, side: "below"}, s2, s3, s4},
 			notes: []string{
-				"Stage 0 から 1: 縦に上がりメモリ帯域の上限で止まる(AI 0.5 はリッジの左)",
-				"Stage 1 から 2 / 3: AI を右に動かすとリッジを越え、SIMD が効く側に入る",
+				"Stage 0 から 1: 縦に上がりメモリ帯域の上限で止まる(算術強度 0.5 はリッジの左)",
+				"Stage 1 から 2 / 3: 算術強度 を右に動かすとリッジを越え、SIMD が効く側に入る",
 				"Stage 4: データを 1/32 にしてキャッシュに乗せる。flop が無いので点の位置は目安",
 			}},
 	}
@@ -171,9 +171,9 @@ func render(f fig, peak, bw, tpeak float64) string {
 			p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10.5\" fill=\"#6b7280\" text-anchor=\"end\">%g</text>\n", x0-8, y+3.5, t)
 		}
 	}
-	xlab, ylab := "算術強度 AI (flop/byte)、対数", "性能 (GFLOP/s)、対数"
+	xlab, ylab := "算術強度 (flop/byte)、対数", "性能 (GFLOP/s)、対数"
 	if f.concept {
-		xlab, ylab = "算術強度 AI (flop/byte)。右ほど 1 バイトあたりの計算が多い", "性能 (GFLOP/s)。上ほど速い"
+		xlab, ylab = "算術強度 (flop/byte)。右ほど 1 バイトあたりの計算が多い", "性能 (GFLOP/s)。上ほど速い"
 	}
 	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\" fill=\"#374151\" text-anchor=\"middle\">%s</text>\n", x0+plotW/2, y0+plotH+40, xlab)
 	p("<text transform=\"translate(22,%.1f) rotate(-90)\" font-size=\"12\" fill=\"#374151\" text-anchor=\"middle\">%s</text>\n", y0+plotH/2, ylab)
@@ -182,17 +182,17 @@ func render(f fig, peak, bw, tpeak float64) string {
 	p("<polyline fill=\"none\" stroke=\"%s\" stroke-width=\"2.5\" points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\"/>\n",
 		roofColor, px(aiLo), py(roof(aiLo)), px(ridge), py(peak), px(aiHi), py(peak))
 	if f.concept {
-		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\" font-weight=\"600\" fill=\"%s\" text-anchor=\"start\">メモリ帯域で決まる斜線(メモリ律速の上限)</text>\n", px(aiLo)+8, py(roof(aiLo))+20, memStroke)
-		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\" font-weight=\"600\" fill=\"%s\" text-anchor=\"end\">演算ピークで決まる水平線(演算律速の上限)</text>\n", px(aiHi)-6, py(peak)-10, cStroke)
+		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\" font-weight=\"600\" fill=\"%s\" text-anchor=\"start\">メモリ帯域で決まる斜線</text>\n", px(aiLo)+8, py(roof(aiLo))+20, memStroke)
+		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\" font-weight=\"600\" fill=\"%s\" text-anchor=\"end\">演算ピークで決まる水平線</text>\n", px(aiHi)-6, py(peak)-10, cStroke)
 		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"14\" font-weight=\"600\" fill=\"%s\" text-anchor=\"middle\">メモリ律速</text>\n", px(0.6), py(2.6), "#1d4ed8")
 		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11.5\" fill=\"%s\" text-anchor=\"middle\">データを運ぶのが間に合わない</text>\n", px(0.6), py(2.6)+18, "#1d4ed8")
-		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11.5\" fill=\"%s\" text-anchor=\"middle\">点がここなら AI を上げる(データ表現を変える)</text>\n", px(0.6), py(2.6)+36, "#1d4ed8")
+		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11.5\" fill=\"%s\" text-anchor=\"middle\">点がここなら 算術強度 を上げる(データ表現を変える)</text>\n", px(0.6), py(2.6)+36, "#1d4ed8")
 		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"14\" font-weight=\"600\" fill=\"%s\" text-anchor=\"middle\">演算律速</text>\n", px(12), py(4), "#c2410c")
 		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11.5\" fill=\"%s\" text-anchor=\"middle\">計算が間に合わない</text>\n", px(12), py(4)+18, "#c2410c")
 		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11.5\" fill=\"%s\" text-anchor=\"middle\">点がここなら実装効率を上げる(SIMD など)</text>\n", px(12), py(4)+36, "#c2410c")
 	} else {
-		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"start\">メモリ律速(read 帯域 %.1f GB/s の斜線)</text>\n", px(aiLo)+8, py(roof(aiLo))+18, memStroke, bw)
-		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"end\">演算律速(Go 実測の演算ピーク %.1f GFLOP/s)</text>\n", px(aiHi)-6, py(peak)-8, cStroke, peak)
+		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"start\">メモリ律速(メモリ帯域 %.1f GB/s で決まる斜線)</text>\n", px(aiLo)+8, py(roof(aiLo))+18, memStroke, bw)
+		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"end\">演算律速(演算ピーク %.1f GFLOP/s で決まる水平線)</text>\n", px(aiHi)-6, py(peak)-8, cStroke, peak)
 	}
 	// ridge
 	p("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-dasharray=\"3 3\"/>\n", px(ridge), py(peak), px(ridge), y0+plotH, roofColor)

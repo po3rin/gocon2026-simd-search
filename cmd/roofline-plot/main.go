@@ -136,8 +136,8 @@ func main() {
 	p("<div class=\"wrap\">\n")
 	p("<svg id=\"rl\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 %d %d\" width=\"100%%\">\n", W, H)
 	p("<rect width=\"%d\" height=\"%d\" fill=\"#ffffff\"/>\n", W, H)
-	p("<text x=\"%d\" y=\"32\" font-size=\"18\" font-weight=\"600\" text-anchor=\"middle\">実測ルーフライン — 測った点が天井に当たる</text>\n", W/2)
-	p("<text x=\"%d\" y=\"52\" font-size=\"11.5\" fill=\"#6b7280\" text-anchor=\"middle\">演算ピーク %.1f GFLOP/s ・ read 帯域 %.1f GB/s ・ リッジ %.2f flop/byte(make roofline-ceiling 実測)。点にカーソルを当てると詳細。</text>\n", W/2, *peak, *bw, ridge)
+	p("<text x=\"%d\" y=\"32\" font-size=\"18\" font-weight=\"600\" text-anchor=\"middle\">実測ルーフライン: 測った点が上限に近づく</text>\n", W/2)
+	p("<text x=\"%d\" y=\"52\" font-size=\"11.5\" fill=\"#6b7280\" text-anchor=\"middle\">演算ピーク %.1f GFLOP/s、メモリ帯域 %.1f GB/s、リッジ %.2f flop/byte(make roofline-ceiling の実測)。点にカーソルを当てると詳細が出ます。</text>\n", W/2, *peak, *bw, ridge)
 
 	// --- grid + ticks
 	for _, t := range []float64{0.25, 0.5, 1, 2, 4, 8, 16, 32, 64} {
@@ -158,16 +158,16 @@ func main() {
 		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10.5\" fill=\"#6b7280\" text-anchor=\"end\">%g</text>\n", x0-8, y+3.5, t)
 	}
 	// axis titles
-	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\" fill=\"#374151\" text-anchor=\"middle\">算術強度 AI (flop/byte) — log</text>\n", x0+plotW/2, y0+plotH+40)
-	p("<text transform=\"translate(22,%.1f) rotate(-90)\" font-size=\"12\" fill=\"#374151\" text-anchor=\"middle\">性能 (GFLOP/s) — log</text>\n", y0+plotH/2)
+	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\" fill=\"#374151\" text-anchor=\"middle\">算術強度 (flop/byte)、対数</text>\n", x0+plotW/2, y0+plotH+40)
+	p("<text transform=\"translate(22,%.1f) rotate(-90)\" font-size=\"12\" fill=\"#374151\" text-anchor=\"middle\">性能 (GFLOP/s)、対数</text>\n", y0+plotH/2)
 
 	// --- roofline: memory diagonal up to the ridge, then compute horizontal.
 	rx := math.Max(aiLo, math.Min(ridge, aiHi))
 	p("<polyline fill=\"none\" stroke=\"#9ca3af\" stroke-width=\"2.5\" points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\"/>\n",
 		px(aiLo), py(roof(aiLo)), px(rx), py(*peak), px(aiHi), py(*peak))
 	// region tints (memory-bound left of ridge, compute-bound right)
-	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"start\">メモリ律速 ↙(帯域 %.1f GB/s の斜線)</text>\n", px(aiLo)+6, py(roof(aiLo))-8, memStroke, *bw)
-	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"end\">演算律速 ↗(演算ピーク %.1f GFLOP/s)</text>\n", px(aiHi)-6, py(*peak)-8, cStroke, *peak)
+	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"start\">メモリ律速(メモリ帯域 %.1f GB/s で決まる斜線)</text>\n", px(aiLo)+6, py(roof(aiLo))-8, memStroke, *bw)
+	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"end\">演算律速(演算ピーク %.1f GFLOP/s で決まる水平線)</text>\n", px(aiHi)-6, py(*peak)-8, cStroke, *peak)
 	// ridge marker
 	p("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#9ca3af\" stroke-dasharray=\"3 3\"/>\n", px(ridge), py(*peak), px(ridge), y0+plotH)
 	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10\" fill=\"#6b7280\" text-anchor=\"middle\">リッジ %.2f</text>\n", px(ridge), py(*peak)-4, ridge)
@@ -176,7 +176,7 @@ func main() {
 	if *tpeak > 0 {
 		y := py(*tpeak)
 		p("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#cbd5e1\" stroke-width=\"1.5\" stroke-dasharray=\"6 4\"/>\n", x0, y, x0+plotW, y)
-		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10.5\" fill=\"#94a3b8\" text-anchor=\"end\">理論ピーク %.0f(到達できないのは register spill)</text>\n", x0+plotW, y-4, *tpeak)
+		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10.5\" fill=\"#94a3b8\" text-anchor=\"end\">AVX2 の理論ピーク %.0f(register spill で届かない)</text>\n", x0+plotW, y-4, *tpeak)
 	}
 
 	// --- points: a dropline to the roof shows how close to the ceiling it is.
@@ -194,7 +194,7 @@ func main() {
 			"data-name=\"%s\" data-ai=\"%g\" data-gf=\"%.2f\" data-roof=\"%.2f\" data-frac=\"%.0f\"/>\n",
 			x, yPt, fill, stroke, pt.name, pt.ai, pt.gf, r, frac)
 		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" font-weight=\"600\" fill=\"#111827\" text-anchor=\"middle\">%s</text>\n", x, yPt-12, pt.name)
-		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10\" fill=\"#6b7280\" text-anchor=\"middle\">%.1f GF・天井の %.0f%%</text>\n", x, yPt+20, pt.gf, frac)
+		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10\" fill=\"#6b7280\" text-anchor=\"middle\">%.1f GF・上限の %.0f%%</text>\n", x, yPt+20, pt.gf, frac)
 	}
 
 	p("</svg>\n")
@@ -205,7 +205,7 @@ func main() {
 	p("document.querySelectorAll('circle.pt').forEach(function(c){\n")
 	p("  c.addEventListener('mousemove',function(e){\n")
 	p("    var d=c.dataset;\n")
-	p("    tip.innerHTML=d.name+'<br>AI='+d.ai+' flop/byte<br>'+d.gf+' GFLOP/s<br>天井 '+d.roof+' GF の '+d.frac+'%%';\n")
+	p("    tip.innerHTML=d.name+'<br>算術強度 '+d.ai+' flop/byte<br>'+d.gf+' GFLOP/s<br>上限 '+d.roof+' GF の '+d.frac+'%%';\n")
 	p("    tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.style.opacity=1;\n")
 	p("  });\n")
 	p("  c.addEventListener('mouseleave',function(){tip.style.opacity=0;});\n")
