@@ -605,10 +605,16 @@ VM の揺れ。2 回目以降は 56 ns)。
 壁の下に落ちる」。教材のコラムはこの実測に合わせて**書き直した**(想定の「変わらない」は撤回)。
 むしろ「点は壁の下側にしか動けない」の実証として Stage 1 の結論を補強する形になった。
 
-### 残課題
+### 見送り(スコープ外と決めたもの)
 
-- PROPOSAL.md / PROPOSAL_NOTES.md の「Go 1.26」表記は CFP 提出時点の史実として触っていない。
-- AVX-512 機(`infra/` の c7i)での `GODEBUG=simd=512/256/128` 3 段比較は未実施。
+- **AVX-512 機での `GODEBUG=simd=512/256/128` 3 段比較は見送り**(2026-09-05)。ワークショップで
+  使う環境は Codespaces だけに閉じる方針。Codespaces を EastUs / WestUs2 / WestEurope /
+  SouthEastAsia の 4 リージョンで起動して確認したが、**全て AMD EPYC 7763(AVX-512 なし)**だった
+  ので、参加者が AVX-512 を踏むことはまず無い。`infra/` の c7i は 6 月の計測後に消えており
+  `terraform.tfstate` は古い(plan は 7 リソース新規作成)。付録 B を実機で試したい人向けに
+  Terraform 一式は残置。
+- PROPOSAL.md は Go 1.27 の一文を追記済み。PROPOSAL_NOTES.md の実測表(Go 1.26.4・c7i)は
+  CFP 提出時点の史実として据え置き。
 
 ## 高速化の階段(最終形)
 
