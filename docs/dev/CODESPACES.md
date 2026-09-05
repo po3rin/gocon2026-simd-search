@@ -70,8 +70,10 @@ ssh-keygen -t ed25519 -f ~/.ssh/codespaces.auto -N "" -q -C codespaces.auto
 ```sh
 REPO=po3rin/gocon2026-simd-search
 
-# 立てる（8-core, idle 30分で自動停止）
-CS=$(gh codespace create -R $REPO -b main -m premiumLinux --idle-timeout 30m -q)
+# 立てる（8-core, idle 30分で自動停止）。参加者と同条件で測るなら -m standardLinux32gb（4-core）
+# ※ gh 2.7x では -q フラグが無くなった（unknown shorthand flag: 'q'）。create は名前だけを stdout に出すので
+#    そのまま受ける。--default-permissions を付けないと権限確認のプロンプトで止まることがある
+CS=$(gh codespace create -R $REPO -b main -m premiumLinux --idle-timeout 30m --default-permissions 2>/dev/null | tail -1)
 
 # Available になるまで待つ
 until [ "$(gh codespace list --json name,state -q '.[]|select(.name=="'$CS'")|.state')" = "Available" ]; do sleep 8; done
@@ -89,7 +91,11 @@ gh codespace delete -c $CS
 ```
 
 リポジトリは Codespace 内の `/workspaces/gocon2026-simd-search` にチェックアウトされる。
-`GOEXPERIMENT=simd` は devcontainer の `containerEnv` で設定済み。
+`GOEXPERIMENT=simd` は devcontainer の `containerEnv` で設定済み。GOPATH は `/go`（`~/go` ではない）。
+
+**測り方の注意（2026-09-05 の再計測で判明）:** 容器起動直後の 1 回目のベンチは遅めに出る
+（DotSIMD が 56 ns のところ 71 ns）。数字を採るときは同じターゲットを 2 回走らせて 2 回目以降を使う。
+手元の作業ツリーだけを試したいときは push せずに `gh codespace cp -e -c $CS <file> "remote:/workspaces/gocon2026-simd-search/<file>"` で 1 ファイルずつ送れる。
 
 ### make ターゲット早見
 
@@ -118,6 +124,7 @@ gh codespace delete -c $CS
 
 | 症状 | 原因 / 対処 |
 |---|---|
+| `unknown shorthand flag: 'q'` | gh 2.7x で `create -q` が廃止 → フラグを外す（create は名前だけを出力する） |
 | `failed to start SSH server / install sshd` | devcontainer に sshd feature が無い → 0-2 を追加して作り直し |
 | `Permission denied (publickey,password)` | `~/.ssh/codespaces.auto` が無い → 0-3 で生成 |
 | `nproc` が想定より少ない | SKU 名の取り違え（`standardLinux32gb`=4-core）。8-core は `premiumLinux` |
