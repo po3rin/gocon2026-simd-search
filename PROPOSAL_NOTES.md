@@ -37,4 +37,4 @@
 | bonus: unsafe + VZEROUPPER 最適化 | sub-ceilingを掃除しメモリ天井へ | 23.5 ns(カーネル) | 8.7x |
 
 ※ **上の倍率はこの c7i 固有の実測例**。CPU・キャッシュ・帯域で変わるため、当日は各自のベンチで点を打って確かめる(=数値を約束しない設計)。本編(AVX2+FMA)はCodespacesだけで全ステージ再現でき、**Codespaces(8-core / AMD EPYC 7763 / Zen3)で本編再計測済み**(2026-06-14)。実測: SIMD全探索 8.41ms(**4.2x**・c7iは1.6x)/ バイナリ量子化 0.762ms(**46.7x**)/ rerank 0.822ms(Recall@10 0.868)。**SIMD全探索の倍率が CPU で 1.6x↔4.2x と動く**のは「数値を約束しない」設計のよい裏付け(詳細: docs/dev/OPTIMIZATION_LOG.md Step 7、手順: docs/dev/CODESPACES.md)。
-※ 調査の副産物として「Go 1.26 simd は VZEROUPPER を自動挿入せず、SIMD関数の呼び出しごとに〜550cycleの隠れ税が発生しうる」という(おそらく)未報告の知見を得た(modern Intel = Sapphire Rapids での実測)。ルーフライン上では「メモリ天井に届く前に越えるべき隠れ sub-ceiling」として現れる。詳細は docs/dev/OPTIMIZATION_LOG.md。golang/go への issue 報告予定(関連: #77647)。
+※ 調査の副産物として「Go 1.26 simd は VZEROUPPER を自動挿入せず、SIMD関数の呼び出しごとに〜550cycleの隠れ税が発生しうる」という(おそらく)未報告の知見を得た(modern Intel = Sapphire Rapids での実測)。ルーフライン上では「メモリ天井に届く前に越えるべき隠れ sub-ceiling」として現れる。詳細は docs/dev/OPTIMIZATION_LOG.md。golang/go への issue 報告予定(関連: #77647)。Go 1.27.1 でも自動挿入は無いことを 2026-09-05 に再確認(docs/dev/OPTIMIZATION_LOG.md Step 12)。
