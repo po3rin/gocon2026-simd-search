@@ -8,13 +8,16 @@ Go Conference 2026 ショートワークショップ
 ## 何をするか
 
 Go 1.27 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)を使い、
-外部ライブラリなしの Pure Go でベクトル検索エンジンを高速化する。ただし闇雲に触らず、
-**ルーフラインモデル**という一枚の地図の上で、毎回この4手を回す:
+外部ライブラリなしの Pure Go でベクトル検索エンジンを高速化する。ただし闇雲には触らず、
+ルーフラインモデル(性能の上限を図にする方法。教材 §04 で説明)を使って毎回この 4 手を回す:
 
-> **① 測る → ② 算術強度(AI)を出して図に点を打つ → ③ 当たっている天井を特定 → ④ その天井を狙う手だけ打つ**
+1. 測る
+2. 算術強度(AI)を出して図に点を打つ
+3. いま何が性能の上限になっているかを特定する
+4. その上限に効く手だけ打つ
 
-ルーフラインは、**まだ1行も最適化していない段階で「縦に上っても天井で頭打ち、
-本命は AI を右に動かすこと」を予言してくれる**。その地図に沿って実装するのが本教材。
+ルーフラインを使うと、1 行も最適化していない段階で「実装を速くしてもメモリ帯域で頭打ちになる。
+本命は AI を上げること」が分かる。その見立てに沿って実装するのが本教材。
 
 | Stage | 内容 | ルーフライン上の動き | カーネル |
 |---|---|---|---|
@@ -26,14 +29,14 @@ Go 1.27 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 | 4 | バイナリ量子化 + ハミング距離(byte 1/32) | **右上へ** → DRAM 律速を脱出(Recall 0.18) | `vec.Quantize` + `vec.Hamming` |
 | 5 | binary で粗く絞って float32 で rerank | 精度軸(Recall@10 0.18→0.87) | `Index.SearchBinaryRerank` |
 
-> 本編で使う SIMD は **AVX2 + FMA だけ**(Stage 3 の int8 カーネルは AVX2 のみ)。だから **GitHub Codespaces にどの CPU が当たっても全ステージ再現します**。AVX-512 VPOPCNT は Stage 4 で見たとおり量子化後は速くならないので本編では扱いません(AVX-512 機で試したい人向けの付録 `vec.HammingSIMD` のみ残置)。
+> 本編で使う SIMD は AVX2 + FMA だけ(Stage 3 の int8 カーネルは AVX2 のみ)。そのため GitHub Codespaces にどの CPU が当たっても全ステージ再現する。AVX-512 VPOPCNT は Stage 4 で見るとおり量子化後は速くならないので本編では扱わない(AVX-512 機で試したい人向けの付録 `vec.HammingSIMD` のみ残している)。
 
-中核メッセージ: **SIMD だけが高速化じゃない。ルーフラインで天井を見れば、
-「縦に上る(実装効率)」と「横に動く(データ表現)」のどちらを打つべきかが図から決まる。
-そして横に動いた先でまた SIMD が効く。**
+伝えたいことは 1 つ。SIMD だけが高速化ではない。ルーフラインで性能の上限を見れば、
+実装効率を上げる(SIMD)のか、データ表現を変える(バッチ化・量子化)のか、どちらを打つべきかが図から決まる。
+そしてデータ表現を変えた先でまた SIMD が効く。
 
-ワークショップの進め方・本物のルーフライン(Codespaces / AMD EPYC 7763 実測)・各 Stage の点と天井・計測方法・原典は、
-教材 **[`docs/workshop/workshop.md`](docs/workshop/workshop.md)** に集約(各 Stage の点と当たっている天井を静止画のルーフラインで示し、Go コードと計測コマンドを併記)。
+ワークショップの進め方、Codespaces(AMD EPYC 7763)で実測したルーフライン、各 Stage の位置、計測方法、原典は
+教材 [`docs/workshop/workshop.md`](docs/workshop/workshop.md) にまとめてある(各 Stage の位置を図で示し、Go コードと計測コマンドを併記)。
 
 ## 動かし方
 
@@ -49,18 +52,18 @@ make recall     # Recall@10(binary vs rerank vs int8)
 make bench-parallel # 寄り道: goroutine 並列はどの天井に効くか
 make bench-nsweep   # Stage 1 コラム: DB サイズで SIMD 倍率が崩れる境界
 make bench-int8     # Stage 3: int8 量子化(カーネル 10x・Recall 0.948)
-make bench-portable # Stage 1 コラム: ポータブル simd 版(256bit で同じ点)+ GODEBUG=simd=128 で幅を半分にすると壁の下に落ちる
+make bench-portable # Stage 1 コラム: ポータブル simd 版(256bit で同じ結果)+ GODEBUG=simd=128 で幅を半分にすると遅くなる
 make bench-maxsim   # 付録A: MaxSim(late interaction・最初から演算律速)
 make bench-bonus    # 付録B: AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
 ```
 
-`make roofline` の出力例(点を打つ = ルーフラインの①②):
+`make roofline` の出力例(上の 4 手の 1〜2 にあたる):
 
 ```
 # 例: 4コア Codespace(AMD EPYC 7763)。数値は当たった CPU・実行ごとの揺れで変わります
 BenchmarkSearchNaive   ... ns/op   ... MB/s   0.5 AI(flop/byte)   2.15 GFLOP/s   153.6 MB/query
-BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   9.7 GFLOP/s    153.6 MB/query  ← メモリ斜線(read天井)に張り付く
-BenchmarkSearchBinary  ... ns/op   ... MB/s                                       4.8 MB/query  ← 横に動いて 1/32
+BenchmarkSearchSIMD    ... ns/op   ... MB/s   0.5 AI(flop/byte)   9.7 GFLOP/s    153.6 MB/query  ← メモリ帯域の上限(read 約 20 GB/s)に達する
+BenchmarkSearchBinary  ... ns/op   ... MB/s                                       4.8 MB/query  ← 転送量を 1/32 に減らす
 ```
 
 ### ローカル(mac / arm64)
@@ -90,7 +93,7 @@ make isa-report-amd64 GO=$(go env GOPATH)/bin/go1.27.1   # Rosetta で amd64 側
 ## 構成
 
 ```
-internal/vec/    距離カーネル(ワークショップで穴埋めする場所)
+internal/vec/    距離カーネル(Stage ごとの内積・ハミング距離の実装)
 internal/index/  ミニ検索エンジン(Index / Search API)+ ベンチ + roofline 計測
 docs/workshop/   参加者教材 workshop.md(SIMD/ベクトル検索の基礎+進め方+図+計測方法+まとめ+原典)
 docs/dev/        開発記録(OPTIMIZATION_LOG / ENVIRONMENT_SURVEY)

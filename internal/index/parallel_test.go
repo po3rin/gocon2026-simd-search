@@ -67,7 +67,7 @@ func TestSearchBatchParallelMatchesBatchSIMD(t *testing.T) {
 
 // 寄り道: goroutine 並列はどの天井に効くか。
 // メモリ律速の全探索(B=1)はコアが DRAM 帯域を取り合うのでサブリニア、
-// 演算律速のバッチ(B=32)はほぼリニアに伸びるはず。
+// 演算律速のバッチ(B=32)は物理コア数までほぼリニアに伸びる。
 func BenchmarkSearchParallel(b *testing.B) {
 	benchSetup()
 	for _, w := range []int{1, 2, 4} {

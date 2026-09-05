@@ -41,7 +41,7 @@ func Dot(a, b []float32) float32 {
 	// 水平加算: 16レーンをスカラーに畳み込む
 	var buf [8]float32
 	acc0.Add(acc1).Store(buf[:])
-	// ベクトル→スカラーの境界。Go 1.26 は VZEROUPPER を自動挿入しないため、
+	// ベクトルからスカラーへ戻る境界。Go は 1.27 でも VZEROUPPER を自動挿入しないため、
 	// 標準 API の archsimd.ClearAVXUpperBits()(= VZEROUPPER)を自分で呼ぶ。
 	// これを忘れると dirty ymm × レガシーSSE の遷移ペナルティで呼び出しごとに
 	// 〜550サイクル失う(詳細: docs/dev/OPTIMIZATION_LOG.md)

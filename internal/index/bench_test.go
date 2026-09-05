@@ -95,7 +95,7 @@ func BenchmarkSearchSIMD(b *testing.B) {
 	reportFloatRoofline(b, iters)
 }
 
-// Stage 1 コラム: ポータブル simd 版(simd.Float32s)。SearchSIMD と同じ点に乗るはず。
+// Stage 1 コラム: ポータブル simd 版(simd.Float32s)。SearchSIMD と同じ点に乗る(Codespaces 実測で確認済み)。
 // GODEBUG=simd=128 で幅を半分にすると、カーネルが 1 ベクトルのメモリ時間からはみ出して壁の下に落ちる。
 func BenchmarkSearchPortable(b *testing.B) {
 	benchSetup()

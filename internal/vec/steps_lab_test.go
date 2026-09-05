@@ -22,7 +22,7 @@ import (
 //   本実装:      vec.HammingSIMD
 
 // dotStep1 は最初に書いた素朴な SIMD 内積。
-// 実測 219ns(naive 205ns より遅い!)。罠②の現物。
+// 実測 219ns(naive 205ns より遅い)。OPTIMIZATION_LOG の罠②を再現するもの。
 func dotStep1(a, b []float32) float32 {
 	var acc archsimd.Float32x8
 	i := 0

@@ -13,7 +13,7 @@ var hasInt8SIMD = archsimd.X86.AVX2()
 // 1イテレーションで int8 を16個: sign-extend で int16x16 に広げ(VPMOVSXBW)、
 // DotProductPairs(VPMADDWD)が「隣り合う2要素の積和」を int32x8 で返すので
 // アキュムレータに足し込む。int16 同士の積は最大 127*127=16129、ペア和でも
-// int32 に余裕で収まる(飽和トリック不要なのが signed×signed のうれしさ)。
+// int32 に余裕で収まる(signed×signed なので飽和対策が要らない)。
 func DotInt8(a, b []int8) int32 {
 	if !hasInt8SIMD {
 		return DotInt8Naive(a, b)
