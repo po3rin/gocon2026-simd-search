@@ -330,7 +330,7 @@ VMOVDQU X2, 0x398(SP)     # acc をスタックへ書き戻し
 
 本編(Stage 0/1/2 + rerank)を Codespaces 一本化したので、実際に **8-core Codespace
 (`premiumLinux`)** を立てて本編フルを取り直した。当たった CPU は **AMD EPYC 7763
-(Zen3、AVX2+FMA あり / AVX-512 VPOPCNTDQ なし)**。手順は [CODESPACES.md](CODESPACES.md)。
+(Zen3、AVX2+FMA あり / AVX-512 VPOPCNTDQ なし)**。手順は CODESPACES.md(非公開の運営メモ)。
 これで「本編は Codespaces のどの CPU でも再現／AVX-512 は保証されない」を実機で確認できた
 (付録 `SearchBinarySIMD` は VPOPCNT 非搭載のため fallback)。
 

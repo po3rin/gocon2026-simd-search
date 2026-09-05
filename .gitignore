@@ -40,3 +40,9 @@ crash.log
 *~
 .idea/
 .vscode/
+
+# ---- 個人メモ(公開しない。ローカルには残す) ----
+/PROPOSAL.md
+/PROPOSAL_NOTES.md
+/docs/dev/VIZ_TOOLING_PLAN.md
+/docs/dev/CODESPACES.md
