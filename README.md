@@ -109,3 +109,7 @@ docs/appendix/   付録(隠れた性能上限 / 実行環境の調査 / 最適�
 docs/images/     図(SVG+PNG)
 docs/README.md   ドキュメント索引
 ```
+
+## ライセンス
+
+MIT License。コード、教材、図のすべてに適用します([LICENSE](LICENSE))。
