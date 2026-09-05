@@ -58,7 +58,7 @@ func main() {
 	p(`<style>text{font-family:'Helvetica Neue',Helvetica,Arial,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;}</style>` + "\n")
 	p(`<rect width="960" height="440" fill="#ffffff"/>` + "\n")
 	p(`<text x="480" y="32" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">メモリ時間 vs 演算時間 — バッチ化で律速が反転(ルーフライン分解)</text>` + "\n")
-	p(`<text x="480" y="54" font-size="11.5" fill="#6b7280" text-anchor="middle">go 実測の天井(演算 %.1f GFLOP/s・read 帯域 %.1f GB/s, make roofline-ceiling)から計算。実時間 ≈ 長い方(max)。</text>`+"\n", *peak, *bw)
+	p(`<text x="480" y="54" font-size="11.5" fill="#6b7280" text-anchor="middle">Go 実測の上限(演算 %.1f GFLOP/s、read 帯域 %.1f GB/s。make roofline-ceiling)から計算。実時間はおおよそ長い方。</text>`+"\n", *peak, *bw)
 
 	for _, s := range stages {
 		tm := s.bytes / *bw
