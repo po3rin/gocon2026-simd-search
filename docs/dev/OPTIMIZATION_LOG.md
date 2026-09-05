@@ -566,14 +566,49 @@ Go 1.27(2026-08 リリース。手元は 1.27.1)で SIMD 周りが動いたの�
 「検索と同じ読み方で DRAM を流す」形(`ceiling_mem_arm64_test.go`)にした。教材の言い分
 (「天井ベンチも検索と同じ SIMD ロードで測る」)を arm64 でもそのまま適用した格好。
 
-### 未計測・残課題
+### Codespaces(4コア・AMD EPYC 7763・go1.27.1)での再計測(2026-09-05)
 
-- **Codespaces(amd64)での再計測は未実施**。API 改訂は名前だけでコード生成は同じはず
-  (`Dot` の `-S` はロード + VFMADD のみで 1.26 と同形)だが、`make bench` の数字は要再確認。
-- `make bench-portable` の **256 vs 128 bit の対比は amd64 でしか出ない**(arm64 は元から 128)。
-  workshop.md Stage 1 の新コラムは数値を `...` で置いてある(`<!-- TODO(author) -->`)。
-  Codespaces で叩いて埋める。
+`gh codespace create -m standardLinux32gb` でブランチから立て、`make isa-report / test / bench1 /
+bench-portable / bench3 / bench-int8 / roofline-ceiling / roofline-batch / recall / spill` を一括実行。
+本編の数字は全て**教材の記述の範囲内**で再現(揺れは §05 の注どおり ±5〜10%):
+
+| ベンチ | 教材の値(Step 9) | 今回(1.27.1) |
+|---|---|---|
+| DotNaive → DotSIMD | 348 → 55.2 ns | 344 → 56.1 ns |
+| SearchNaive → SearchSIMD | 35.7 → 7.9 ms(19.4 GB/s) | 35.0 → 8.4〜8.6 ms(18.2 GB/s) |
+| PeakFLOP_AVX2 / ReadBW / TriadBW | 25.6 GF / 20.8 / 17.4 GB/s | 25.0 GF / 19.2 / 13.7 GB/s |
+| DotInt8Naive → DotInt8SIMD / SearchInt8 | 364 → 34.6 ns / 4.2 ms | 381 → 33.3 ns / 4.0 ms |
+| SearchBinary / BinaryRerank | 0.77 / 0.85 ms 前後 | 0.84 / 0.93 ms |
+| Batch B=32 naive / SIMD | — | 36.6 / 6.25 ms/query(12.3 GF) |
+| Recall@10 binary / rerank / int8 | 0.180 / 0.868 / 0.948 | 0.180 / 0.868 / 0.948(完全一致) |
+| spill(`make spill`) | あり | あり(`VMOVDQU Y2, a0+952(SP)` …) |
+
+**Go 1.26.8 vs 1.27.1 の A/B(同一 Codespace・交互 2 ラウンド):** HEAD~1(1.26 API のコード)を
+go1.26.8 + `GOTOOLCHAIN=local` で、HEAD を go1.27.1 で交互に測定。DotSIMD 57.5〜61.3 ns vs
+56.3〜60.0 ns、SearchSIMD 8.37〜8.89 ms vs 8.35〜8.45 ms で**差は揺れの範囲内**。API 改訂は名前
+だけでコード生成は変わっていない(容器起動直後の初回 `make bench1` で DotSIMD 71 ns が出たのは
+VM の揺れ。2 回目以降は 56 ns)。
+
+**罠 ⑧: `GODEBUG=simd=128` で「同じ ms」にならない。** ポータブル版コラムは当初「幅を半分に
+しても全探索の ms は変わらない(= メモリ律速の証拠)」を想定していたが、実測は逆:
+
+| | DotPortable カーネル | SearchPortable |
+|---|---|---|
+| 256bit(既定) | 56.8 ns(archsimd 版 56.1 と同じ) | 8.46 ms・18.1 GB/s(SearchSIMD 8.64 と同じ点) |
+| 128bit(`GODEBUG=simd=128`) | 107 ns | 11.9 ms・12.9 GB/s(**1.4x 遅い**) |
+
+アキュムレータを 2 本→4 本にしても同じ比率(2 本: 80 ns / 14.7 ms → 4 本: 107 ns / 11.9 ms。
+かえって 128bit カーネルは 4 本の方が遅い = レイテンシ連鎖ではなく命令数で律速)。
+読み解き: DB ベクトル 1 本(1536 byte)の DRAM 転送時間は 1536 / 19.2 GB/s ≈ 80 ns。256bit の
+カーネル 57 ns は 80 ns に隠れる(→壁に張り付く)が、128bit の 107 ns は 80 ns からはみ出す
+(→律速がカーネルに戻り、点は壁の下へ)。つまり「幅を広げても壁の上には行けない・狭めると
+壁の下に落ちる」。教材のコラムはこの実測に合わせて**書き直した**(想定の「変わらない」は撤回)。
+むしろ「点は壁の下側にしか動けない」の実証として Stage 1 の結論を補強する形になった。
+
+### 残課題
+
 - PROPOSAL.md / PROPOSAL_NOTES.md の「Go 1.26」表記は CFP 提出時点の史実として触っていない。
+- AVX-512 機(`infra/` の c7i)での `GODEBUG=simd=512/256/128` 3 段比較は未実施。
 
 ## 高速化の階段(最終形)
 

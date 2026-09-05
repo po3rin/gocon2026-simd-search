@@ -49,7 +49,7 @@ make recall     # Recall@10(binary vs rerank vs int8)
 make bench-parallel # 寄り道: goroutine 並列はどの天井に効くか
 make bench-nsweep   # Stage 1 コラム: DB サイズで SIMD 倍率が崩れる境界
 make bench-int8     # Stage 3: int8 量子化(カーネル 10x・Recall 0.948)
-make bench-portable # Stage 1 コラム: ポータブル simd 版 + GODEBUG=simd=128 で幅を半分にしても壁は動かない
+make bench-portable # Stage 1 コラム: ポータブル simd 版(256bit で同じ点)+ GODEBUG=simd=128 で幅を半分にすると壁の下に落ちる
 make bench-maxsim   # 付録A: MaxSim(late interaction・最初から演算律速)
 make bench-bonus    # 付録B: AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
 ```

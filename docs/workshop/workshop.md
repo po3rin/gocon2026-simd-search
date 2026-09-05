@@ -457,18 +457,20 @@ func Dot(a, b []float32) float32 {
 >
 > L3 に収まる間はカーネル並みの 5.7〜5.8x、DRAM に溢れた瞬間に 3.9x へ落ちて以後一定(表は別インスタンスの実測なので Stage 1 本文と絶対値が少し違います — §05 の揺れの注のとおり)。本編の10万件(154MB)は、**意図的に壁の向こう側**に置いた設定です。
 
-> **コラム: 同じ内積を「ポータブル simd」で書く — レジスタ幅を半分にしても壁は動かない(`make bench-portable`):** Go 1.27 には `archsimd` の上にもう1段、**ベクトル長に依存しない `simd` パッケージ**が入りました。型名からレーン数が消え(`Float32x8` → `Float32s`)、幅は実行時に CPU が決めます(AVX-512 機なら 16 レーン、AVX2 機なら 8、Apple Silicon の Neon なら 4)。同じソースが amd64 / arm64 / Wasm で動き、命令の無い環境では純 Go でエミュレートされます:
+> **コラム: 同じ内積を「ポータブル simd」で書く — レジスタ幅を半分にすると点はどこへ行くか(`make bench-portable`):** Go 1.27 には `archsimd` の上にもう1段、**ベクトル長に依存しない `simd` パッケージ**が入りました。型名からレーン数が消え(`Float32x8` → `Float32s`)、幅は実行時に CPU が決めます(AVX-512 機なら 16 レーン、AVX2 機なら 8、Apple Silicon の Neon なら 4)。同じソースが amd64 / arm64 / Wasm で動き、命令の無い環境では純 Go でエミュレートされます:
 >
 > ```go
 > // internal/vec/dot_portable.go(GOEXPERIMENT=simd。ビルドタグに amd64 は無い)
-> var acc0, acc1 simd.Float32s     // 幅は実行時に決まる
-> n := acc0.Len()                  // このマシンのレーン数(4 / 8 / 16)
-> for len(a) >= 2*n {
+> var acc0, acc1, acc2, acc3 simd.Float32s   // 幅は実行時に決まる。4本で依存連鎖を短く
+> n := acc0.Len()                            // このマシンのレーン数(4 / 8 / 16)
+> for len(a) >= 4*n {
 >     acc0 = simd.LoadFloat32s(a).MulAdd(simd.LoadFloat32s(b), acc0)
 >     acc1 = simd.LoadFloat32s(a[n:]).MulAdd(simd.LoadFloat32s(b[n:]), acc1)
->     a = a[2*n:]; b = b[2*n:]
+>     acc2 = simd.LoadFloat32s(a[2*n:]).MulAdd(simd.LoadFloat32s(b[2*n:]), acc2)
+>     acc3 = simd.LoadFloat32s(a[3*n:]).MulAdd(simd.LoadFloat32s(b[3*n:]), acc3)
+>     a = a[4*n:]; b = b[4*n:]
 > }
-> for len(a) > 0 {                 // 端数はマスク付きロードでベクトルのまま
+> for len(a) > 0 {                           // 端数はマスク付きロードでベクトルのまま
 >     va, k := simd.LoadFloat32sPart(a)
 >     vb, _ := simd.LoadFloat32sPart(b)
 >     acc0 = va.MulAdd(vb, acc0)
@@ -476,19 +478,18 @@ func Dot(a, b []float32) float32 {
 > }
 > ```
 >
-> このパッケージには **`GODEBUG=simd=128` のように幅を狭めて実行する仕組み**があります。つまり同じバイナリで「256bit(8レーン)」と「128bit(4レーン)」の全探索を測り比べられる。Stage 1 の結論「幅を広げても壁は動かない」を、逆向き(**幅を半分にしても遅くならない**)から自分の手で確かめる実験です:
+> このパッケージには **`GODEBUG=simd=128` のように幅を狭めて実行する仕組み**があります。つまり同じバイナリで「256bit(8レーン)」と「128bit(4レーン)」の全探索を測り比べられる。Stage 1 の結論は「幅を 8→16 に**広げても**壁は動かない」でした。では**狭めたら**どうなるか — 自分の手で確かめる実験です:
 >
 > ```bash
-> $ make bench-portable
-> BenchmarkDotSIMD          ... ns/op                          ← archsimd 版カーネル(Stage 1b)
-> BenchmarkDotPortable      ... ns/op                          ← ポータブル版カーネル(少し遅くて良い)
-> BenchmarkSearchSIMD       ... ms/op  ... GB/s                ← 全探索: 壁に張り付く
-> BenchmarkSearchPortable   ... ms/op  ... GB/s  256 vec-bits  ← 全探索: 同じ壁
-> BenchmarkSearchPortable   ... ms/op  ... GB/s  128 vec-bits  ← GODEBUG=simd=128。幅を半分にしても ms が(ほぼ)同じなら、壁はレジスタ幅ではなく帯域
+> $ make bench-portable   # 4コア Codespace(EPYC 7763)。表示は整形・抜粋
+> BenchmarkDotSIMD          56.1 ns/op                          ← archsimd 版カーネル(Stage 1b)
+> BenchmarkDotPortable      56.8 ns/op                          ← ポータブル版カーネル。同じ速さ
+> BenchmarkSearchSIMD        8.6 ms/op  17.8 GB/s              ← 全探索: 壁(read 天井 ~19)に張り付く
+> BenchmarkSearchPortable    8.5 ms/op  18.1 GB/s  256 vec-bits ← 全探索: 同じ壁・同じ点
+> BenchmarkSearchPortable   11.9 ms/op  12.9 GB/s  128 vec-bits ← GODEBUG=simd=128: 壁の下に落ちた(1.4x 遅い)
 > ```
-> <!-- TODO(author): Codespaces(amd64)で make bench-portable を実測して数値を入れる。arm64(M3 Pro)では 128bit 固定のため幅の対比が出ない -->
 >
-> 読み方: カーネル単体はレーン数の分だけ差が出るのに、全探索の ms が変わらなければ「この検索はレジスタ幅で決まっていない」— ルーフラインの言うとおりです(Apple Silicon は元が 128bit なので下 2 行は同じ数字になります)。ポータブル版は水平和や VZEROUPPER の後始末をアーキ別に持てないぶん少し遅く、Stage 3 の int8 積和(VPMADDWD)や popcount のような**アーキ固有の命令はそもそも入っていません**(どのアーキでも共通に持てる演算だけ)。だから本編の量子化カーネルは `archsimd` のままです。
+> 読み方: 256bit ではポータブル版も archsimd 版と**同じ点**に乗ります(API が変わってもルーフライン上の位置は同じ)。幅を 128bit に半分にすると、カーネルは 57→107 ns と約2倍遅くなり、全探索も 8.5→11.9 ms と遅くなりました。これは §05 の「1ベクトルあたりの時間」で読めます — DB ベクトル1本(1536 byte)を DRAM から運ぶのに約 80 ns(1536 ÷ 19 GB/s)。**256bit のカーネル 57 ns はこの 80 ns の下に隠れる**(だから壁に張り付く)のに対し、**128bit の 107 ns は 80 ns からはみ出す**ので、律速がメモリからカーネルへ戻ってしまう。つまり幅は「広げても壁の上には行けない。狭めると壁の下に落ちる」— 点は壁の**下側にしか動けない**、というのがルーフラインの言う「メモリ律速」の正体です(Apple Silicon は元が 128bit なので下 2 行は同じ数字になります)。なお、ポータブル API には Stage 3 の int8 積和(VPMADDWD)や popcount のような**アーキ固有の命令はそもそも入っていません**(どのアーキでも共通に持てる演算だけ)。だから本編の量子化カーネルは `archsimd` のままです。
 
 ```bash
 $ make bench1    # カーネル単体(internal/vec)と全探索(internal/index)の2粒度(表示は整形・抜粋)

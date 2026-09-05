@@ -21,7 +21,8 @@ bench1:
 ## Stage 1 コラム: ポータブル simd パッケージ(Go 1.27 の simd.Float32s)。
 ## archsimd 版と同じ内積をベクトル長非依存で書いたもの(vec.DotPortable)。
 ## 3行目は GODEBUG=simd=128 でレジスタ幅を半分(AVX2 機なら 256→128bit)にして同じ全探索を測る。
-## ms がほぼ変わらなければ「壁はレジスタ幅ではなくメモリ帯域」の実証(workshop.md Stage 1 コラム)。
+## 256bit は archsimd 版と同じ点(壁)、128bit はカーネルが 1 ベクトルのメモリ時間からはみ出して
+## 壁の下に落ちる = 「幅は広げても壁の上に行けず、狭めると下に落ちる」(workshop.md Stage 1 コラム)。
 ## arm64(Neon)は元から 128bit なので 2行目と 3行目は同じ数字になる。
 bench-portable:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD|Portable)$$' -benchtime 2s

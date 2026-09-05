@@ -13,8 +13,10 @@ import "simd"
 //   - 命令が無いアーキでは純 Go でエミュレートされる(simd.Emulated() で判定)
 //
 // 幅が実行時に決まるので、ループ 1 周の要素数は n = acc.Len() から組み立てる。
-// GODEBUG=simd=128 のように幅を狭めて実行できるので、「レジスタ幅を半分にしても
-// 全探索は遅くならない(= メモリ律速)」を同じバイナリで確かめられる(make bench-portable)。
+// GODEBUG=simd=128 のように幅を狭めて実行できるので、同じバイナリで「幅を半分に
+// すると点がどこへ動くか」を確かめられる(make bench-portable)。Codespaces(EPYC 7763)
+// 実測: 256bit は archsimd 版と同じ点(8.5 ms・壁)、128bit はカーネルが 57→107 ns と
+// 2倍遅くなって 1 ベクトルのメモリ時間(~80 ns)からはみ出し、全探索 11.9 ms と壁の下に落ちる。
 //
 // 一方、Stage 3 の int8 積和(VPMADDWD / SMULL)や付録 B の popcount は
 // ポータブル API には無い(アーキ間で共通に持てる演算だけが入っている)ので、
@@ -23,13 +25,23 @@ func DotPortable(a, b []float32) float32 {
 	if len(b) < len(a) {
 		a = a[:len(b)]
 	}
-	var acc0, acc1 simd.Float32s // ゼロ値は全要素 0
-	n := acc0.Len()              // このマシンのレーン数(4 / 8 / 16)
-	for len(a) >= 2*n {
+	// アキュムレータは 4 本。幅が 128bit(4 レーン)に狭まっても FMA の依存連鎖が
+	// 長くならないように(2 本だと 384 次元で 48 段の連鎖。Codespaces 実測では 2 本でも
+	// 4 本でも 128bit 時は全探索が 1.4x 遅く、律速は連鎖長より命令数だった)。
+	var acc0, acc1, acc2, acc3 simd.Float32s // ゼロ値は全要素 0
+	n := acc0.Len()                          // このマシンのレーン数(4 / 8 / 16)
+	for len(a) >= 4*n {
 		acc0 = simd.LoadFloat32s(a).MulAdd(simd.LoadFloat32s(b), acc0)
 		acc1 = simd.LoadFloat32s(a[n:]).MulAdd(simd.LoadFloat32s(b[n:]), acc1)
-		a = a[2*n:]
-		b = b[2*n:]
+		acc2 = simd.LoadFloat32s(a[2*n:]).MulAdd(simd.LoadFloat32s(b[2*n:]), acc2)
+		acc3 = simd.LoadFloat32s(a[3*n:]).MulAdd(simd.LoadFloat32s(b[3*n:]), acc3)
+		a = a[4*n:]
+		b = b[4*n:]
+	}
+	for len(a) >= n {
+		acc0 = simd.LoadFloat32s(a).MulAdd(simd.LoadFloat32s(b), acc0)
+		a = a[n:]
+		b = b[n:]
 	}
 	// 端数はマスク付きロード(足りないレーンはゼロ埋め)でベクトルのまま処理する
 	for len(a) > 0 {
@@ -41,7 +53,7 @@ func DotPortable(a, b []float32) float32 {
 	}
 	// 水平加算: ポータブル API には ReduceSum が無いので、ストアして足す
 	var buf [16]float32 // 512bit = 16 レーンが上限
-	acc0.Add(acc1).Store(buf[:n])
+	acc0.Add(acc1).Add(acc2.Add(acc3)).Store(buf[:n])
 	clearAVXUpperBits() // amd64 のみ VZEROUPPER。他アーキでは no-op
 	var sum float32
 	for _, x := range buf[:n] {

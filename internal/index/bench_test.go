@@ -96,7 +96,7 @@ func BenchmarkSearchSIMD(b *testing.B) {
 }
 
 // Stage 1 コラム: ポータブル simd 版(simd.Float32s)。SearchSIMD と同じ点に乗るはず。
-// GODEBUG=simd=128 で幅を半分にしても同じ ms なら「壁はレジスタ幅ではなく帯域」。
+// GODEBUG=simd=128 で幅を半分にすると、カーネルが 1 ベクトルのメモリ時間からはみ出して壁の下に落ちる。
 func BenchmarkSearchPortable(b *testing.B) {
 	benchSetup()
 	b.SetBytes(benchN * benchDim * 4)
