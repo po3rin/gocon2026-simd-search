@@ -58,3 +58,21 @@ func TestHammingSIMDMatchesScalar(t *testing.T) {
 		}
 	}
 }
+
+func TestDotPortableMatchesNaive(t *testing.T) {
+	t.Logf("PortableVectorBits=%d PortableEmulated=%v", PortableVectorBits(), PortableEmulated())
+	r := rand.New(rand.NewPCG(5, 6))
+	for _, n := range []int{0, 1, 3, 4, 7, 8, 9, 15, 16, 17, 31, 32, 33, 100, 384, 768} {
+		a := make([]float32, n)
+		b := make([]float32, n)
+		for i := range a {
+			a[i] = float32(r.NormFloat64())
+			b[i] = float32(r.NormFloat64())
+		}
+		want := DotNaive(a, b)
+		got := DotPortable(a, b)
+		if diff := math.Abs(float64(got - want)); diff > 1e-3*(1+math.Abs(float64(want))) {
+			t.Errorf("n=%d: DotPortable=%v DotNaive=%v", n, got, want)
+		}
+	}
+}

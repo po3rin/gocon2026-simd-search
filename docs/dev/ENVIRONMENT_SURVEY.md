@@ -1,6 +1,8 @@
 # 実行環境調査 — Apple Silicon / Rosetta / Docker / amd64 実機
 
-2026-06-11 実施。調査コマンド: `make isa-report`, `make test`, ベンチ 1 回実行。
+2026-06-11 実施(Go 1.26.4)。調査コマンド: `make isa-report`, `make test`, ベンチ 1 回実行。
+
+> **2026-09-05 追記(Go 1.27.1):** `archsimd` が arm64(Neon・128bit)に対応したので、下表の「arm64 ネイティブ」列は **Stage 1 SIMD 内積 ✅(Neon 版 `dot_arm64.go`)、Stage 3 int8 ✅(`int8_arm64.go`)** に変わった。M3 Pro 実測は [OPTIMIZATION_LOG.md Step 12](OPTIMIZATION_LOG.md)。Rosetta の `FMA=false` は Go 1.27.1 + macOS 26 でも変わらず(再確認済み)。API 名は 1.27 で `LoadFloat32x8Slice`→`LoadFloat32x8`、`StoreSlice`→`Store` に改訂(下表は新名で記載)。
 
 参照:
 - [simd/archsimd (pkg.go.dev)](https://pkg.go.dev/simd/archsimd) — API ごとの `CPU Feature` と `archsimd.X86` ランタイムチェック
@@ -10,7 +12,7 @@
 
 | 環境 | 正しさのテスト | Stage 0/2 (スカラー) | Stage 1 SIMD 内積 | 付録 AVX-512 | 本編ベンチ再現 |
 |---|---|---|---|---|---|
-| **arm64 ネイティブ** (Apple M3 Pro) | ✅ `make test` | ✅ フォールバック | ❌ | ❌ | ❌ 絶対値は参考程度 |
+| **arm64 ネイティブ** (Apple M3 Pro) | ✅ `make test` | ✅ | ✅ Neon 128bit(Go 1.27〜。1.26 は ❌) | ❌ | △ 動くが本編(AVX2)とは別の点 |
 | **Rosetta** (`GOARCH=amd64`) | ✅ | ✅ | ❌ **FMA=false** | ❌ AVX-512 非対応 | △ 量子化は再現、SIMD 内積は不可 |
 | **Docker `linux/amd64`** (Apple Silicon 上) | ❌ ビルドクラッシュ / CPUID 全 false | △ バイナリ実行のみ | ❌ | ❌ | ❌ 使わない |
 | **amd64 実機** (Codespaces / AWS c7i) | ✅ | ✅ | ✅ | ✅ | ✅ `make remote-bench` |
@@ -22,7 +24,7 @@
 `cmd/isa-report` が [pkg.go.dev/simd/archsimd](https://pkg.go.dev/simd/archsimd) に沿って、本リポが使う API と `archsimd.X86.*()` の対応を一覧する。
 
 ```sh
-make isa-report GO=$(go env GOPATH)/bin/go1.26.4   # GOARCH=amd64 内蔵
+make isa-report-amd64 GO=$(go env GOPATH)/bin/go1.27.1   # GOARCH=amd64(Rosetta)。素の make isa-report は arm64 版の一覧
 ```
 
 本リポのガード（コードと一致）:
@@ -58,7 +60,7 @@ BenchmarkSearchNaive  33.1 ms/op  (arm64 スカラー)
 | Feature | 値 | pkg.go.dev 上の意味 |
 |---|---|---|
 | AVX | **true** | `ClearAVXUpperBits` / VZEROUPPER |
-| AVX2 | **true** | `LoadFloat32x8Slice`, `Uint64x4.Xor` 等 |
+| AVX2 | **true** | `LoadFloat32x8`, `Uint64x4.Xor` 等 |
 | FMA | **false** | `Float32x8.MulAdd` ← **Stage 1 のボトルネック** |
 | AVX512 | false | Apple ドキュメント: 非対応 |
 | AVX512VPOPCNTDQ | false | `Uint64x4.OnesCount` |
@@ -70,7 +72,7 @@ BenchmarkSearchNaive  33.1 ms/op  (arm64 スカラー)
 | Stage | API | 要求 feature | Rosetta |
 |---|---|---|---|
 | 0 | `bits.OnesCount64` | スカラー POPCNT | ✅ |
-| 1 | `LoadFloat32x8Slice` | AVX2 | ✅ |
+| 1 | `LoadFloat32x8` | AVX2 | ✅ |
 | 1 | `Float32x8.MulAdd` | **FMA** | ❌ |
 | 1 | `archsimd.ClearAVXUpperBits` | AVX | ✅ (到達前にガードで落ちる) |
 | 2 | `Hamming` | スカラー POPCNT | ✅ |

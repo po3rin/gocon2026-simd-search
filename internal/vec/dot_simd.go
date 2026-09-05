@@ -28,19 +28,19 @@ func Dot(a, b []float32) float32 {
 	}
 	var acc0, acc1 archsimd.Float32x8 // ゼロ値は全要素 0
 	for len(a) >= 16 {
-		acc0 = archsimd.LoadFloat32x8Slice(a).MulAdd(archsimd.LoadFloat32x8Slice(b), acc0)
-		acc1 = archsimd.LoadFloat32x8Slice(a[8:]).MulAdd(archsimd.LoadFloat32x8Slice(b[8:]), acc1)
+		acc0 = archsimd.LoadFloat32x8(a).MulAdd(archsimd.LoadFloat32x8(b), acc0)
+		acc1 = archsimd.LoadFloat32x8(a[8:]).MulAdd(archsimd.LoadFloat32x8(b[8:]), acc1)
 		a = a[16:]
 		b = b[16:]
 	}
 	if len(a) >= 8 {
-		acc0 = archsimd.LoadFloat32x8Slice(a).MulAdd(archsimd.LoadFloat32x8Slice(b), acc0)
+		acc0 = archsimd.LoadFloat32x8(a).MulAdd(archsimd.LoadFloat32x8(b), acc0)
 		a = a[8:]
 		b = b[8:]
 	}
 	// 水平加算: 16レーンをスカラーに畳み込む
 	var buf [8]float32
-	acc0.Add(acc1).StoreSlice(buf[:])
+	acc0.Add(acc1).Store(buf[:])
 	// ベクトル→スカラーの境界。Go 1.26 は VZEROUPPER を自動挿入しないため、
 	// 標準 API の archsimd.ClearAVXUpperBits()(= VZEROUPPER)を自分で呼ぶ。
 	// これを忘れると dirty ymm × レガシーSSE の遷移ペナルティで呼び出しごとに

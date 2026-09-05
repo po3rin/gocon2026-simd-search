@@ -3,7 +3,7 @@
   "image": "mcr.microsoft.com/devcontainers/base:bookworm",
   "features": {
     "ghcr.io/devcontainers/features/go:1": {
-      "version": "1.26"
+      "version": "1.27"
     },
     "ghcr.io/devcontainers/features/sshd:1": {
       "version": "latest"

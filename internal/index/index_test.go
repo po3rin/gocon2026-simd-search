@@ -32,6 +32,12 @@ func TestSearchAgreement(t *testing.T) {
 			t.Errorf("rank %d: naive=%v simd=%v", i, naive[i], simd[i])
 		}
 	}
+	portable := ix.SearchPortable(q, 10)
+	for i := range naive {
+		if naive[i].ID != portable[i].ID {
+			t.Errorf("rank %d: naive=%v portable=%v", i, naive[i], portable[i])
+		}
+	}
 }
 
 // TestRecall measures Recall@10 of the binary stage on clustered data.

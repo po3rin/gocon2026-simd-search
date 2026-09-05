@@ -30,7 +30,7 @@ gh auth status | grep -i scope   # 'codespace' が入っていることを確認
 
 ```jsonc
 "features": {
-  "ghcr.io/devcontainers/features/go:1": { "version": "1.26" },
+  "ghcr.io/devcontainers/features/go:1": { "version": "1.27" },
   "ghcr.io/devcontainers/features/sshd:1": { "version": "latest" }
 }
 ```

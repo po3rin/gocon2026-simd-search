@@ -23,7 +23,7 @@ func fill8(v float32) archsimd.Float32x8 {
 	for i := range b {
 		b[i] = v
 	}
-	return archsimd.LoadFloat32x8Slice(b[:])
+	return archsimd.LoadFloat32x8(b[:])
 }
 
 // BenchmarkPeakFLOP_AVX2 は 256bit FMA(Float32x8)のピーク GFLOP/s を測る。
@@ -61,7 +61,7 @@ func BenchmarkPeakFLOP_AVX2(b *testing.B) {
 		Add(a8.Add(a9).Add(a10.Add(a11)))
 	archsimd.ClearAVXUpperBits()
 	var buf [8]float32
-	sum.StoreSlice(buf[:])
+	sum.Store(buf[:])
 	ceilSinkFloat = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
 	sec := b.Elapsed().Seconds()
 	flop := float64(iters) * inner * 12 * 8 * 2 // 12 acc × 8 lane × 2 flop/FMA
@@ -92,7 +92,7 @@ func BenchmarkPeakFLOP_AVX2_4acc(b *testing.B) {
 	sum := a0.Add(a1).Add(a2.Add(a3))
 	archsimd.ClearAVXUpperBits()
 	var buf [8]float32
-	sum.StoreSlice(buf[:])
+	sum.Store(buf[:])
 	ceilSinkFloat = buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
 	sec := b.Elapsed().Seconds()
 	flop := float64(iters) * inner * 4 * 8 * 2

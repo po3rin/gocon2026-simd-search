@@ -27,12 +27,12 @@ func dotStep1(a, b []float32) float32 {
 	var acc archsimd.Float32x8
 	i := 0
 	for ; i+8 <= len(a); i += 8 {
-		va := archsimd.LoadFloat32x8Slice(a[i:])
-		vb := archsimd.LoadFloat32x8Slice(b[i:])
+		va := archsimd.LoadFloat32x8(a[i:])
+		vb := archsimd.LoadFloat32x8(b[i:])
 		acc = va.MulAdd(vb, acc)
 	}
 	var buf [8]float32
-	acc.StoreSlice(buf[:])
+	acc.Store(buf[:])
 	sum := buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
 	for ; i < len(a); i++ {
 		sum += a[i] * b[i]
@@ -48,18 +48,18 @@ func dotStep2(a, b []float32) float32 {
 	}
 	var acc0, acc1 archsimd.Float32x8
 	for len(a) >= 16 {
-		acc0 = archsimd.LoadFloat32x8Slice(a).MulAdd(archsimd.LoadFloat32x8Slice(b), acc0)
-		acc1 = archsimd.LoadFloat32x8Slice(a[8:]).MulAdd(archsimd.LoadFloat32x8Slice(b[8:]), acc1)
+		acc0 = archsimd.LoadFloat32x8(a).MulAdd(archsimd.LoadFloat32x8(b), acc0)
+		acc1 = archsimd.LoadFloat32x8(a[8:]).MulAdd(archsimd.LoadFloat32x8(b[8:]), acc1)
 		a = a[16:]
 		b = b[16:]
 	}
 	if len(a) >= 8 {
-		acc0 = archsimd.LoadFloat32x8Slice(a).MulAdd(archsimd.LoadFloat32x8Slice(b), acc0)
+		acc0 = archsimd.LoadFloat32x8(a).MulAdd(archsimd.LoadFloat32x8(b), acc0)
 		a = a[8:]
 		b = b[8:]
 	}
 	var buf [8]float32
-	acc0.Add(acc1).StoreSlice(buf[:])
+	acc0.Add(acc1).Store(buf[:])
 	sum := buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
 	for i := range a {
 		sum += a[i] * b[i]
@@ -74,12 +74,12 @@ func hammingStep1(a, b []uint64) int {
 	var acc archsimd.Uint64x4
 	i := 0
 	for ; i+4 <= len(a); i += 4 {
-		va := archsimd.LoadUint64x4Slice(a[i:])
-		vb := archsimd.LoadUint64x4Slice(b[i:])
+		va := archsimd.LoadUint64x4(a[i:])
+		vb := archsimd.LoadUint64x4(b[i:])
 		acc = acc.Add(va.Xor(vb).OnesCount())
 	}
 	var buf [4]uint64
-	acc.StoreSlice(buf[:])
+	acc.Store(buf[:])
 	d := int(buf[0] + buf[1] + buf[2] + buf[3])
 	for ; i < len(a); i++ {
 		d += bits.OnesCount64(a[i] ^ b[i])

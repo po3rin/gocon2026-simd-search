@@ -1,9 +1,10 @@
-# devcontainer / Codespaces では go = 1.26 なのでそのまま動く。
-# ローカル mac (arm64) では: make GO=$(go env GOPATH)/bin/go1.26.4
+# devcontainer / Codespaces では go = 1.27 なのでそのまま動く。
+# ローカル mac (arm64) では: make GO=$(go env GOPATH)/bin/go1.27.1
+# (Go 1.27 から archsimd が arm64 Neon に対応したので、Mac でも SIMD パスが走る)
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report
+.PHONY: test bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-plot spill recall cpuinfo isa-report isa-report-amd64
 
 test:
 	$(GO) test ./...
@@ -16,6 +17,16 @@ bench0:
 bench1:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD)$$' -benchtime 2s
+
+## Stage 1 コラム: ポータブル simd パッケージ(Go 1.27 の simd.Float32s)。
+## archsimd 版と同じ内積をベクトル長非依存で書いたもの(vec.DotPortable)。
+## 3行目は GODEBUG=simd=128 でレジスタ幅を半分(AVX2 機なら 256→128bit)にして同じ全探索を測る。
+## ms がほぼ変わらなければ「壁はレジスタ幅ではなくメモリ帯域」の実証(workshop.md Stage 1 コラム)。
+## arm64(Neon)は元から 128bit なので 2行目と 3行目は同じ数字になる。
+bench-portable:
+	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD|Portable)$$' -benchtime 2s
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|Portable)$$' -benchtime 2s
+	GODEBUG=simd=128 $(GO) test ./internal/index -run - -bench 'BenchmarkSearchPortable$$' -benchtime 2s
 
 ## Stage 4: バイナリ量子化(1bit・1/32)
 bench2:
@@ -72,8 +83,9 @@ roofline-batch:
 
 ## ルーフラインの天井そのものを実測: 演算ピーク(FMA飽和) + メモリ帯域(read/triad)
 ## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §05)
+## amd64 は FLOP_AVX2、arm64(Apple Silicon)は FLOP_NEON が走る(ReadBW/TriadBW は arm64 ではスカラ版)。
 roofline-ceiling:
-	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|ReadBW|TriadBW)$$' -benchtime 2s
+	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|FLOP_NEON|ReadBW|TriadBW)$$' -benchtime 2s
 
 ## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(docs/workshop §06 Stage 2)
 ## 自分のマシンの天井で: make roofline-decompose PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
@@ -101,7 +113,7 @@ roofline-plot:
 ## BenchmarkPeakFLOP_AVX2 の機械語をコンパイラ -S で出し、各アキュムレータ aN が毎回
 ## 「ロード(SP)→VFMADD→ストア(SP)」とスタックへ退避(spill)している様子を表示する。
 ## 12本+m+c=14 は使える 15本の Y レジスタ(Y15 は Go ABI の予約ゼロレジスタ:
-## golang/go#76969)に収まる数なので、本数圧ではなく Go 1.26 のコード生成の問題。
+## golang/go#76969)に収まる数なので、本数圧ではなく Go のコード生成の問題(1.26 / 1.27 とも退避する)。
 ## amd64 用にクロスコンパイルするので mac でも可(objdump と違い -S は VFMADD を正名で出す)。
 spill:
 	GOARCH=amd64 $(GO) test -gcflags=-S -c -o /dev/null ./internal/vec 2>&1 \
@@ -117,8 +129,13 @@ recall:
 cpuinfo:
 	$(GO) test ./internal/vec -run TestDotMatchesNaive -v | grep -E 'HasSIMD|ok|FAIL'
 
-## 各 Stage の archsimd API と archsimd.X86 対応を一覧 (pkg.go.dev 準拠)
+## 各 Stage の archsimd API と CPU 機能の対応を一覧 (pkg.go.dev 準拠)。
+## amd64 なら archsimd.X86.* のチェック結果、arm64(Apple Silicon)なら Neon 版カーネルの一覧が出る。
+## Mac から amd64 側の一覧を見たいときは: make isa-report-amd64 (Rosetta 実行・FMA=false になる)
 isa-report:
+	GOEXPERIMENT=simd $(GO) run ./cmd/isa-report/
+
+isa-report-amd64:
 	GOARCH=amd64 GOEXPERIMENT=simd $(GO) run ./cmd/isa-report/
 
 # ---- リモート実行 (infra/ の AVX-512 VM) ----------------------------------

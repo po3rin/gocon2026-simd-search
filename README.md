@@ -7,7 +7,7 @@ Go Conference 2026 ショートワークショップ
 
 ## 何をするか
 
-Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)を使い、
+Go 1.27 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)を使い、
 外部ライブラリなしの Pure Go でベクトル検索エンジンを高速化する。ただし闇雲に触らず、
 **ルーフラインモデル**という一枚の地図の上で、毎回この4手を回す:
 
@@ -39,7 +39,7 @@ Go 1.26 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 
 ### Codespaces / devcontainer(推奨)
 
-`.devcontainer/` に Go 1.26 + `GOEXPERIMENT=simd` 環境を定義済み。開いてそのまま:
+`.devcontainer/` に Go 1.27 + `GOEXPERIMENT=simd` 環境を定義済み。開いてそのまま:
 
 ```sh
 make test       # 正しさの確認
@@ -49,6 +49,7 @@ make recall     # Recall@10(binary vs rerank vs int8)
 make bench-parallel # 寄り道: goroutine 並列はどの天井に効くか
 make bench-nsweep   # Stage 1 コラム: DB サイズで SIMD 倍率が崩れる境界
 make bench-int8     # Stage 3: int8 量子化(カーネル 10x・Recall 0.948)
+make bench-portable # Stage 1 コラム: ポータブル simd 版 + GODEBUG=simd=128 で幅を半分にしても壁は動かない
 make bench-maxsim   # 付録A: MaxSim(late interaction・最初から演算律速)
 make bench-bonus    # 付録B: AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
 ```
@@ -64,23 +65,26 @@ BenchmarkSearchBinary  ... ns/op   ... MB/s                                     
 
 ### ローカル(mac / arm64)
 
-`simd/archsimd` は amd64 専用なので、arm64 ではスカラーフォールバックでビルド・テストだけ通る:
+Go 1.27 から `simd/archsimd` が arm64(Neon・128bit)に対応したので、Apple Silicon でも SIMD パスが走る
+(`internal/vec/dot_arm64.go` / `int8_arm64.go`。天井ベンチも Neon 版あり):
 
 ```sh
-go install golang.org/dl/go1.26.4@latest && go1.26.4 download
-make GO=$(go env GOPATH)/bin/go1.26.4 test
+go install golang.org/dl/go1.27.1@latest && go1.27.1 download
+make GO=$(go env GOPATH)/bin/go1.27.1 test
+make GO=$(go env GOPATH)/bin/go1.27.1 bench1   # Neon 版の数字(本編の AVX2 とは別物。workshop.md §09)
 ```
 
-amd64 クロスビルド(Rosetta 実行)で SIMD パスのコンパイル確認も可能:
+amd64 クロスビルド(Rosetta 実行)で amd64 側の SIMD パスのコンパイル確認も可能(Rosetta は FMA 非対応なので実行はスカラに落ちる):
 
 ```sh
-GOARCH=amd64 GOEXPERIMENT=simd go1.26.4 test ./...
+GOARCH=amd64 GOEXPERIMENT=simd go1.27.1 test ./...
 ```
 
-各 Stage の `archsimd` API が要求する CPU 機能と、`archsimd.X86` でこの CPU が対応しているかを一覧([pkg.go.dev/simd/archsimd](https://pkg.go.dev/simd/archsimd) 準拠):
+各 Stage の `archsimd` API が要求する CPU 機能と、この CPU が対応しているかを一覧([pkg.go.dev/simd/archsimd](https://pkg.go.dev/simd/archsimd) 準拠。arm64 では Neon 版カーネルの一覧が出る):
 
 ```sh
-make isa-report GO=$(go env GOPATH)/bin/go1.26.4
+make isa-report GO=$(go env GOPATH)/bin/go1.27.1
+make isa-report-amd64 GO=$(go env GOPATH)/bin/go1.27.1   # Rosetta で amd64 側の一覧
 ```
 
 ## 構成

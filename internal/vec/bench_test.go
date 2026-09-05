@@ -75,3 +75,11 @@ func BenchmarkHammingSIMDBig(b *testing.B) {
 		sinkI = HammingSIMD(benchBigA, benchBigB)
 	}
 }
+
+// Stage 1 コラム: ポータブル simd パッケージ版。archsimd 版(DotSIMD)との差と、
+// GODEBUG=simd=128 で幅を狭めたときの変化を見る(make bench-portable)。
+func BenchmarkDotPortable(b *testing.B) {
+	for b.Loop() {
+		sinkF = DotPortable(benchA, benchB)
+	}
+}

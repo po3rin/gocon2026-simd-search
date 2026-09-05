@@ -519,6 +519,62 @@ Stage 2 の正当化に使える。ColBERT / Qdrant マルチベクトルと同�
   コードコメントの番号もすべて追随。make ターゲット名は互換のため変更せず
   (bench2=Stage 4、bench3=Stage 5。対応は workshop.md のコマンド一覧に明記)。
 
+## Step 12: Go 1.27 対応 — archsimd API 改訂・arm64 Neon・ポータブル simd(2026-09-05)
+
+Go 1.27(2026-08 リリース。手元は 1.27.1)で SIMD 周りが動いたので追従した。
+測定環境はこの Step だけ **Apple M3 Pro(arm64 ネイティブ・Neon 128bit)**。Codespaces(amd64)の
+再計測は未実施(下記「未計測」)。
+
+### 何が変わったか(Go 1.26 → 1.27)
+
+| 項目 | 1.26 | 1.27 | 本リポへの影響 |
+|---|---|---|---|
+| `archsimd` の Load/Store 名 | `LoadFloat32x8Slice` / `StoreSlice` / `Store(*[8]T)` | `LoadFloat32x8` / `Store` / `StoreArray`、端数は `LoadFloat32x8Part` | **1.26 のコードは 1.27 でコンパイル不能**。全 `.go` と教材を機械置換 |
+| `archsimd` の対応アーキ | amd64 のみ | amd64 + arm64(Neon 128bit)+ wasm(128bit) | `dot_arm64.go` / `int8_arm64.go` / Neon 天井ベンチを追加。Mac で SIMD が走る |
+| ポータブル `simd` パッケージ | 無し | `simd.Float32s` 等(幅は実行時決定、`GODEBUG=simd=128` で狭められる) | `dot_portable.go` + `SearchPortable` + `make bench-portable` を追加 |
+| `GOEXPERIMENT=simd` | 必要 | 必要(デフォルト有効化 [#78979](https://github.com/golang/go/issues/78979) は保留) | Makefile / devcontainer はそのまま |
+| VZEROUPPER 自動挿入 | 無し | 無し(コンパイラの経路は `ClearAVXUpperBits` イントリンシックだけ) | Step 4 の結論は 1.27 でも有効 |
+| register spill(Step 6) | 12本 AVX2 ループで退避 | **同じ**(`make spill GO=go1.27.1` で 48 行の `VMOVDQU …(SP)`)。arm64 でも `FMOVQ …(SP)` | §05 のコラムの結論は変わらず |
+| Rosetta の FMA | false | false(macOS 26 + 1.27.1 で再確認) | amd64 側の数字は引き続き実機でしか取れない |
+
+### arm64(Neon)カーネルの設計メモ
+
+- **Dot**: `Float32x4.MulAdd`(FMLA)× アキュムレータ 4 本。レーンが 4 なので、amd64 の 2 本と同じ「1周 16 要素」にするには 4 本要る。`-S` で見るとループ本体は `FMOVQ`(ロード)+ `VFMLA` だけで spill なし。
+- **DotInt8**: Neon の archsimd には VPMADDWD(`DotProductPairs`)が無い。`MulWidenLo`(SMULL・int8→int16 の積)→ `ExtendLo4ToInt32`(SXTL)→ `Int32x4.Add` の 3 段。int16 のまま足すと 3 個目で溢れるので必ず int32 に広げてから蓄積。`-S`: SMULL×1 + SMULL2×1 + SXTL×2 + SXTL2×2 + ADD×7 / 16 要素。
+- **Hamming**: arm64 版は作らず。`bits.OnesCount64` が Go の intrinsic で既に CNT+ADDV(Neon)になるうえ、`Uint64x2` に `OnesCount` も `As*` 再解釈も無く、付録 B の趣旨(VPOPCNT は効かない)にも影響しない。
+- **ClearAVXUpperBits** は amd64 専用 API。ポータブル版 `dot_portable.go` からはビルドタグ付きの `clearAVXUpperBits()`(amd64: VZEROUPPER / 他: no-op)経由で呼ぶ。ポータブル API 自体に境界の後始末は無い。
+
+### M3 Pro 実測(go1.27.1・GOEXPERIMENT=simd・arm64)
+
+| ベンチ | 結果 | メモ |
+|---|---|---|
+| DotNaive → Dot(Neon) | 349 → 44.8 ns(**7.8x**) | Codespaces の AVX2 は 6.3x |
+| DotPortable(simd.Float32s, 128bit) | 63.1 ns | archsimd 版より遅い(2 本アキュムレータ・水平和がストア経由)。`GODEBUG=simd=0`(純 Go エミュ)だと 977 ns |
+| DotInt8Naive → DotInt8(Neon) | 116 → 23.2 ns(**5.0x**) | amd64 は 10.5x(VPMADDWD の有無が効く) |
+| SearchNaive → SearchSIMD | 34.6 → 4.59 ms(**7.5x**)、33.5 GB/s | Codespaces は 4.5x・19.4 GB/s。単コア帯域が M3 Pro の方が大きい |
+| SearchPortable | 6.25 ms、24.6 GB/s(128 vec-bits) | `GODEBUG=simd=128` でも同値(元から 128) |
+| SearchInt8 / SearchBinary / SearchBinaryRerank | 2.47 / 0.43 / 0.46 ms | 本編と同じ形(int8 でカーネル律速、1bit で脱出) |
+| PeakFLOP_NEON(12 本 FMLA) | 32.0 GFLOP/s | 理論 ~130 の 1/4。amd64 と同じく spill(`FMOVQ …(SP)`) |
+| PeakReadBW(Neon) | **34.2 read-GB/s** | 下記の罠 ⑦ |
+| PeakTriadBW(Neon) | 29.3 triad-GB/s | |
+
+**罠 ⑦: arm64 のメモリ天井ベンチが達成点を下回る。** スカラ縮約版は 10.7 GB/s、AVX2 版を写した
+「128bit ロード × 8 本 Add」は 26.6 GB/s、4 本 FMLA は 22.7 GB/s — いずれも SIMD 全探索の達成
+33.5 GB/s を下回り、ルーフライン上で点が屋根を突き抜ける。`-S` で見ると 8 本 Add ループは
+アキュムレータを毎回スタックへ退避していた(Step 6 と同根)。一方、検索カーネル `Dot`
+(4 本 FMLA・spill なし)で 1536 byte の行を順に流すと 34.2 GB/s。天井ベンチは
+「検索と同じ読み方で DRAM を流す」形(`ceiling_mem_arm64_test.go`)にした。教材の言い分
+(「天井ベンチも検索と同じ SIMD ロードで測る」)を arm64 でもそのまま適用した格好。
+
+### 未計測・残課題
+
+- **Codespaces(amd64)での再計測は未実施**。API 改訂は名前だけでコード生成は同じはず
+  (`Dot` の `-S` はロード + VFMADD のみで 1.26 と同形)だが、`make bench` の数字は要再確認。
+- `make bench-portable` の **256 vs 128 bit の対比は amd64 でしか出ない**(arm64 は元から 128)。
+  workshop.md Stage 1 の新コラムは数値を `...` で置いてある(`<!-- TODO(author) -->`)。
+  Codespaces で叩いて埋める。
+- PROPOSAL.md / PROPOSAL_NOTES.md の「Go 1.26」表記は CFP 提出時点の史実として触っていない。
+
 ## 高速化の階段(最終形)
 
 > 倍率は **AWS c7i** の史実。Codespaces(EPYC 7763)の実測は Step 7 を参照(SIMD 全探索の倍率が

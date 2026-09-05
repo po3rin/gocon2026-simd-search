@@ -12,7 +12,7 @@
 3. **マシンは `4-core`（16 GB RAM）を選ぶ** ← 全員ここで揃えます（理由は下記）
 4. しばらく待つ（初回はコンテナのビルドで 1〜3 分）。VS Code がブラウザで開けば準備完了
 
-`.devcontainer/` に **Go 1.26 + `GOEXPERIMENT=simd`** が入っているので、開いたらそのまま使えます。
+`.devcontainer/` に **Go 1.27 + `GOEXPERIMENT=simd`** が入っているので、開いたらそのまま使えます。
 
 ## 2. 動作確認（これが通れば準備OK）
 
@@ -53,8 +53,8 @@ Codespaces は当たる CPU（Intel/AMD・世代）を選べませんが、**本
 | 状況 | 対処 |
 |---|---|
 | **会社/組織アカウントで Codespaces が無効**（組織ポリシー） | 個人の GitHub アカウントで参加するか、講師に共有環境を相談。または下の「ローカル devcontainer」 |
-| Codespaces をどうしても使えない | **ローカル devcontainer**: VS Code + Docker Desktop で「Reopen in Container」。※SIMD の数字を出すには **amd64 マシン**が必要（Apple Silicon は次項） |
-| 手元が **Apple Silicon (Mac)** | `make test`（正しさ）は arm64 のスカラ版で通りますが、**SIMD の数字は出ません**。数字を取るなら Codespaces を使ってください |
+| Codespaces をどうしても使えない | **ローカル devcontainer**: VS Code + Docker Desktop で「Reopen in Container」。※本編と同じ数字を出すには **amd64 マシン**が必要（Apple Silicon は次項） |
+| 手元が **Apple Silicon (Mac)** | Go 1.27 なら `make test` も `make bench1` も **Neon(128bit)版の SIMD** で動きます。ただし本編の数字（AVX2・256bit）とは**別物の「自分の Mac の点」**になるので、みんなで見比べる数字は Codespaces で取ってください（workshop.md §09） |
 | 起動が遅い / 失敗する | 一度 Codespace を削除して作り直す。それでもダメなら講師へ |
 
 困ったら早めに講師に声をかけてください。当日は会場ネットワーク障害時に講師画面でのライブ進行に切り替えます。

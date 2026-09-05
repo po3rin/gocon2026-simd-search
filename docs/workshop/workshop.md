@@ -1,9 +1,9 @@
 # Go × SIMDで高速化するベクトル検索 — ルーフラインモデルでSIMDが効く境界を探れ！
-Go 1.26 の実験的 SIMD で、外部ライブラリなしの Pure Go ベクトル検索を高速化します。ただし闇雲には触りません — **ルーフライン**という1枚の地図の上で「測る → 算術強度(AI)を出す → 当たっている天井を見る → その天井を狙う手だけ打つ」を繰り返します。
+Go 1.27 の実験的 SIMD で、外部ライブラリなしの Pure Go ベクトル検索を高速化します。ただし闇雲には触りません — **ルーフライン**という1枚の地図の上で「測る → 算術強度(AI)を出す → 当たっている天井を見る → その天井を狙う手だけ打つ」を繰り返します。
 
 ## はじめに
 
-**これは何か:** Go 1.26 の標準 SIMD(`simd/archsimd`)を使い、外部ライブラリなしの Pure Go でベクトル検索を高速化する、**読みながら手元で動かせる**教材です(Go Conference 2026・40分ワークショップ)。題材は内積によるベクトル検索。ただ速くするのではなく、**ルーフライン**という地図の上で「いまどこが詰まっているか」を測り、打つ手を選ぶのが軸です。構成は「**律速(壁)が現れる → 手を打って突破する → 次の律速が現れる**」の連鎖で、各段の突破で SIMD がどの役割(主役/脇役/効かない)を果たすかを実測で確かめていきます。
+**これは何か:** Go 1.27 の標準 SIMD(`simd/archsimd`)を使い、外部ライブラリなしの Pure Go でベクトル検索を高速化する、**読みながら手元で動かせる**教材です(Go Conference 2026・40分ワークショップ)。題材は内積によるベクトル検索。ただ速くするのではなく、**ルーフライン**という地図の上で「いまどこが詰まっているか」を測り、打つ手を選ぶのが軸です。構成は「**律速(壁)が現れる → 手を打って突破する → 次の律速が現れる**」の連鎖で、各段の突破で SIMD がどの役割(主役/脇役/効かない)を果たすかを実測で確かめていきます。
 
 **何が学べるか:**
 
@@ -34,15 +34,15 @@ for i := range a {
 
 384次元の内積なら、スカラで384回かかる掛け算が SIMD なら48回で済みます。**理論上は8倍速い**わけです。
 
-Go 1.26 では `GOEXPERIMENT=simd` を付けてビルドすると `simd/archsimd` パッケージが使え、**アセンブリも cgo も書かずに**ベクトル命令を直接叩けます。メソッド呼び出しがほぼそのまま1つの CPU 命令にコンパイルされます:
+Go 1.27 では `GOEXPERIMENT=simd` を付けてビルドすると `simd/archsimd` パッケージ(Go 1.26 で導入、1.27 で API 改訂と arm64 / Wasm 対応)が使え、**アセンブリも cgo も書かずに**ベクトル命令を直接叩けます。メソッド呼び出しがほぼそのまま1つの CPU 命令にコンパイルされます:
 
 ```go
-va := archsimd.LoadFloat32x8Slice(a)   // float32 を8個ロード
-vb := archsimd.LoadFloat32x8Slice(b)
+va := archsimd.LoadFloat32x8(a)   // float32 を8個ロード
+vb := archsimd.LoadFloat32x8(b)
 acc = va.MulAdd(vb, acc)               // acc += va*vb(FMA: 掛けて足すまでを1命令でやる積和命令)
 ```
 
-注意点として、`archsimd` は今のところ **amd64(Intel/AMD)専用**です。Apple Silicon の Mac(arm64)ではパッケージ自体が無く、スカラ処理にフォールバックします(Go 1.27 では arm64(Neon)対応が予定されています — 最後の「持ち帰り」で触れます)。
+注意点として、`archsimd` は**アーキテクチャ固有**の API です。型も命令も CPU ごとに違い、Go 1.27 時点で amd64(AVX/AVX2/AVX-512)・arm64(Neon・128bit)・WebAssembly(128bit)に対応しています。本編のコードと数字は **amd64(Codespaces)** のものですが、Apple Silicon の Mac でも Go 1.27 からは Neon 版(`internal/vec/dot_arm64.go`。型は `Float32x4` のような 128bit だけで、Neon は必須機能なのでガード不要)が走ります — ただし幅もメモリ帯域も違うので**「自分の Mac の点」**になります(§09)。同じ内積をアーキに依存せず書ける **ポータブルな `simd` パッケージ**も 1.27 で入りました(Stage 1 のコラムで使います)。
 
 ### archsimd の API の読み方
 
@@ -59,11 +59,11 @@ var c archsimd.Uint64x4     // uint64 を4レーン
 **② メソッドが「1つの CPU 命令」に対応する。** 各メソッドはベクトル命令(イントリンシック)にほぼ1対1で変換され、**メソッド名から出てくる機械語の見当がつきます**。
 
 ```go
-va := archsimd.LoadFloat32x8Slice(xs)  // スライス → レジスタ(ロード)
+va := archsimd.LoadFloat32x8(xs)  // スライス → レジスタ(ロード)
 va = va.MulAdd(vb, acc)                // 積和      → VFMADD
 xo := vc.Xor(vd)                       // XOR       → VPXOR(vc・vd は Uint64x4。Xor は整数ベクトル専用)
 po := xo.OnesCount()                   // popcount(立っている bit を数える)→ VPOPCNTQ
-va.StoreSlice(xs)                      // レジスタ → スライス(ストア)
+va.Store(xs)                      // レジスタ → スライス(ストア)
 ```
 
 **③ 使う前に、その CPU が対応しているか確かめる。** 未対応の CPU で呼ぶと panic するので、実行時に機能フラグでガードします。
@@ -117,18 +117,20 @@ SIMDとベクトル検索の概要が分かったところで、一度動かし�
 
 ### 環境を用意する
 
-SIMD が走るのは **amd64(Intel/AMD)実機**。一番楽なのは **GitHub Codespaces**(amd64・ゼロインストール)で、手元が Apple Silicon でもこれなら同じ数字が出ます。必要なものは **Go 1.26** と **make** だけです(`GOEXPERIMENT=simd` は Makefile が自動で付きます)。
+本編の数字を出す環境は **amd64(Intel/AMD)実機**。一番楽なのは **GitHub Codespaces**(amd64・ゼロインストール)で、手元が Apple Silicon でもこれなら本編と同じ条件の数字が出ます(Go 1.27 からは Apple Silicon 上でも Neon 版の SIMD が走りますが、幅も帯域も違う**別の点**になります — §09)。必要なものは **Go 1.27** と **make** だけです(`GOEXPERIMENT=simd` は Makefile が自動で付きます)。
 
-**① Codespaces(推奨)** — リポジトリの `Code → Codespaces → Create`。`.devcontainer/` に Go 1.26 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。**手順の詳細（マシンサイズの選び方・費用・困ったときのフォールバック）は [SETUP.md](SETUP.md) にまとめてあります。**
+**① Codespaces(推奨)** — リポジトリの `Code → Codespaces → Create`。`.devcontainer/` に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。**手順の詳細（マシンサイズの選び方・費用・困ったときのフォールバック）は [SETUP.md](SETUP.md) にまとめてあります。**
 
 **② ローカル(amd64 Linux / Windows)**
 
 ```bash
 git clone https://github.com/po3rin/gocon2026-simd-search
 cd gocon2026-simd-search
-go install golang.org/dl/go1.26.4@latest && go1.26.4 download   # Go 1.26 を入れる
-make GO=$(go env GOPATH)/bin/go1.26.4 test                      # GOEXPERIMENT=simd は Makefile が付与
+go install golang.org/dl/go1.27.1@latest && go1.27.1 download   # Go 1.27 を入れる
+make GO=$(go env GOPATH)/bin/go1.27.1 test                      # GOEXPERIMENT=simd は Makefile が付与
 ```
+
+**③ ローカル(Apple Silicon の Mac)** — コマンドは②と同じ。Go 1.27 から `archsimd` が arm64 に対応したので、`make bench1` を叩くと Neon(128bit)版の SIMD が走ります。**本編の数字(AVX2・256bit)とは別物**なので、§09 の環境メモを読んでから「自分の Mac の点」として眺めてください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
 
 ### 動かす
 
@@ -220,9 +222,9 @@ flop := float64(iters) * inner * 12 * 8 * 2  // 12acc × 8lane × 2flop/FMA
 b.ReportMetric(flop/sec/1e9, "GFLOP/s")      // ← これが 25.59
 ```
 
-実測 **25.5 GFLOP/s**。試しにアキュムレータを4本に減らした `BenchmarkPeakFLOP_AVX2_4acc` を測ると **13.4 GFLOP/s** まで落ちます(本数を減らすと**遅くなる**)。理論ピークは ~100 GFLOP/s で、実測はその約 1/4 — Go 1.26 のコード生成がこのループのアキュムレータを毎回スタックへ退避する(register spill)ためですが、AI=0.5 の深いメモリ律速なのでこの低さは検索の結論を変えません。
+実測 **25.5 GFLOP/s**。試しにアキュムレータを4本に減らした `BenchmarkPeakFLOP_AVX2_4acc` を測ると **13.4 GFLOP/s** まで落ちます(本数を減らすと**遅くなる**)。理論ピークは ~100 GFLOP/s で、実測はその約 1/4 — Go のコード生成(1.26 / 1.27 とも)がこのループのアキュムレータを毎回スタックへ退避する(register spill)ためですが、AI=0.5 の深いメモリ律速なのでこの低さは検索の結論を変えません。
 
-> **コラム: register spill を“見る”(任意・理解用):** 上の「実測 25.5 ≪ 理論 ~100」は、**Go 1.26 のコード生成がこのループでは SIMD 値をレジスタに保てず**、12本のアキュムレータを毎回スタックへ退避(register spill)するため(本数圧ではありません — 12本 + m + c = 14 は、使える15本の Y レジスタに収まる数です。Y15 は Go 内部 ABI の予約ゼロレジスタで割り当てられません: [golang/go#76969](https://github.com/golang/go/issues/76969))。本当に起きているかは `make spill` で演算ピークループ(`BenchmarkPeakFLOP_AVX2`)の機械語を見れば分かります(コンパイラの `-S` 出力。amd64 クロスコンパイルなので mac でも可)。各アキュムレータ `aN` が **ロード→FMA→ストアの三つ組**を毎回踏んでいる = レジスタに居続けられていない証拠です:
+> **コラム: register spill を“見る”(任意・理解用):** 上の「実測 25.5 ≪ 理論 ~100」は、**Go のコード生成(1.26 / 1.27 とも)がこのループでは SIMD 値をレジスタに保てず**、12本のアキュムレータを毎回スタックへ退避(register spill)するため(本数圧ではありません — 12本 + m + c = 14 は、使える15本の Y レジスタに収まる数です。Y15 は Go 内部 ABI の予約ゼロレジスタで割り当てられません: [golang/go#76969](https://github.com/golang/go/issues/76969))。本当に起きているかは `make spill` で演算ピークループ(`BenchmarkPeakFLOP_AVX2`)の機械語を見れば分かります(コンパイラの `-S` 出力。amd64 クロスコンパイルなので mac でも可)。各アキュムレータ `aN` が **ロード→FMA→ストアの三つ組**を毎回踏んでいる = レジスタに居続けられていない証拠です:
 >
 > ```text
 >   VMOVDQU     a0+952(SP), Y2     ← ① a0 をスタックから戻す(本当はレジスタに置きっぱなしにしたい)
@@ -233,7 +235,7 @@ b.ReportMetric(flop/sec/1e9, "GFLOP/s")      // ← これが 25.59
 >   VMOVDQU     Y2, a1+920(SP)
 > ```
 >
-> レジスタに収まっていれば本体は**裸の `VFMADD` だけ**になるはず。その前後に必ず付く `VMOVDQU …(SP)` が spill です。この spill が、演算天井が理論ピーク(~100)に届かず 25.5 GFLOP/s に留まる主因とみられます(§05 本文の説明。ただし「spill を消せば理論ピークに届く」かは本資料では未検証)。**それでも打ち手は変わりません** — 検索は AI=0.5 のメモリ律速なので、天井がこの低さでも結論は変わらない(roofline が「ここは演算で詰まっていない」と言っている)。ポート圧(なぜ 0.65 FMA/cyc か)まで踏み込むなら llvm-mca / uiCA(本編 40 分外)。
+> レジスタに収まっていれば本体は**裸の `VFMADD` だけ**になるはず。その前後に必ず付く `VMOVDQU …(SP)` が spill です。この spill が、演算天井が理論ピーク(~100)に届かず 25.5 GFLOP/s に留まる主因とみられます(§05 本文の説明。ただし「spill を消せば理論ピークに届く」かは本資料では未検証)。**それでも打ち手は変わりません** — 検索は AI=0.5 のメモリ律速なので、天井がこの低さでも結論は変わらない(roofline が「ここは演算で詰まっていない」と言っている)。ポート圧(なぜ 0.65 FMA/cyc か)まで踏み込むなら llvm-mca / uiCA(本編 40 分外)。なお arm64(Neon)でも同じ退避が起きます — Apple M3 Pro で 12 本の FMLA ループ(`BenchmarkPeakFLOP_NEON`)は 32 GFLOP/s 止まりで、`-S` を見ると各 FMLA の前後に `FMOVQ …(SP)` が付きます。アーキが変わっても「Go の SIMD コード生成はまだ発展途上」は共通です。
 
 ### キャッシュに乗らない巨大配列を先頭から末尾まで順番に読んでメモリ天井を見る
 
@@ -247,7 +249,7 @@ const memN = 1 << 26  // 67,108,864 float32 = 256 MB(L3 溢れ確実)
 for b.Loop() {
     var a0 archsimd.Float32x8 /* … a7 まで … */
     for len(x) >= 64 {
-        a0 = archsimd.LoadFloat32x8Slice(x).Add(a0)   /* … x[8:] 〜 x[56:] も … */
+        a0 = archsimd.LoadFloat32x8(x).Add(a0)   /* … x[8:] 〜 x[56:] も … */
         x = x[64:]
     }
 }
@@ -255,7 +257,7 @@ b.ReportMetric(gb, "read-GB/s")    // ← 20.80
 
 // Triad(STREAM 標準): a = b + s*c。read b + read c + write a で3配列ぶん(SIMD)
 for len(aa) >= 8 {
-    archsimd.LoadFloat32x8Slice(cc).MulAdd(s, archsimd.LoadFloat32x8Slice(bb)).StoreSlice(aa)
+    archsimd.LoadFloat32x8(cc).MulAdd(s, archsimd.LoadFloat32x8(bb)).Store(aa)
     aa, bb, cc = aa[8:], bb[8:], cc[8:]
 }
 b.ReportMetric(gb, "triad-GB/s")   // ← 17.36
@@ -396,8 +398,8 @@ BenchmarkSearchNaive   35.7 ms/op   2.15 GFLOP/s   0.5 AI(flop/byte)   153.6 MB/
 // まず最小形:アキュムレータ1本で「8個まとめて」
 var acc archsimd.Float32x8                 // アキュムレータ1本
 for len(a) >= 8 {
-    va := archsimd.LoadFloat32x8Slice(a)   // float32 を8個ロード
-    vb := archsimd.LoadFloat32x8Slice(b)
+    va := archsimd.LoadFloat32x8(a)   // float32 を8個ロード
+    vb := archsimd.LoadFloat32x8(b)
     acc = va.MulAdd(vb, acc)               // acc += va*vb を8レーン同時に(FMA)
     a = a[8:]; b = b[8:]
 }
@@ -410,7 +412,7 @@ for len(a) >= 8 {
 
 1a の `acc = va.MulAdd(vb, acc)` は、**前の acc が出来上がるまで次の MulAdd を始められません**(acc を読んで acc に書く=依存連鎖)。FMA は結果が出るまで数サイクルかかる(レイテンシ)ので、1本だとその待ち時間が毎回そのまま出ます — Stage 0 の `sum += ...` と同じ直列化です。
 
-そこで**独立したアキュムレータを2本**(acc0 / acc1)に分けます。互いに依存しないので、acc0 の FMA が計算中でも acc1 の FMA を走らせられる＝待ち時間を隠せます(命令レベル並列性)。最後に2本を足してから水平和します。仕上げに境界の `archsimd.ClearAVXUpperBits()`(中身は VZEROUPPER という1命令)— SIMD→スカラ計算へ戻る前に呼ぶ、Intel 機での遷移ペナルティ対策です(AMD では不要だが無害)。Go は自動挿入しないので、標準 API で自分で呼びます。
+そこで**独立したアキュムレータを2本**(acc0 / acc1)に分けます。互いに依存しないので、acc0 の FMA が計算中でも acc1 の FMA を走らせられる＝待ち時間を隠せます(命令レベル並列性)。最後に2本を足してから水平和します。仕上げに境界の `archsimd.ClearAVXUpperBits()`(中身は VZEROUPPER という1命令)— SIMD→スカラ計算へ戻る前に呼ぶ、Intel 機での遷移ペナルティ対策です(AMD では不要だが無害)。Go は(1.27 でも)自動挿入しないので、標準 API で自分で呼びます。
 
 ```go
 // internal/vec/dot_simd.go  (GOEXPERIMENT=simd, amd64)
@@ -418,16 +420,16 @@ import "simd/archsimd"
 
 func Dot(a, b []float32) float32 {
     if !hasSIMD {
-        return DotNaive(a, b)              // arm64 等はスカラに退避
+        return DotNaive(a, b)              // AVX2+FMA の無い amd64 はスカラに退避(arm64 は dot_arm64.go の Neon 版)
     }
     var acc0, acc1 archsimd.Float32x8      // ★ 1b: アキュムレータ2本で待ち時間を隠す
     for len(a) >= 16 {
-        acc0 = archsimd.LoadFloat32x8Slice(a).MulAdd(archsimd.LoadFloat32x8Slice(b), acc0)
-        acc1 = archsimd.LoadFloat32x8Slice(a[8:]).MulAdd(archsimd.LoadFloat32x8Slice(b[8:]), acc1)
+        acc0 = archsimd.LoadFloat32x8(a).MulAdd(archsimd.LoadFloat32x8(b), acc0)
+        acc1 = archsimd.LoadFloat32x8(a[8:]).MulAdd(archsimd.LoadFloat32x8(b[8:]), acc1)
         a = a[16:]; b = b[16:]             // 前進(境界計算をループ条件に吸収)
     }
     var buf [8]float32
-    acc0.Add(acc1).StoreSlice(buf[:])
+    acc0.Add(acc1).Store(buf[:])
     archsimd.ClearAVXUpperBits()           // ★ VZEROUPPER。Intel機の遷移ペナルティ対策(AMDでは不要・無害)。Goは自動挿入しない
     sum := buf[0]+buf[1]+buf[2]+buf[3]+buf[4]+buf[5]+buf[6]+buf[7]
     for i := range a {                     // 8の倍数でない端数
@@ -442,7 +444,7 @@ func Dot(a, b []float32) float32 {
 **→ 結論:** もう実装効率では伸びません。幅を 8→16(AVX-512)に広げても壁は動かず、キャッシュブロッキングも効きません — DB ベクトルは各1回しか読まれず再利用が無いので、タイリングしても DRAM 読み出し総量は変わらないからです。**次は実装効率ではなく、算術強度(AI)を上げる番。**AI を上げる道は2つ — **①再利用(クエリのバッチ化・exact)** と **②バイト削減(量子化・近似)**。まず①を Stage 2 で、続いて②を Stage 3(int8)→ Stage 4(1bit)の2段で。  
 ※ 上は要点。長さガードと「8幅の端数処理」を含む完全版は `internal/vec/dot_simd.go`。
 
-> **コラム: 端数はマスク付きロードでも書ける(任意):** 上のコードは 8 の倍数に満たない端数をスカラループで処理しています(384次元は 16 で割り切れるので、実は一度も通りません)。Go 1.26 には端数専用の **`LoadFloat32x8SlicePart`**(足りないレーンをゼロ埋めして読むマスク付きロード)があり、端数もベクトルのまま処理できます。SIMD の面倒どころ筆頭の端数処理が標準 API で完結する、覚えておくと便利な道具です。
+> **コラム: 端数はマスク付きロードでも書ける(任意):** 上のコードは 8 の倍数に満たない端数をスカラループで処理しています(384次元は 16 で割り切れるので、実は一度も通りません)。Go 1.27 には端数専用の **`LoadFloat32x8Part`**(足りないレーンをゼロ埋めして読むマスク付きロード。1.26 では `LoadFloat32x8SlicePart` という名前でした)があり、端数もベクトルのまま処理できます。SIMD の面倒どころ筆頭の端数処理が標準 API で完結する、覚えておくと便利な道具です。
 
 > **コラム: 「SIMD が効く境界」はデータサイズの軸にもある(`make bench-nsweep`):** カーネル単体 6.3x と全探索 4.5x の差は、データが L1 に収まるか DRAM から流れてくるかの差でした。なら DB 件数を振れば、SIMD の倍率が**キャッシュ境界で崩れる瞬間**が見えるはずです:
 >
@@ -454,6 +456,39 @@ func Dot(a, b []float32) float32 {
 > | 1,000,000 | 1.5 GB(DRAM) | 347 ms | 89.5 ms | **3.9x** |
 >
 > L3 に収まる間はカーネル並みの 5.7〜5.8x、DRAM に溢れた瞬間に 3.9x へ落ちて以後一定(表は別インスタンスの実測なので Stage 1 本文と絶対値が少し違います — §05 の揺れの注のとおり)。本編の10万件(154MB)は、**意図的に壁の向こう側**に置いた設定です。
+
+> **コラム: 同じ内積を「ポータブル simd」で書く — レジスタ幅を半分にしても壁は動かない(`make bench-portable`):** Go 1.27 には `archsimd` の上にもう1段、**ベクトル長に依存しない `simd` パッケージ**が入りました。型名からレーン数が消え(`Float32x8` → `Float32s`)、幅は実行時に CPU が決めます(AVX-512 機なら 16 レーン、AVX2 機なら 8、Apple Silicon の Neon なら 4)。同じソースが amd64 / arm64 / Wasm で動き、命令の無い環境では純 Go でエミュレートされます:
+>
+> ```go
+> // internal/vec/dot_portable.go(GOEXPERIMENT=simd。ビルドタグに amd64 は無い)
+> var acc0, acc1 simd.Float32s     // 幅は実行時に決まる
+> n := acc0.Len()                  // このマシンのレーン数(4 / 8 / 16)
+> for len(a) >= 2*n {
+>     acc0 = simd.LoadFloat32s(a).MulAdd(simd.LoadFloat32s(b), acc0)
+>     acc1 = simd.LoadFloat32s(a[n:]).MulAdd(simd.LoadFloat32s(b[n:]), acc1)
+>     a = a[2*n:]; b = b[2*n:]
+> }
+> for len(a) > 0 {                 // 端数はマスク付きロードでベクトルのまま
+>     va, k := simd.LoadFloat32sPart(a)
+>     vb, _ := simd.LoadFloat32sPart(b)
+>     acc0 = va.MulAdd(vb, acc0)
+>     a = a[k:]; b = b[k:]
+> }
+> ```
+>
+> このパッケージには **`GODEBUG=simd=128` のように幅を狭めて実行する仕組み**があります。つまり同じバイナリで「256bit(8レーン)」と「128bit(4レーン)」の全探索を測り比べられる。Stage 1 の結論「幅を広げても壁は動かない」を、逆向き(**幅を半分にしても遅くならない**)から自分の手で確かめる実験です:
+>
+> ```bash
+> $ make bench-portable
+> BenchmarkDotSIMD          ... ns/op                          ← archsimd 版カーネル(Stage 1b)
+> BenchmarkDotPortable      ... ns/op                          ← ポータブル版カーネル(少し遅くて良い)
+> BenchmarkSearchSIMD       ... ms/op  ... GB/s                ← 全探索: 壁に張り付く
+> BenchmarkSearchPortable   ... ms/op  ... GB/s  256 vec-bits  ← 全探索: 同じ壁
+> BenchmarkSearchPortable   ... ms/op  ... GB/s  128 vec-bits  ← GODEBUG=simd=128。幅を半分にしても ms が(ほぼ)同じなら、壁はレジスタ幅ではなく帯域
+> ```
+> <!-- TODO(author): Codespaces(amd64)で make bench-portable を実測して数値を入れる。arm64(M3 Pro)では 128bit 固定のため幅の対比が出ない -->
+>
+> 読み方: カーネル単体はレーン数の分だけ差が出るのに、全探索の ms が変わらなければ「この検索はレジスタ幅で決まっていない」— ルーフラインの言うとおりです(Apple Silicon は元が 128bit なので下 2 行は同じ数字になります)。ポータブル版は水平和や VZEROUPPER の後始末をアーキ別に持てないぶん少し遅く、Stage 3 の int8 積和(VPMADDWD)や popcount のような**アーキ固有の命令はそもそも入っていません**(どのアーキでも共通に持てる演算だけ)。だから本編の量子化カーネルは `archsimd` のままです。
 
 ```bash
 $ make bench1    # カーネル単体(internal/vec)と全探索(internal/index)の2粒度(表示は整形・抜粋)
@@ -551,11 +586,11 @@ SearchBatchParallel/workers=4   3.5 ms/query            ← 1.9x = 物理コア�
 func QuantizeInt8(v []float32, out []int8) (scale float32)
 
 // internal/vec/int8_simd.go — 内積カーネル。AVX2 だけで完結(FMA 不要)
-acc0 = acc0.Add(archsimd.LoadInt8x16Slice(a).ExtendToInt16().            // VPMOVSXBW
-    DotProductPairs(archsimd.LoadInt8x16Slice(b).ExtendToInt16()))       // VPMADDWD
+acc0 = acc0.Add(archsimd.LoadInt8x16(a).ExtendToInt16().            // VPMOVSXBW
+    DotProductPairs(archsimd.LoadInt8x16(b).ExtendToInt16()))       // VPMADDWD
 ```
 
-int8 同士(signed×signed)なら積は最大 127×127 で int32 に余裕で収まり、飽和対策なしの素直なコードで済みます。1命令で **16要素** — fp32(8要素)の2倍幅です。
+int8 同士(signed×signed)なら積は最大 127×127 で int32 に余裕で収まり、飽和対策なしの素直なコードで済みます。1命令で **16要素** — fp32(8要素)の2倍幅です。なお arm64(Neon)の `archsimd` には VPMADDWD 相当が無く、`int8_arm64.go` は SMULL(掛けて int16 に広げる)+ SXTL(int32 に広げる)の 3 段で同じ計算をします — **どの命令があるかがアーキごとに違う**、それが `archsimd` を「アーキ固有」と呼ぶ理由です。
 
 **どうなったか:** カーネル 364→**34.6 ns = 10.5x**。**fp32 SIMD カーネル(55 ns)より速い**内積が Pure Go で出ました。検索全体は **4.2 ms**(fp32 SIMD 全探索比 ~2x)、精度は **Recall@10 = 0.948** — 1バイトでも大きさの情報が残るので、rerank なしで実用域です。  
 ただしここで面白いことが起きています。**転送を 1/4 にしたのに速度は 4x になっていません**(達成 9.2 GB/s は壁のずっと下)。AI=2 でリッジの右へ移った、つまり**律速がメモリからカーネルの演算へ移動した**からです — 壁を1つ越えると、次の壁が現れる。ルーフラインの点の位置がそのまま説明になります。  
@@ -664,7 +699,7 @@ Recall@10: binary=0.180 binary+rerank=0.868             ← 0.18 → 0.87(SIMD�
 
 - **量子化 × バッチの合成** — Stage 2(①再利用)と Stage 3/4(②バイト削減)は排他ではありません。int8 化した DB ベクトルをバッチで回せば AI は掛け算で上がり(int8 × B=32 で AI ≈ 64)、さらに演算律速側へ。実運用のベクトル検索エンジンが速いのはこの合成のためです。
 - **アルゴリズムの軸(HNSW・IVF)** — ここまでの手は全て「10万件全部に触る」前提でした。そもそも**触る件数を減らす**のが第3の軸で、全探索の O(N) を割る唯一の道です。ただし飛び飛びのメモリアクセスになるため今度は**帯域ではなくレイテンシ**が敵になる — ルーフラインとはまた別の地図が要る領域で、実運用は「候補を絞る(HNSW/IVF)× 絞った中を本資料の技で速く走る」の合成です。
-- **Go 1.27 の SIMD** — 次のリリースでは、ベクトル長に依存しないポータブルな `simd` パッケージ([golang/go#78902](https://github.com/golang/go/issues/78902))が加わり、`archsimd` も arm64(Neon)・WebAssembly 対応と amd64 API の改訂が予定されています。本資料の「amd64 専用」という制約は早晩なくなります — そして**ルーフラインの読み方は、どのアーキテクチャでもそのまま使えます**。
+- **Go の SIMD はまだ動いている** — Go 1.27 で、ベクトル長に依存しないポータブルな `simd` パッケージ([golang/go#78902](https://github.com/golang/go/issues/78902)。Stage 1 のコラム)と、`archsimd` の arm64(Neon)・WebAssembly 対応(本資料の `dot_arm64.go` / `int8_arm64.go`)が入りました。どちらもまだ `GOEXPERIMENT=simd` が要る実験的 API で、amd64 版をデフォルト有効にする提案([golang/go#78979](https://github.com/golang/go/issues/78979))は保留中、arm64 の SVE(可変長ベクトル)も未着手です。§05 で見た register spill も 1.27 で残っています。API 名は変わり続けます(1.26→1.27 で `LoadFloat32x8Slice`→`LoadFloat32x8` など)が、**ルーフラインの読み方は、どのアーキテクチャ・どのバージョンでもそのまま使えます**。
 
 ## 07. まとめ
 
@@ -735,11 +770,11 @@ Stage 4 で述べたとおり、量子化後の Hamming 距離を AVX-512 VPOPCN
 
 ## 09. 環境メモ
 
-**Apple Silicon 参加者向け：** Go 1.26 の `archsimd` は AMD64 専用(Go 1.27 で arm64 Neon / Wasm 対応が予定されています)。ARM64 では `//go:build amd64` でSIMD実装を分け、スカラ版へフォールバックさせる構成にします。当日は **GitHub Codespaces** を共有環境にすれば、手元のアーキ差を気にせず全員が同じ条件で達成性能と AI を測れます。**本編で使う SIMD は AVX2 + FMA だけ**(Stage 1/2/5 の内積。Stage 3 の int8 カーネルは AVX2 のみ)で、これは過去10年の x86(Intel Haswell 2013+ / AMD 2015+)がほぼ全て持つため、**Codespaces にどの CPU が当たっても本編は再現します**。AVX-512(VPOPCNT)は本編では使いません(Stage 4 で見たとおり量子化後は速くならないため)。AVX-512 を実機で確かめたい人だけ、`infra/` の AWS c7i(Sapphire Rapids)を使ってください。
+**Apple Silicon 参加者向け：** Go 1.27 から `archsimd` が arm64(Neon・128bit)に対応したので、手元の Mac でも SIMD パスが走ります(`//go:build arm64` の `dot_arm64.go` / `int8_arm64.go`。天井ベンチも Neon 版あり)。ただし **本編の数字とは別物**です — レジスタ幅が 256→128bit、単コアのメモリ帯域は逆に Codespaces より大きい(M3 Pro 実測: read 天井 ~34 GB/s、全探索 naive 34.6 ms → SIMD 4.6 ms の 7.5x、binary 0.43 ms)ので、点も倍率も本編とは違う位置に打たれます。当日は **GitHub Codespaces** を共有環境にすれば、手元のアーキ差を気にせず全員が同じ条件で達成性能と AI を測れます。Mac の数字は「自分の点」として持ち帰ってください。**本編で使う SIMD は AVX2 + FMA だけ**(Stage 1/2/5 の内積。Stage 3 の int8 カーネルは AVX2 のみ)で、これは過去10年の x86(Intel Haswell 2013+ / AMD 2015+)がほぼ全て持つため、**Codespaces にどの CPU が当たっても本編は再現します**。AVX-512(VPOPCNT)は本編では使いません(Stage 4 で見たとおり量子化後は速くならないため)。AVX-512 を実機で確かめたい人だけ、`infra/` の AWS c7i(Sapphire Rapids)を使ってください。
 
 > **コラム: なぜ Docker で「amd64」を指定してもダメか**  
 Apple Silicon でも `docker run --platform linux/amd64` を使えば実際の x86 で測れる——と思いがちですが、これは落とし穴です。中身は **QEMU エミュレーション**(または Rosetta 経由)で、**実際の x86 CPU ではありません**。具体的には:  
 ① CPU の機能問い合わせ(CPUID)を正しく真似ないので archsimd.X86.\*() が**すべて false** → SIMD ガードがスカラ実装にフォールバックして、SIMD パスがそもそも走りません。  
 ② QEMU が不安定で、ビルド中に SIGSEGV で落ちることもあります。  
-③ Rosetta 経由にしても翻訳されるのは AVX/AVX2 まで。**FMA が使えません**(`X86.FMA()=false`)。本編の内積 SIMD は AVX2 + FMA が要るので、ここで落ちてスカラにフォールバックします。  
+③ Rosetta 経由にしても翻訳されるのは AVX/AVX2 まで。**FMA が使えません**(`X86.FMA()=false`。macOS 26 + Go 1.27.1 でも同じ)。本編の内積 SIMD は AVX2 + FMA が要るので、ここで落ちてスカラにフォールバックします。  
 つまり **linux/amd64 コンテナ ≠ 実際の amd64**。SIMD のベンチは **GitHub Codespaces(amd64 ホスト)** で測りましょう — 本編は AVX2+FMA だけなのでこれで全ステージ足ります。詳細は [`../dev/ENVIRONMENT_SURVEY.md`](../dev/ENVIRONMENT_SURVEY.md)。

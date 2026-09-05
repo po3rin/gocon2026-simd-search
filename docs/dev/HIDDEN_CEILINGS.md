@@ -1,7 +1,7 @@
 # Go の SIMD の2つの隠れ天井（VZEROUPPER 税 / register spill）
 
 > これは深掘りメモです。ワークショップ本編（[`../workshop/workshop.md`](../workshop/workshop.md)）の
-> Stage 0〜4 とは独立した読み物で、**Go 1.26 archsimd のコード生成の今**に踏み込みたい人向け。
+> Stage 0〜4 とは独立した読み物で、**Go 1.26 / 1.27 archsimd のコード生成の今**に踏み込みたい人向け。
 > ハードの限界ではなく **Go のコード生成がまだ若い**ことの表れで、2つは**同根**です。
 
 > ⚠️ **計測機について:** この調査は **AWS c7i(Intel Xeon 8488C / Sapphire Rapids）** で行ったものです。
@@ -25,7 +25,7 @@
 
 **ペナルティの正体(世代で違う・ここ重要):** 教科書でよく語られる「**一度きりの大きな遷移ペナルティ(上位状態をセーブ/リストアするモード切替)**」は Sandy/Ivy Bridge〜Haswell 世代の挙動です。**Skylake 以降の modern Intel では仕組みが変わり**、もう上位状態を保存せず、dirty 状態で実行する**レガシー SSE 命令1個ごとに false dependency(上位ビットへの偽の依存)+ マージ(blend)μop が挿入される**形になっています。テスト機 `AWS c7i`(4th Gen Xeon Scalable = Sapphire Rapids)はまさにこの後者で、実測した「呼び出しごとの固定費 ≒145ns(550cyc)」は、この per-instruction ペナルティの蓄積を VZEROUPPER がまとめて消していると読むのが正確です。
 
-**Go 固有の事情:** Go 1.26 の archsimd は**この VZEROUPPER を自動挿入しません**。本来コンパイラが境界を管理して入れてくれることを期待したいところで、実際 [golang/go#77647](https://github.com/golang/go/issues/77647) でも「intrinsics はコンパイラ管理だから VEX 遷移は面倒を見てくれるはず…?」という**未解決の問い**として挙がっています。現状、境界に何も置かないと生成コードに VZEROUPPER は1個も出ません。回避策は標準 API の **`archsimd.ClearAVXUpperBits()`**(中身は VZEROUPPER 1命令。doc コメントにも「将来コンパイラが自動生成するかもしれない」と明記)を境界で呼ぶこと。本リポも当初は3行の自作アセンブリ `vzeroupper_amd64.s` を使っていたが、この標準 API に置き換えた。下の register spill と**同根のコード生成の未熟さ**で、これも将来 Go 側で解消される見込みです。
+**Go 固有の事情:** Go の archsimd は**この VZEROUPPER を自動挿入しません**(1.26・1.27 とも。1.27 のコンパイラにも VZEROUPPER を出す経路は `ClearAVXUpperBits` のイントリンシックだけ)。本来コンパイラが境界を管理して入れてくれることを期待したいところで、実際 [golang/go#77647](https://github.com/golang/go/issues/77647) でも「intrinsics はコンパイラ管理だから VEX 遷移は面倒を見てくれるはず…?」という**未解決の問い**として挙がっています。現状、境界に何も置かないと生成コードに VZEROUPPER は1個も出ません。回避策は標準 API の **`archsimd.ClearAVXUpperBits()`**(中身は VZEROUPPER 1命令。doc コメントにも「将来コンパイラが自動生成するかもしれない」と明記)を境界で呼ぶこと。本リポも当初は3行の自作アセンブリ `vzeroupper_amd64.s` を使っていたが、この標準 API に置き換えた。下の register spill と**同根のコード生成の未熟さ**で、これも将来 Go 側で解消される見込みです。
 
 **どこまで確かか(正直に):** 「VZEROUPPER 1命令で同一コードが 7倍速くなった」は実測で確認済み(167→23ns)。ただし**効果の大きさはベンダー・世代依存**で、ここの値は modern Intel(Sapphire Rapids)のもの。**AMD Zen には Intel 型の遷移ペナルティが基本的に無く**、むしろ VZEROUPPER 自体が高コストな世代もある(=同じ7倍は出ない)。また 550cyc の固定費を命令単位まで分解したわけではなく、**dim スケーリングで固定費を分離 → VZEROUPPER 投入で7倍を確認**、という状況証拠による特定です。生ログは [`OPTIMIZATION_LOG.md`](OPTIMIZATION_LOG.md) の Step 4。
 
@@ -37,9 +37,9 @@
 
 図: 理想はアキュムレータをレジスタに置いたまま回す。実際は毎回スタックへ退避(register spill)し、FMA ごとに load+store が付く。
 
-register spill = レジスタに収まらない/置けない値をメモリ(スタック)へ追い出すこと。これはハードの限界ではなく **Go 1.26 archsimd のレジスタ割り当ての未熟さ**(VZEROUPPER を自動挿入しないのと同根のコード生成課題)。既知 issue [golang/go#76969](https://github.com/golang/go/issues/76969) と同件で、レジスタ割り当ての改善は [#78753](https://github.com/golang/go/issues/78753) など **Go 1.27 で進行中** — **将来このピークは上がる見込み**。生ログは [`OPTIMIZATION_LOG.md`](OPTIMIZATION_LOG.md) の Step 6/6b。
+register spill = レジスタに収まらない/置けない値をメモリ(スタック)へ追い出すこと。これはハードの限界ではなく **Go 1.26 archsimd のレジスタ割り当ての未熟さ**(VZEROUPPER を自動挿入しないのと同根のコード生成課題)。既知 issue [golang/go#76969](https://github.com/golang/go/issues/76969)(closed / not planned)と同件。[#78753](https://github.com/golang/go/issues/78753)(AVX-512 の上位 16 本の ZMM が割り当てられない件)は Go 1.27 で閉じたが、**この 12 本 AVX2 ループの spill は Go 1.27.1 でも残っている**(`make spill GO=go1.27.1` で 48 行の `VMOVDQU …(SP)`)。arm64(Neon)でも同じで、M3 Pro の 12 本 FMLA ループは `FMOVQ …(SP)` に挟まれて 32 GFLOP/s 止まり。**将来このピークは上がる見込み**だが 1.27 ではまだ。生ログは [`OPTIMIZATION_LOG.md`](OPTIMIZATION_LOG.md) の Step 6/6b。
 
-**どこまで確かか(正直に):** 確認できたのは **「spill が存在する」**(objdump で 4本・12本とも FMA に load+store が付く ＋ 上流 issue [#76969](https://github.com/golang/go/issues/76969))と、メモリポート律速の見積り(〜0.6 FMA/cyc)が実測 0.65 とほぼ一致する点まで。**「spill さえ消せば理論ピークに届く」は未検証** — Go 1.26 archsimd は常に spill し Go コードでは消せないため、VZEROUPPER のような「1命令足したら7倍」の決定的な介入実験ができていません。よって本節は**強い状況証拠による推定**であって断定ではありません。
+**どこまで確かか(正直に):** 確認できたのは **「spill が存在する」**(objdump で 4本・12本とも FMA に load+store が付く ＋ 上流 issue [#76969](https://github.com/golang/go/issues/76969))と、メモリポート律速の見積り(〜0.6 FMA/cyc)が実測 0.65 とほぼ一致する点まで。**「spill さえ消せば理論ピークに届く」は未検証** — Go 1.26 / 1.27 の archsimd は常に spill し Go コードでは消せないため、VZEROUPPER のような「1命令足したら7倍」の決定的な介入実験ができていません。よって本節は**強い状況証拠による推定**であって断定ではありません。
 
 ```text
 // go tool objdump で見た内側ループ(アキュムレータ1本ぶん)

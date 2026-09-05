@@ -8,7 +8,8 @@ import "sync"
 // 実体の Benchmark は2つに分かれている:
 //   - ceiling_mem_simd_test.go   : AVX2 ストリーミング(検索カーネルと同じロード幅)。
 //     単コアが DRAM から実際に引ける帯域を測れるので、これが天井の実測値。
-//   - ceiling_mem_scalar_test.go : amd64/SIMD 以外向けのスカラー fallback。
+//   - ceiling_mem_arm64_test.go  : 同じものの Neon(128bit)版。Apple Silicon はこちら。
+//   - ceiling_mem_scalar_test.go : SIMD の無いビルド向けのスカラー fallback。
 //
 // 配列は L3 キャッシュを確実に溢れさせる 256MB。GB/s を ReportMetric で出す。
 // 詳細は docs/workshop/workshop.md。
