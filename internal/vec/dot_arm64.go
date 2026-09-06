@@ -8,21 +8,19 @@ import "simd/archsimd"
 // amd64 版(dot_simd.go)のような CPU 機能チェックは要らない。
 var hasSIMD = true
 
-// HasSIMD reports whether the SIMD fast path is compiled in and usable.
+// HasSIMD は SIMD 版がビルドに含まれ、この CPU で使えるかを返す。
 func HasSIMD() bool { return hasSIMD }
 
-// Dot は Neon(Float32x4 = 128bit・4レーン)で内積を計算する(Stage 1 の arm64 版)。
+// Dot は Neon(Float32x4。128bit で 4 レーン)で内積を計算する(Stage 1 の arm64 版)。
 //
-// Go 1.27 で archsimd が arm64 に対応したので、Apple Silicon の Mac でも
-// スカラ退避ではなく本物の SIMD が走る。構成は amd64 版と同じ:
-//   - 1 イテレーションで 16 要素(4レーン × 4本)
-//   - アキュムレータは 4 本。レーン幅が半分(4)なので、amd64 版の 2 本と
-//     同じ「1周 16 要素」にするには 4 本要る。FMLA のレイテンシ隠しにも効く
-//   - スライスは a = a[16:] と前進させる(境界計算をループ条件に吸収)
-//   - VZEROUPPER 相当の後始末は arm64 には無い(AVX 特有の遷移ペナルティが存在しない)
+// Go 1.27 で archsimd が arm64 に対応したので、Apple Silicon の Mac でも本物の SIMD が走る。
+// 構成は amd64 版と同じ。
+//   - 1 周で 16 要素(4 レーン × 4 本)
+//   - アキュムレータは 4 本。レーン数が半分なので、amd64 版の 2 本と同じ「1 周 16 要素」にするには 4 本要る
+//   - スライスは a = a[16:] と前進させる
+//   - VZEROUPPER にあたる後始末は無い(AVX 特有の遷移ペナルティは arm64 に存在しない)
 //
-// 本編(Codespaces / amd64)の数字とは別物なので、ここで出る倍率は
-// 「自分の Mac の点」として読むこと(レジスタ幅 256→128、メモリ帯域も別)。
+// 本編(Codespaces、amd64)の数字とは別物なので、ここで出る倍率は自分の Mac の値として読む。
 func Dot(a, b []float32) float32 {
 	if len(b) < len(a) {
 		a = a[:len(b)]
@@ -41,7 +39,7 @@ func Dot(a, b []float32) float32 {
 		a = a[4:]
 		b = b[4:]
 	}
-	// 水平加算: 4本を1本に足してから 4 レーンをスカラーへ
+	// 水平和: 4 本を 1 本に足してから 4 レーンをスカラへ
 	var buf [4]float32
 	acc0.Add(acc1).Add(acc2.Add(acc3)).Store(buf[:])
 	sum := buf[0] + buf[1] + buf[2] + buf[3]

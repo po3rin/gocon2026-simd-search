@@ -1,5 +1,5 @@
-// Package index implements a minimal brute-force vector search engine.
-// 高速化の対象は距離カーネル(internal/vec)で、Index 自体は全ステージ共通。
+// Package index は最小限の全探索ベクトル検索エンジン。
+// 高速化の対象は距離カーネル(internal/vec)で、Index 自体は全 Stage で共通。
 package index
 
 import (
@@ -8,33 +8,33 @@ import (
 	"github.com/po3rin/gocon2026-simd-search/internal/vec"
 )
 
-// Result is a single search hit. Score is higher-is-better.
+// Result は検索結果の 1 件。Score は大きいほど良い。
 type Result struct {
 	ID    int
 	Score float32
 }
 
-// Index holds the vectors in multiple representations:
-// float32(正確・重い)、binary code(粗い・1/32 サイズ)、
-// int8 code(Stage 3: 1/4 サイズ・BuildInt8 で構築)。
+// Index はベクトルを 3 つの表現で持つ。
+//   - Data:   float32(正確。重い)
+//   - Codes:  符号 1bit(Stage 4。1/32 サイズ。Add で同時に作る)
+//   - Codes8: int8(Stage 3。1/4 サイズ。BuildInt8 で作る)
 type Index struct {
 	Dim   int
-	Words int
+	Words int // 1 ベクトルの 1bit 表現に要る uint64 の語数
 	N     int
-	Data  []float32 // N*Dim, row-major
-	Codes []uint64  // N*Words, sign-bit quantized
+	Data  []float32 // N*Dim、行優先
+	Codes []uint64  // N*Words
 
-	// Stage 3(int8 量子化)。BuildInt8() を呼ぶまで空。
-	Codes8 []int8    // N*Dim, symmetric int8 quantized
-	Scales []float32 // N, per-vector scale(復元は q8*scale ≈ fp32)
+	Codes8 []int8    // N*Dim。BuildInt8 を呼ぶまで nil
+	Scales []float32 // N。ベクトルごとの scale(q8*scale で fp32 に戻る)
 }
 
-// New creates an empty index for dim-dimensional vectors.
+// New は dim 次元の空の索引を作る。
 func New(dim int) *Index {
 	return &Index{Dim: dim, Words: vec.Words(dim)}
 }
 
-// Add appends a vector and its binary code to the index.
+// Add はベクトルを追加し、1bit 表現も同時に作る。
 func (ix *Index) Add(v []float32) {
 	if len(v) != ix.Dim {
 		panic(fmt.Sprintf("index: dim mismatch: got %d want %d", len(v), ix.Dim))
@@ -46,74 +46,59 @@ func (ix *Index) Add(v []float32) {
 	ix.N++
 }
 
-// Vec returns the float32 vector for id.
+// Vec は id 番目の float32 ベクトルを返す。
 func (ix *Index) Vec(id int) []float32 {
 	return ix.Data[id*ix.Dim : (id+1)*ix.Dim]
 }
 
-// Code returns the binary code for id.
+// Code は id 番目の 1bit 表現を返す。
 func (ix *Index) Code(id int) []uint64 {
 	return ix.Codes[id*ix.Words : (id+1)*ix.Words]
 }
 
-// SearchNaive is the Stage 0 baseline: scalar dot product over all vectors.
-func (ix *Index) SearchNaive(q []float32, k int) []Result {
+// scan は全ベクトルを走査し、内積関数 dot で採点して上位 k 件を返す。
+// Stage 0 と Stage 1 の違いは dot だけで、走査の形は同じ。
+func (ix *Index) scan(q []float32, k int, dot func(a, b []float32) float32) []Result {
 	t := newTopK(k)
 	for id := 0; id < ix.N; id++ {
-		t.push(id, vec.DotNaive(q, ix.Vec(id)))
+		t.push(id, dot(q, ix.Vec(id)))
 	}
 	return t.results()
 }
 
-// SearchSIMD is Stage 1: same scan, SIMD dot product.
-func (ix *Index) SearchSIMD(q []float32, k int) []Result {
-	t := newTopK(k)
-	for id := 0; id < ix.N; id++ {
-		t.push(id, vec.Dot(q, ix.Vec(id)))
-	}
-	return t.results()
-}
+// SearchNaive は Stage 0。スカラの内積で全探索する。
+func (ix *Index) SearchNaive(q []float32, k int) []Result { return ix.scan(q, k, vec.DotNaive) }
 
-// SearchPortable is Stage 1 written with the portable simd package
-// (Go 1.27 の simd.Float32s)。SearchSIMD と同じ走査で、カーネルだけ vec.DotPortable。
-// GODEBUG=simd=128 で幅を狭めると点がどこへ動くかを見る用(make bench-portable。workshop.md Stage 1 コラム)。
-func (ix *Index) SearchPortable(q []float32, k int) []Result {
-	t := newTopK(k)
-	for id := 0; id < ix.N; id++ {
-		t.push(id, vec.DotPortable(q, ix.Vec(id)))
-	}
-	return t.results()
-}
+// SearchSIMD は Stage 1。SIMD の内積で全探索する。
+func (ix *Index) SearchSIMD(q []float32, k int) []Result { return ix.scan(q, k, vec.Dot) }
 
-// SearchBinary is Stage 4: scan over binary codes with Hamming distance.
-// Score は -距離(距離が小さいほど良い)。
-func (ix *Index) SearchBinary(q []float32, k int) []Result {
+// SearchPortable は Stage 1 をポータブル simd パッケージで書いた版(workshop.md Stage 1 コラム)。
+// GODEBUG=simd=128 で幅を狭めると点がどこへ動くかを見る(make bench-portable)。
+func (ix *Index) SearchPortable(q []float32, k int) []Result { return ix.scan(q, k, vec.DotPortable) }
+
+// scanBinary は 1bit 表現を走査し、ハミング距離で採点して上位 k 件を返す。
+// Score は距離の符号を反転したもの(距離が小さいほど良い)。
+func (ix *Index) scanBinary(q []float32, k int, hamming func(a, b []uint64) int) []Result {
 	code := make([]uint64, ix.Words)
 	vec.Quantize(q, code)
 	t := newTopK(k)
 	for id := 0; id < ix.N; id++ {
-		t.push(id, -float32(vec.Hamming(code, ix.Code(id))))
+		t.push(id, -float32(hamming(code, ix.Code(id))))
 	}
 	return t.results()
 }
 
-// SearchBinarySIMD is an appendix path (本編フロー外): Hamming with AVX-512 VPOPCNT.
-// 量子化後はキャッシュ律速で popcount を SIMD 化しても速くならない(計測上 SearchBinarySIMD
-// ≧ SearchBinary)ため、本編 Stage には含めず付録として残置。AVX-512 機向け(make bench-bonus)。
-// 非対応 CPU では vec.HammingSIMD がスカラ Hamming にフォールバックする。
+// SearchBinary は Stage 4。1bit 表現とスカラの POPCNT で全探索する。
+func (ix *Index) SearchBinary(q []float32, k int) []Result { return ix.scanBinary(q, k, vec.Hamming) }
+
+// SearchBinarySIMD は付録 3 節(本編フロー外)。popcount を AVX-512 VPOPCNT で SIMD 化しても
+// 速くならないことの確認用(make bench-bonus)。非対応 CPU では vec.HammingSIMD がスカラ版に落ちる。
 func (ix *Index) SearchBinarySIMD(q []float32, k int) []Result {
-	code := make([]uint64, ix.Words)
-	vec.Quantize(q, code)
-	t := newTopK(k)
-	for id := 0; id < ix.N; id++ {
-		t.push(id, -float32(vec.HammingSIMD(code, ix.Code(id))))
-	}
-	return t.results()
+	return ix.scanBinary(q, k, vec.HammingSIMD)
 }
 
-// SearchBinaryRerank retrieves k*factor candidates with the cheap binary
-// scan, then re-scores them with the exact float32 dot product.
-// 「速度と精度は二者択一ではない」を示す QBit 風の二段構え。
+// SearchBinaryRerank は Stage 5。1bit で k*factor 件まで粗く絞り、
+// その候補だけを fp32 の SIMD 内積で採点し直して上位 k 件を返す。
 func (ix *Index) SearchBinaryRerank(q []float32, k, factor int) []Result {
 	cands := ix.SearchBinary(q, k*factor)
 	t := newTopK(k)
@@ -123,11 +108,10 @@ func (ix *Index) SearchBinaryRerank(q []float32, k, factor int) []Result {
 	return t.results()
 }
 
-// SearchBatchNaive runs len(qs) queries in a single pass over the DB.
-// 各 DB ベクトル d を1回ロードして B 本のクエリ全部と内積する(d はキャッシュ常駐で
-// 使い回される)。DRAM 転送は B=1 と同じなので算術強度 AI ≈ 0.5×B に上がり、
-// バッチを大きくするほど演算律速側へ移る(事実上の GEMM 化)。
-func (ix *Index) SearchBatchNaive(qs [][]float32, k int) [][]Result {
+// scanBatch は B 本のクエリを 1 パスで処理する。DB ベクトル d を 1 回ロードするたびに
+// B 本のクエリ全部と内積を取る(d はキャッシュに乗ったまま使い回される)。
+// DRAM から運ぶ量は B=1 と同じなので、算術強度が 0.5×B に上がり演算律速側へ移る。
+func (ix *Index) scanBatch(qs [][]float32, k int, dot func(a, b []float32) float32) [][]Result {
 	tops := make([]*topK, len(qs))
 	for b := range tops {
 		tops[b] = newTopK(k)
@@ -135,7 +119,7 @@ func (ix *Index) SearchBatchNaive(qs [][]float32, k int) [][]Result {
 	for id := 0; id < ix.N; id++ {
 		d := ix.Vec(id)
 		for b := range qs {
-			tops[b].push(id, vec.DotNaive(qs[b], d))
+			tops[b].push(id, dot(qs[b], d))
 		}
 	}
 	out := make([][]Result, len(qs))
@@ -145,22 +129,12 @@ func (ix *Index) SearchBatchNaive(qs [][]float32, k int) [][]Result {
 	return out
 }
 
-// SearchBatchSIMD is SearchBatchNaive with the SIMD dot.
-// バッチで演算律速にした上で SIMD を効かせる狙い。
+// SearchBatchNaive は Stage 2 の比較用。バッチ化した上でスカラの内積を使う。
+func (ix *Index) SearchBatchNaive(qs [][]float32, k int) [][]Result {
+	return ix.scanBatch(qs, k, vec.DotNaive)
+}
+
+// SearchBatchSIMD は Stage 2。バッチ化した上で SIMD の内積を使う。
 func (ix *Index) SearchBatchSIMD(qs [][]float32, k int) [][]Result {
-	tops := make([]*topK, len(qs))
-	for b := range tops {
-		tops[b] = newTopK(k)
-	}
-	for id := 0; id < ix.N; id++ {
-		d := ix.Vec(id)
-		for b := range qs {
-			tops[b].push(id, vec.Dot(qs[b], d))
-		}
-	}
-	out := make([][]Result, len(qs))
-	for b := range tops {
-		out[b] = tops[b].results()
-	}
-	return out
+	return ix.scanBatch(qs, k, vec.Dot)
 }

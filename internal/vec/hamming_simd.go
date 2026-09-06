@@ -8,17 +8,16 @@ import (
 	"simd/archsimd"
 )
 
-// hasVPOPCNT reports whether the CPU has AVX-512 VPOPCNTQ.
+// hasVPOPCNT はこの CPU に AVX-512 の VPOPCNTQ があるか。
 var hasVPOPCNT = archsimd.X86.AVX512() && archsimd.X86.AVX512VPOPCNTDQ()
 
-// HasVPOPCNT reports whether the AVX-512 popcount bonus path is usable.
+// HasVPOPCNT は AVX-512 の popcount(付録 3 節)がこの CPU で使えるかを返す。
 func HasVPOPCNT() bool { return hasVPOPCNT }
 
-// HammingSIMD computes the Hamming distance using AVX-512 VPOPCNTQ
-// (4 つの uint64 を 1 命令で popcount する)。
+// HammingSIMD は AVX-512 の VPOPCNTQ(4 つの uint64 を 1 命令で popcount)でハミング距離を計算する。
 //
-// 付録 3 節: 量子化後はキャッシュ律速のため、popcount を SIMD 化しても速くならない
-// ことの確認用(make bench-bonus)。AVX-512 が無い CPU ではスカラー版にフォールバックする。
+// 付録 3 節。量子化後はキャッシュ律速なので、popcount を SIMD 化しても速くならないことの
+// 確認用(make bench-bonus)。AVX-512 が無い CPU ではスカラ版に落ちる。
 func HammingSIMD(a, b []uint64) int {
 	if !hasVPOPCNT {
 		return Hamming(a, b)
@@ -40,7 +39,7 @@ func HammingSIMD(a, b []uint64) int {
 	}
 	var buf [4]uint64
 	acc0.Add(acc1).Store(buf[:])
-	// 呼び出し元のスカラー float コード(topK の比較など)を遷移ペナルティから守る
+	// 呼び出し元のスカラの float コード(topK の比較など)を遷移ペナルティから守る
 	archsimd.ClearAVXUpperBits()
 	d := int(buf[0] + buf[1] + buf[2] + buf[3])
 	for i := range a {

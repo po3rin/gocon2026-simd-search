@@ -2,6 +2,5 @@
 
 package vec
 
-// DotInt8 falls back to the scalar implementation on platforms without
-// the simd package (GOEXPERIMENT 未指定のビルドや amd64/arm64 以外).
+// DotInt8 は simd パッケージが無いビルド(GOEXPERIMENT 未指定、amd64 と arm64 以外)ではスカラ版に落ちる。
 func DotInt8(a, b []int8) int32 { return DotInt8Naive(a, b) }

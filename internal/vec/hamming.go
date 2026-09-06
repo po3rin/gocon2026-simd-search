@@ -2,11 +2,11 @@ package vec
 
 import "math/bits"
 
-// Words returns the number of uint64 words needed to hold dim bits.
+// Words は dim ビットを入れるのに要る uint64 の語数を返す。
 func Words(dim int) int { return (dim + 63) / 64 }
 
-// Quantize packs the sign bits of v into out (bit i = 1 iff v[i] > 0).
-// バイナリ量子化: float32 1要素 → 1bit。メモリは 1/32 になる。
+// Quantize は v の符号を out に詰める(v[i] > 0 のとき bit i が 1)。
+// 1bit 量子化。float32 の 1 要素が 1bit になり、メモリは 1/32 になる。
 func Quantize(v []float32, out []uint64) {
 	for i := range out {
 		out[i] = 0
@@ -18,11 +18,9 @@ func Quantize(v []float32, out []uint64) {
 	}
 }
 
-// Hamming returns the number of differing bits between a and b.
-//
-// Stage 4 のカーネル。XOR + popcount だけで距離が出る。
-// math/bits.OnesCount64 はスカラーの POPCNT 命令にコンパイルされる。
-// SIMD 版 popcount(VPOPCNTQ)は AVX512VPOPCNTDQ が必要なので付録 3 節(make bench-bonus)で扱う。
+// Hamming は a と b で値が違うビットの数を返す(Stage 4 のカーネル)。
+// XOR と popcount だけで距離が出る。math/bits.OnesCount64 はスカラの POPCNT 命令になる。
+// SIMD 版の popcount(VPOPCNTQ)は AVX512VPOPCNTDQ が要るので付録 3 節(make bench-bonus)で扱う。
 func Hamming(a, b []uint64) int {
 	var d int
 	for i := range a {

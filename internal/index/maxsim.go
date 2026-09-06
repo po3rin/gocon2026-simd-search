@@ -7,14 +7,14 @@ import (
 	"github.com/po3rin/gocon2026-simd-search/internal/vec"
 )
 
-// MultiIndex は文書を「トークンベクトルの集合」で持つ(付録 2 節: late interaction)。
+// MultiIndex は文書を「トークンベクトルの集合」で持つ(付録 2 節、late interaction)。
 // ColBERT 系の検索方式で、スコアは MaxSim:
 //
 //	score(q, d) = Σ_{qt∈q} max_{dt∈d} dot(qt, dt)
 //
-// 文書トークン dt を1回ロードするとクエリトークン全部(Tq 本)と内積するので、
-// バッチ化(Stage 2)と同じ「1ロードに対し多数の計算」がタスクの仕様として内在する
-// = 最初から演算律速で、SIMD が最初から効く。
+// 文書トークン dt を 1 回ロードするたびにクエリトークン全部(Tq 本)と内積を取るので、
+// バッチ化(Stage 2)と同じ「1 回のロードに多数の計算」が検索方式そのものに含まれる。
+// つまり最初から演算律速で、SIMD が最初から効く。
 type MultiIndex struct {
 	Dim  int
 	Tok  int // 文書あたりのトークンベクトル数
@@ -22,12 +22,12 @@ type MultiIndex struct {
 	Data []float32 // N*Tok*Dim, row-major
 }
 
-// NewMulti creates an empty multi-vector index.
+// NewMulti は 1 文書あたり tok 本の dim 次元ベクトルを持つ空の索引を作る。
 func NewMulti(dim, tok int) *MultiIndex {
 	return &MultiIndex{Dim: dim, Tok: tok}
 }
 
-// Add appends a document (tok 本のトークンベクトル).
+// Add は文書(tok 本のトークンベクトル)を追加する。
 func (mx *MultiIndex) Add(doc [][]float32) {
 	if len(doc) != mx.Tok {
 		panic(fmt.Sprintf("index: token count mismatch: got %d want %d", len(doc), mx.Tok))
@@ -41,14 +41,13 @@ func (mx *MultiIndex) Add(doc [][]float32) {
 	mx.N++
 }
 
-// DocToken returns document id's t-th token vector.
+// DocToken は文書 id の t 番目のトークンベクトルを返す。
 func (mx *MultiIndex) DocToken(id, t int) []float32 {
 	off := (id*mx.Tok + t) * mx.Dim
 	return mx.Data[off : off+mx.Dim]
 }
 
-// maxSim は1文書ぶんの MaxSim スコアを計算する。dot は内積カーネル
-// (DotNaive / Dot)を差し替えて naive/SIMD を比較する。
+// maxSim は 1 文書ぶんの MaxSim スコアを計算する。内積関数 dot を差し替えてスカラと SIMD を比較する。
 func (mx *MultiIndex) maxSim(q [][]float32, id int, dot func(a, b []float32) float32) float32 {
 	var s float32
 	for _, qt := range q {
@@ -63,7 +62,7 @@ func (mx *MultiIndex) maxSim(q [][]float32, id int, dot func(a, b []float32) flo
 	return s
 }
 
-// SearchMaxSimNaive is MaxSim search with the scalar dot product.
+// SearchMaxSimNaive はスカラの内積で MaxSim 検索する。
 func (mx *MultiIndex) SearchMaxSimNaive(q [][]float32, k int) []Result {
 	t := newTopK(k)
 	for id := 0; id < mx.N; id++ {
@@ -72,7 +71,7 @@ func (mx *MultiIndex) SearchMaxSimNaive(q [][]float32, k int) []Result {
 	return t.results()
 }
 
-// SearchMaxSimSIMD is MaxSim search with the SIMD dot product.
+// SearchMaxSimSIMD は SIMD の内積で MaxSim 検索する。
 func (mx *MultiIndex) SearchMaxSimSIMD(q [][]float32, k int) []Result {
 	t := newTopK(k)
 	for id := 0; id < mx.N; id++ {

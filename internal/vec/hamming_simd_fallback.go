@@ -2,8 +2,8 @@
 
 package vec
 
-// HasVPOPCNT reports whether the AVX-512 popcount bonus path is usable.
+// HasVPOPCNT は AVX-512 版がビルドに含まれていないので常に false。
 func HasVPOPCNT() bool { return false }
 
-// HammingSIMD falls back to the scalar implementation.
+// HammingSIMD はこのビルドではスカラ版に落ちる。
 func HammingSIMD(a, b []uint64) int { return Hamming(a, b) }

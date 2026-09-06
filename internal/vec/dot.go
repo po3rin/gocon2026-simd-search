@@ -1,8 +1,8 @@
-// Package vec provides the distance kernels that the workshop optimizes
-// stage by stage: scalar baseline → SIMD → binary quantization.
+// Package vec はワークショップで Stage ごとに速くしていく距離カーネル。
+// スカラの内積、SIMD の内積、int8 の内積、1bit のハミング距離。
 package vec
 
-// DotNaive is the Stage 0 baseline: one scalar multiply-add per element.
+// DotNaive は Stage 0 のベースライン。1 要素ずつスカラで掛けて足す。
 func DotNaive(a, b []float32) float32 {
 	var sum float32
 	for i := range a {

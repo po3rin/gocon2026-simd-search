@@ -4,19 +4,19 @@ package vec
 
 import "simd/archsimd"
 
-// hasSIMD reports whether the CPU supports the 256-bit FMA path.
-// MulAdd compiles to VFMADD213PS, which requires FMA in addition to AVX2.
+// hasSIMD はこの CPU で 256bit の FMA パスが使えるか。
+// MulAdd は VFMADD213PS になるので、AVX2 に加えて FMA が要る。
 var hasSIMD = archsimd.X86.AVX2() && archsimd.X86.FMA()
 
-// HasSIMD reports whether the SIMD fast path is compiled in and usable.
+// HasSIMD は SIMD 版がビルドに含まれ、この CPU で使えるかを返す。
 func HasSIMD() bool { return hasSIMD }
 
-// Dot computes the dot product using 256-bit SIMD (8 float32 lanes).
+// Dot は 256bit の SIMD(float32 を 8 レーン)で内積を計算する(Stage 1)。
 //
-// 性能上のポイント2つ:
-//   - スライスは a[i:] でインデックスせず a = a[16:] と前進させる。
-//     インデックス式だと境界計算がループ毎に再実行されて支配的になる
-//   - アキュムレータを2本にして FMA のレイテンシチェーンを分割する
+// 性能上のポイントは 2 つ。
+//   - スライスは a[i:] で添字を付けず、a = a[16:] と前進させる。
+//     添字式だと境界計算がループごとに走って支配的になる
+//   - アキュムレータを 2 本にして、FMA の待ち時間を隠す
 func Dot(a, b []float32) float32 {
 	if !hasSIMD {
 		return DotNaive(a, b)
@@ -36,16 +36,16 @@ func Dot(a, b []float32) float32 {
 		a = a[8:]
 		b = b[8:]
 	}
-	// 水平加算: 16レーンをスカラーに畳み込む
+	// 水平和: 2 本を 1 本に足してから 8 レーンをスカラへ
 	var buf [8]float32
 	acc0.Add(acc1).Store(buf[:])
 	// ベクトルからスカラーへ戻る境界。Go は 1.27 でも VZEROUPPER を自動挿入しないため、
 	// 標準 API の archsimd.ClearAVXUpperBits()(= VZEROUPPER)を自分で呼ぶ。
-	// これを忘れると dirty ymm × レガシーSSE の遷移ペナルティで呼び出しごとに
-	// 〜550サイクル失う(詳細: docs/appendix/appendix.md の 1 節)
+	// これを忘れると Intel 機では遷移ペナルティで呼び出しごとに数百サイクル失う
+	// (docs/appendix/appendix.md の 1 節)
 	archsimd.ClearAVXUpperBits()
 	sum := buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
-	// 端数(dim が 8 の倍数でない場合)
+	// 8 の倍数でない端数
 	for i := range a {
 		sum += a[i] * b[i]
 	}

@@ -1,7 +1,7 @@
 package index
 
-// topK keeps the k highest-scoring results seen so far,
-// sorted by descending score. k は小さい(〜100)前提の挿入ソート。
+// topK はこれまでに見た中でスコア上位 k 件を、スコアの降順で保持する。
+// k は小さい(100 程度まで)前提の挿入ソート。
 type topK struct {
 	k  int
 	rs []Result

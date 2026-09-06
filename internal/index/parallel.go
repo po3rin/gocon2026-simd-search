@@ -6,13 +6,12 @@ import (
 	"github.com/po3rin/gocon2026-simd-search/internal/vec"
 )
 
-// SearchParallel は SearchSIMD(SIMD 内積の全探索)を workers 本の goroutine で
-// 並列化する。DB を連続チャンクに分割し、各 worker が自分のチャンクだけを
-// 走査して worker ローカルの topK を作り、最後にマージする。
+// SearchParallel は SearchSIMD(SIMD 内積の全探索)を workers 本の goroutine で並列化する。
+// DB を連続したチャンクに分割し、各 worker が自分のチャンクだけを走査して
+// worker ごとの topK を作り、最後にマージする。
 //
-// 「寄り道」の実験対象: 全探索はメモリ律速なので、コアを増やしても
-// DRAM 帯域を取り合うだけで理想の workers 倍にはならない(サブリニア)。
-// docs/workshop/workshop.md の寄り道節を参照。
+// 全探索はメモリ律速なので、コアを増やしても DRAM 帯域を取り合うだけで
+// workers 倍にはならない(workshop.md §06 の goroutine のコラム)。
 func (ix *Index) SearchParallel(q []float32, k, workers int) []Result {
 	if workers <= 1 {
 		return ix.SearchSIMD(q, k)
@@ -39,9 +38,9 @@ func (ix *Index) SearchParallel(q []float32, k, workers int) []Result {
 	return mergeTopK(k, tops)
 }
 
-// SearchBatchParallel は SearchBatchSIMD(B 本のクエリを1パスで処理)を
-// workers 本の goroutine で並列化する。分割の仕方は SearchParallel と同じ
-// DB チャンク分割(worker ごとの AI は 0.5×B のまま変わらない)。
+// SearchBatchParallel は SearchBatchSIMD(B 本のクエリを 1 パスで処理)を workers 本の
+// goroutine で並列化する。分割は SearchParallel と同じ DB のチャンク分割で、
+// worker ごとの算術強度は 0.5×B のまま変わらない。
 //
 // バッチは演算律速なので、こちらは物理コア数までほぼ比例して速くなる。
 func (ix *Index) SearchBatchParallel(qs [][]float32, k, workers int) [][]Result {
@@ -87,8 +86,7 @@ func (ix *Index) SearchBatchParallel(qs [][]float32, k, workers int) [][]Result 
 	return out
 }
 
-// mergeTopK は worker ローカルの topK 群を1つの top-k に畳み込む。
-// チャンクは互いに素なので ID の重複は無い。
+// mergeTopK は worker ごとの topK を 1 つにまとめる。チャンクは互いに素なので ID は重複しない。
 func mergeTopK(k int, tops []*topK) []Result {
 	m := newTopK(k)
 	for _, t := range tops {

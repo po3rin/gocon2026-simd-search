@@ -412,14 +412,16 @@ func DotNaive(a, b []float32) float32 {
     return sum
 }
 
-// internal/index/index.go — 全探索
-func (ix *Index) SearchNaive(q []float32, k int) []Result {
+// internal/index/index.go: 全探索。各 Stage の違いは内積関数 dot だけ
+func (ix *Index) scan(q []float32, k int, dot func(a, b []float32) float32) []Result {
     t := newTopK(k)
     for id := 0; id < ix.N; id++ {              // 10万ベクトル全部と内積
-        t.push(id, vec.DotNaive(q, ix.Vec(id)))
+        t.push(id, dot(q, ix.Vec(id)))
     }
     return t.results()
 }
+
+func (ix *Index) SearchNaive(q []float32, k int) []Result { return ix.scan(q, k, vec.DotNaive) }
 ```
 
 
@@ -508,7 +510,7 @@ func Dot(a, b []float32) float32 {
 }
 ```
 
-上のコードは主要部分だけです。長さのチェックと、8 の倍数に満たない端数の処理を含む完全なコードは [`internal/vec/dot_simd.go`](../../internal/vec/dot_simd.go) にあります。
+上のコードは主要部分だけです。長さのチェックと、8 の倍数に満たない端数の処理を含む完全なコードは [`internal/vec/dot_simd.go`](../../internal/vec/dot_simd.go) にあります。 全探索の `SearchSIMD` は、Stage 0 の `scan` に `vec.DotNaive` の代わりに `vec.Dot` を渡すだけです。
 
 ```bash
 $ make bench1    # カーネル単体(internal/vec)と全探索(internal/index)の2粒度(表示は整形・抜粋)
@@ -622,17 +624,19 @@ Stage 1 の点はメモリ帯域の上限に達しました。ここから先は
 
 ```go
 // internal/index/index.go: B 本のクエリを 1 パスで処理(d のロードを再利用)
-func (ix *Index) SearchBatchSIMD(qs [][]float32, k int) [][]Result {
+func (ix *Index) scanBatch(qs [][]float32, k int, dot func(a, b []float32) float32) [][]Result {
     tops := make([]*topK, len(qs))
     for b := range tops { tops[b] = newTopK(k) }
     for id := 0; id < ix.N; id++ {
         d := ix.Vec(id)                          // ① d を1回ロード
         for b := range qs {                      // ② B本のクエリで使い回す(d はキャッシュ常駐)
-            tops[b].push(id, vec.Dot(qs[b], d))   // SIMD内積
+            tops[b].push(id, dot(qs[b], d))
         }
     }
     /* 各 tops[b].results() を返す */
 }
+
+func (ix *Index) SearchBatchSIMD(qs [][]float32, k int) [][]Result { return ix.scanBatch(qs, k, vec.Dot) }
 ```
 
 ```bash
