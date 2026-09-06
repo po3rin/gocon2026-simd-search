@@ -45,7 +45,7 @@ make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 
 Codespaces は割り当てられる CPU(Intel/AMD、世代)を選べませんが、本編が使う SIMD は AVX2 + FMA だけです(Stage 1/2/5 の内積。Stage 3 の int8 カーネルは AVX2 のみ)。過去 10 年の x86(Intel は Haswell 2013 年以降、AMD は 2015 年以降)がほぼ全て持つので、どの CPU でも全ステージ再現します。ただし出る数字は CPU で変わります。教材は各自の数字で進める作りになっているので、それで問題ありません。
 
-AVX-512 は本編では使いません。Stage 4 で見るとおり量子化後は速くならないためで、Faiss も同じ理由で AVX2 と Neon を主に使い、AVX-512 のカーネルは原則持っていません。AVX-512 を実機で確かめたい人向けの実測は[付録](../appendix/avx512-popcount.md)にあります。
+AVX-512 は本編では使いません。Stage 4 で見るとおり量子化後は速くならないためで、Faiss も同じ理由で AVX2 と Neon を主に使い、AVX-512 のカーネルは原則持っていません。AVX-512 を実機で確かめたい人向けの実測は[付録](../appendix/README.md#3-avx-512-の-simd-popcount)にあります。
 
 ## Apple Silicon で動かす場合
 
@@ -67,7 +67,7 @@ Apple Silicon でも `docker run --platform linux/amd64` を使えば x86 とし
 - QEMU が不安定で、ビルド中に SIGSEGV で落ちることがあります
 - Rosetta 経由でも翻訳されるのは AVX/AVX2 までで、FMA が使えません(`X86.FMA()` が false。macOS 26 + Go 1.27.1 で確認)。本編の内積は AVX2 + FMA が要るので、スカラ実装に落ちます
 
-SIMD の数字は Codespaces(amd64 のホスト)で測ってください。詳しい調査は[付録の実行環境の調査](../appendix/environment-survey.md)にあります。
+SIMD の数字は Codespaces(amd64 のホスト)で測ってください。詳しい調査は[付録の実行環境の調査](../appendix/README.md#4-実行環境の調査)にあります。
 
 ---
 

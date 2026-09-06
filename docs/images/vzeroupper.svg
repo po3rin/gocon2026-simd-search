@@ -5,12 +5,12 @@
 <marker id="ar-gr" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#16a34a"/></marker>
 </defs>
 <rect x="0" y="0" width="980" height="720" fill="#ffffff"/>
-<text x="490" y="34" text-anchor="middle" font-size="21" font-weight="700" fill="#111827">VZEROUPPER 税 &#8212; SIMD&#8594;スカラ境界の遷移ペナルティ</text>
+<text x="490" y="34" text-anchor="middle" font-size="21" font-weight="700" fill="#111827">VZEROUPPER の遷移ペナルティ: SIMD からスカラへ戻る境界で起きる</text>
 <text x="490" y="58" text-anchor="middle" font-size="14" fill="#6b7280">同じコードでも、境界の1命令の有無で 167ns &#8594; 23ns（7.1x）</text>
 <rect x="40" y="72" width="430" height="40" rx="8" ry="8" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
-<text x="255" y="98" font-size="16" font-weight="700" fill="#b91c1c" text-anchor="middle">&#10007; VZEROUPPER なし（税あり）= 167ns</text>
+<text x="255" y="98" font-size="16" font-weight="700" fill="#b91c1c" text-anchor="middle">&#10007; VZEROUPPER なし = 167ns</text>
 <rect x="510" y="72" width="430" height="40" rx="8" ry="8" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-<text x="725" y="98" font-size="16" font-weight="700" fill="#15803d" text-anchor="middle">&#10003; VZEROUPPER あり（税なし）= 23ns</text>
+<text x="725" y="98" font-size="16" font-weight="700" fill="#15803d" text-anchor="middle">&#10003; VZEROUPPER あり = 23ns</text>
 <rect x="40" y="130" width="430" height="64" rx="8" ry="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
 <text x="58" y="156" font-size="14" font-weight="600" fill="#9a3412" text-anchor="start">&#9312; AVX2 FMA を実行（YMM 256bit を使う）</text>
 <text x="58" y="178" font-size="12.5" font-weight="400" fill="#b45309" text-anchor="start">&#8594; YMM レジスタの上位128bitが dirty（汚れた）状態</text>
@@ -54,5 +54,5 @@
 <text x="60" y="614" font-size="13" font-weight="400" fill="#374151" text-anchor="start">・教科書でいう「一度きりの大きな遷移ペナルティ（モード切替）」は Haswell 世代までの話。</text>
 <text x="60" y="636" font-size="13" font-weight="400" fill="#374151" text-anchor="start">・Skylake 以降は仕組みが変わり、『レガシーSSE 1命令ごと』に小さなペナルティが蓄積する形になった。</text>
 <text x="60" y="658" font-size="13" font-weight="400" fill="#374151" text-anchor="start">・VZEROUPPER はその蓄積をまとめて消す。ただし効果はベンダー差あり（AMD Zen では小さい）。</text>
-<text x="60" y="680" font-size="13" font-weight="400" fill="#6b7280" text-anchor="start">・Go 1.26 archsimd は VZEROUPPER を自動挿入しないため、3行の .s を自作して境界で呼んでいる。</text>
+<text x="60" y="680" font-size="13" font-weight="400" fill="#6b7280" text-anchor="start">・Go 1.26 / 1.27 の archsimd は VZEROUPPER を自動挿入しないため、境界で archsimd.ClearAVXUpperBits() を呼んでいる。</text>
 </svg>

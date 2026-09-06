@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+<defs><marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker></defs>
+<style>text{font-family:'Helvetica Neue',Helvetica,Arial,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;fill:#111827}</style>
+<rect width="960" height="540" fill="#ffffff"/>
+<text x="480" y="34" font-size="18" font-weight="600" text-anchor="middle">MaxSim の採点: 文書のトークンを 1 回運び、クエリのトークン全部と内積を取る</text>
+<text x="480" y="56" font-size="11.5" fill="#6b7280" text-anchor="middle">クエリ 16 トークン × 文書 4 トークン。1 文書あたり内積 64 回。行ごとに最大値を取り、それを足した値がその文書のスコア</text>
+
+<!-- クエリ -->
+<rect x="40" y="90" width="150" height="310" rx="8" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="115" y="114" font-size="13" font-weight="600" text-anchor="middle">クエリ q</text>
+<text x="115" y="131" font-size="11" fill="#6b7280" text-anchor="middle">トークン 16 本(各 384 次元)</text>
+<g font-size="12" text-anchor="middle">
+<rect x="65" y="148" width="100" height="30" rx="5" fill="#eff6ff" stroke="#93c5fd"/><text x="115" y="168">q1</text>
+<rect x="65" y="192" width="100" height="30" rx="5" fill="#eff6ff" stroke="#93c5fd"/><text x="115" y="212">q2</text>
+<rect x="65" y="236" width="100" height="30" rx="5" fill="#eff6ff" stroke="#93c5fd"/><text x="115" y="256">q3</text>
+<text x="115" y="300" fill="#6b7280">…</text>
+<rect x="65" y="324" width="100" height="30" rx="5" fill="#eff6ff" stroke="#93c5fd"/><text x="115" y="344">q16</text>
+</g>
+<text x="115" y="385" font-size="10.5" fill="#6b7280" text-anchor="middle">レジスタとキャッシュに常駐</text>
+
+<!-- 文書 -->
+<rect x="220" y="90" width="150" height="310" rx="8" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="295" y="114" font-size="13" font-weight="600" text-anchor="middle">文書 d</text>
+<text x="295" y="131" font-size="11" fill="#6b7280" text-anchor="middle">トークン 4 本(各 384 次元)</text>
+<g font-size="12" text-anchor="middle">
+<rect x="245" y="148" width="100" height="30" rx="5" fill="#fff7ed" stroke="#fdba74"/><text x="295" y="168">d1</text>
+<rect x="245" y="192" width="100" height="30" rx="5" fill="#fff7ed" stroke="#fdba74"/><text x="295" y="212">d2</text>
+<rect x="245" y="236" width="100" height="30" rx="5" fill="#fff7ed" stroke="#fdba74"/><text x="295" y="256">d3</text>
+<rect x="245" y="280" width="100" height="30" rx="5" fill="#fff7ed" stroke="#fdba74"/><text x="295" y="300">d4</text>
+</g>
+<text x="295" y="345" font-size="10.5" fill="#6b7280" text-anchor="middle">メモリから 1 回だけ運ぶ</text>
+<text x="295" y="361" font-size="10.5" fill="#6b7280" text-anchor="middle">(1536 byte × 4 = 6 KB)</text>
+<text x="295" y="385" font-size="10.5" fill="#6b7280" text-anchor="middle">これを 1 万文書ぶん繰り返す</text>
+
+<line x1="376" y1="245" x2="416" y2="245" stroke="#2563eb" stroke-width="1.8" marker-end="url(#ab)"/>
+
+<!-- 内積の表 -->
+<rect x="420" y="90" width="330" height="310" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="585" y="114" font-size="13" font-weight="600" text-anchor="middle">内積 dot(q, d) を 16 × 4 = 64 回</text>
+<text x="585" y="131" font-size="11" fill="#6b7280" text-anchor="middle">運んだ d1〜d4 をレジスタに置いたまま、q1〜q16 と順に掛ける</text>
+<g font-size="11" text-anchor="middle" fill="#374151">
+<text x="480" y="160">d1</text><text x="540" y="160">d2</text><text x="600" y="160">d3</text><text x="660" y="160">d4</text>
+<text x="715" y="160" font-weight="600">max</text>
+</g>
+<g font-size="11" text-anchor="middle">
+<text x="440" y="190" fill="#374151">q1</text>
+<rect x="455" y="172" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="480" y="190">0.31</text>
+<rect x="515" y="172" width="50" height="26" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/><text x="540" y="190" font-weight="600">0.72</text>
+<rect x="575" y="172" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="600" y="190">0.10</text>
+<rect x="635" y="172" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="660" y="190">0.44</text>
+<text x="715" y="190" font-weight="600">0.72</text>
+
+<text x="440" y="226" fill="#374151">q2</text>
+<rect x="455" y="208" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="480" y="226">0.05</text>
+<rect x="515" y="208" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="540" y="226">0.12</text>
+<rect x="575" y="208" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="600" y="226">0.20</text>
+<rect x="635" y="208" width="50" height="26" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/><text x="660" y="226" font-weight="600">0.58</text>
+<text x="715" y="226" font-weight="600">0.58</text>
+
+<text x="440" y="262" fill="#374151">q3</text>
+<rect x="455" y="244" width="50" height="26" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/><text x="480" y="262" font-weight="600">0.66</text>
+<rect x="515" y="244" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="540" y="262">0.09</text>
+<rect x="575" y="244" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="600" y="262">0.41</text>
+<rect x="635" y="244" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="660" y="262">0.15</text>
+<text x="715" y="262" font-weight="600">0.66</text>
+
+<text x="440" y="300" fill="#6b7280">…</text>
+<text x="480" y="300" fill="#6b7280">…</text><text x="540" y="300" fill="#6b7280">…</text><text x="600" y="300" fill="#6b7280">…</text><text x="660" y="300" fill="#6b7280">…</text><text x="715" y="300" fill="#6b7280">…</text>
+
+<text x="440" y="336" fill="#374151">q16</text>
+<rect x="455" y="318" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="480" y="336">0.22</text>
+<rect x="515" y="318" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="540" y="336">0.18</text>
+<rect x="575" y="318" width="50" height="26" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/><text x="600" y="336" font-weight="600">0.53</text>
+<rect x="635" y="318" width="50" height="26" fill="#eff6ff" stroke="#bfdbfe"/><text x="660" y="336">0.07</text>
+<text x="715" y="336" font-weight="600">0.53</text>
+</g>
+<text x="585" y="375" font-size="10.5" fill="#6b7280" text-anchor="middle">各行の最大値(濃い色)がそのクエリトークンの得点</text>
+
+<line x1="756" y1="245" x2="796" y2="245" stroke="#2563eb" stroke-width="1.8" marker-end="url(#ab)"/>
+
+<!-- スコア -->
+<rect x="800" y="200" width="120" height="90" rx="8" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1.5"/>
+<text x="860" y="228" font-size="13" font-weight="600" text-anchor="middle">score(q, d)</text>
+<text x="860" y="250" font-size="11.5" text-anchor="middle">= Σ max</text>
+<text x="860" y="272" font-size="11" fill="#6b7280" text-anchor="middle">16 個の max の和</text>
+
+<!-- 注 -->
+<rect x="40" y="420" width="880" height="96" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+<text x="60" y="446" font-size="12.5" font-weight="600">Stage 2 のバッチ化と同じ構造が、検索方式そのものに入っている</text>
+<text x="60" y="468" font-size="11.5" fill="#374151">文書側のトークンを 1 回運ぶたびに 16 本のクエリトークンと内積を取るので、1 byte 運ぶごとの計算回数(算術強度)は 16 / 2 = 8 flop/byte。</text>
+<text x="60" y="488" font-size="11.5" fill="#374151">Stage 0 の全探索(0.5 flop/byte)と違い、何もしなくてもリッジ(約 1.3)の右にある。つまり最初から演算律速で、SIMD がそのまま効く(実測 5.7x)。</text>
+<text x="60" y="508" font-size="11" fill="#6b7280">数値は説明用の例。実装は internal/index/maxsim.go、計測は make bench-maxsim</text>
+</svg>

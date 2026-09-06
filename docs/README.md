@@ -9,10 +9,7 @@
   > 数値の正本はこの教材と、`make roofline` / `make roofline-ceiling`(実測・再現可能)。
 
 ## 付録
-- **[appendix/README.md](appendix/README.md)** — 付録の索引。
-- **[appendix/hidden-ceilings.md](appendix/hidden-ceilings.md)** — Go の SIMD の 2 つの隠れた性能上限(VZEROUPPER の遷移ペナルティ、register spill)。
-- **[appendix/environment-survey.md](appendix/environment-survey.md)** — 実行環境の調査(Apple Silicon、Rosetta、Docker、amd64 実機)。
-- **[appendix/optimization-log.md](appendix/optimization-log.md)** — 最適化の記録(Step 0〜12。つまずきと診断、本編の数字の出どころ)。
+- **[appendix/README.md](appendix/README.md)** — 付録(1 ファイル)。Go の SIMD の 2 つの隠れた性能上限(VZEROUPPER の遷移ペナルティ、register spill)、MaxSim、AVX-512 popcount、実行環境の調査(Apple Silicon、Rosetta、Docker、amd64 実機)。
 
 ## 共有
 - **images/** — 図(SVG + PNG)。教材・記事から参照。
