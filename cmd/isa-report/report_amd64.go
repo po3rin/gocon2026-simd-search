@@ -119,7 +119,7 @@ func run() {
 	fmt.Printf("    HasSIMD=false。Go 1.27 からは GOARCH=arm64 のまま Neon 版が走るので、\n")
 	fmt.Printf("    Mac では素の `make isa-report` / `make bench1` を使う(arm64 の一覧が出る)。\n")
 	fmt.Printf("  • Docker linux/amd64 on Apple Silicon emulates x86; not a substitute for\n")
-	fmt.Printf("    amd64 bare metal (Codespaces / make remote-bench).\n")
+	fmt.Printf("    amd64 bare metal (Codespaces).\n")
 }
 
 func stageSummaries(hasSIMD, hasVPOPCNT bool) []stageSummary {

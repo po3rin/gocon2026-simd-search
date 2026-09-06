@@ -15,7 +15,7 @@
 | **arm64 ネイティブ** (Apple M3 Pro) | ✅ `make test` | ✅ | ✅ Neon 128bit(Go 1.27〜。1.26 は ❌) | ❌ | △ 動くが本編(AVX2)とは別の点 |
 | **Rosetta** (`GOARCH=amd64`) | ✅ | ✅ | ❌ **FMA=false** | ❌ AVX-512 非対応 | △ 量子化は再現、SIMD 内積は不可 |
 | **Docker `linux/amd64`** (Apple Silicon 上) | ❌ ビルドクラッシュ / CPUID 全 false | △ バイナリ実行のみ | ❌ | ❌ | ❌ 使わない |
-| **amd64 実機** (Codespaces / AWS c7i) | ✅ | ✅ | ✅ | ✅ | ✅ `make remote-bench` |
+| **amd64 実機** (Codespaces / AWS c7i) | ✅ | ✅ | ✅ | ✅ | ✅ `make bench` |
 
 **推奨**: 本編(Stage 0/1/2 + rerank)で使う SIMD は **AVX2 + FMA だけ**なので、参加者・記事の数字は **GitHub Codespaces 一本**で全ステージ取れる(当たる CPU の Intel/AMD・世代を問わず再現)。AVX-512 VPOPCNT は本編フロー外の**付録**で、AVX-512 のある機械(AWS c7i など)を用意した場合だけ実機確認する。Apple Silicon の手元では **arm64 で `make test`**（正しさ）、**Rosetta で Stage 2 まで動作確認**が現実的。
 
@@ -111,7 +111,7 @@ isa-report-linux  → 実行はできるが archsimd.X86 は **すべて false**
 
 ## 4. amd64 実機 (記事・教材の本番環境)
 
-AWS c7i (Sapphire Rapids) 上の実測値（`optimization-log.md` / `make remote-bench`）:
+AWS c7i (Sapphire Rapids) 上の実測値（`optimization-log.md`。VM 上で `make bench` を実行）:
 
 | Feature | c7i |
 |---|---|
@@ -139,7 +139,7 @@ SearchBinaryRerank    0.73 ms  (39x, Recall@10=0.87)
   → make bench
 
 (付録) AVX-512 VPOPCNT を実機で確かめたい
-  → make remote-bench / make bench-bonus  (AWS c7i = AVX-512 + VPOPCNTDQ)
+  → AVX-512 のある機械を自分で用意して make bench-bonus  (AWS c7i = AVX-512 + VPOPCNTDQ)
 
 CPU feature を確認したい
   → make isa-report  (Rosetta 上で GOARCH=amd64)
