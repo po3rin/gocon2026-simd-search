@@ -32,7 +32,7 @@ make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 
 ## マシンサイズは `4-core` で固定
 
-**全員 `4-core`(16 GB RAM)を指定してください([マシンタイプの変え方](https://docs.github.com/en/codespaces/customizing-your-codespace/changing-the-machine-type-for-your-codespace))。** 起動時のマシン選択で `4-core` を選ぶだけです。
+全員 `4-core`(16 GB RAM)を指定してください([マシンタイプの変え方](https://docs.github.com/en/codespaces/customizing-your-codespace/changing-the-machine-type-for-your-codespace))。** 起動時のマシン選択で `4-core` を選ぶだけです。
 バラバラのサイズだと比較しづらくなるので、条件を揃えるために統一します。8-core 以上は無料枠を早く消費するだけで不要、2-core はベンチが不安定になりがちなので避けます。
 
 > ただし Codespaces は当たる CPU(Intel/AMD・世代)を選べません。同じ 4-core でも CPU が違えば出る数字は変わります。
@@ -47,7 +47,7 @@ make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 
 Codespaces は割り当てられる CPU(Intel/AMD、世代)を選べませんが、本編が使う SIMD は AVX2 + FMA だけです(Stage 1/2/5 の内積。Stage 3 の int8 カーネルは AVX2 のみ)。過去 10 年の x86(Intel は Haswell 2013 年以降、AMD は 2015 年以降)がほぼ全て持つので、どの CPU でも全ステージ再現します。ただし出る数字は CPU で変わります。教材は各自の数字で進める作りになっているので、それで問題ありません。
 
-AVX-512 は本編では使いません。Stage 4 で見るとおり、量子化後は popcount を SIMD 化しても速くならないためです。AVX-512 を実機で確かめたい人向けの実測は[付録](../appendix/README.md#3-avx-512-の-simd-popcount)にあります。
+AVX-512 は本編では使いません。Stage 4 で見るとおり、量子化後は popcount を SIMD 化しても速くならないためです。AVX-512 を実機で確かめたい人向けの実測は[付録](../appendix/appendix.md#3-avx-512-の-simd-popcount)にあります。
 
 ## Apple Silicon で動かす場合
 
@@ -69,7 +69,7 @@ Apple Silicon でも `docker run --platform linux/amd64` を使えば x86 とし
 - QEMU が不安定で、ビルド中に SIGSEGV で落ちることがあります
 - Rosetta 経由でも翻訳されるのは AVX/AVX2 までで、FMA が使えません(`X86.FMA()` が false。macOS 26 + Go 1.27.1 で確認)。本編の内積は AVX2 + FMA が要るので、スカラ実装に落ちます
 
-SIMD の数字は Codespaces(amd64 のホスト)で測ってください。詳しい調査は[付録の実行環境の調査](../appendix/README.md#4-実行環境の調査)にあります。
+SIMD の数字は Codespaces(amd64 のホスト)で測ってください。詳しい調査は[付録の実行環境の調査](../appendix/appendix.md#4-実行環境の調査)にあります。
 
 ---
 

@@ -9,7 +9,7 @@
 
 ## 付録
 
-- [appendix/README.md](appendix/README.md): Go の SIMD の 2 つの隠れた性能上限(VZEROUPPER の遷移ペナルティ、register spill)、MaxSim、AVX-512 popcount、実行環境の調査(Apple Silicon、Rosetta、Docker、amd64 実機)
+- [appendix/appendix.md](appendix/appendix.md): Go の SIMD の 2 つの隠れた性能上限(VZEROUPPER の遷移ペナルティ、register spill)、MaxSim、AVX-512 popcount、実行環境の調査(Apple Silicon、Rosetta、Docker、amd64 実機)
 
 ## 共有
 

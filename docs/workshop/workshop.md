@@ -132,9 +132,11 @@ SIMD とベクトル検索の概要が分かったところで、一度動かし
 
 本編の環境は amd64(Intel/AMD)です。一番楽なのは GitHub Codespaces です。手元で動かす場合に必要なものは Go 1.27 と make だけです。Go 1.27 からは Apple Silicon でも Neon 版の SIMD が走りますが、レジスタ幅もメモリ帯域も違うので、本編とは別の数字になります。
 
-**① Codespaces(推奨)** リポジトリの `Code → Codespaces → Create`。[`.devcontainer/`](../../.devcontainer/) に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。マシンサイズの選び方、費用、困ったときのフォールバックは [setup.md](setup.md) にまとめてあります。
+#### ① Codespaces(推奨)
 
-**② ローカル(amd64 Linux / Windows)**
+リポジトリの `Code → Codespaces → Create`。[`.devcontainer/`](../../.devcontainer/) に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。マシンサイズの選び方、費用、困ったときのフォールバックは [setup.md](setup.md) にまとめてあります。
+
+#### ② ローカル(amd64 Linux / Windows)
 
 ```bash
 git clone https://github.com/po3rin/gocon2026-simd-search
@@ -143,7 +145,9 @@ go install golang.org/dl/go1.27.1@latest && go1.27.1 download   # Go 1.27 を入
 make GO=$(go env GOPATH)/bin/go1.27.1 test                      # GOEXPERIMENT=simd は Makefile が付与
 ```
 
-**③ ローカル(Apple Silicon の Mac)** コマンドは②と同じです。Go 1.27 から `archsimd` が arm64 に対応したので、`make bench1` を実行すると Neon(128bit)版の SIMD が走ります。本編の数字(AVX2・256bit)とは別物なので、[setup.md](setup.md) の「Apple Silicon で動かす場合」を読んでから、自分の Mac の値として眺めてください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
+#### ③ ローカル(Apple Silicon の Mac)
+
+コマンドは②と同じです。Go 1.27 から `archsimd` が arm64 に対応したので、`make bench1` を実行すると Neon(128bit)版の SIMD が走ります。本編の数字(AVX2・256bit)とは別物なので、[setup.md](setup.md) の「Apple Silicon で動かす場合」を読んでから、自分の Mac の値として眺めてください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
 
 ### 動かす
 
@@ -235,9 +239,9 @@ CPU はまずレジスタとキャッシュにあるデータを使い、そこ�
 
 測るのは `make roofline-ceiling` です。検索のコードは走らせず、マシンの上限だけを測る小さなベンチを 3 つ実行します。
 
-1. **演算ピーク**(`PeakFLOP_AVX2`): メモリに一切触らず、レジスタ上で FMA(積和)命令だけを回し続けて、1 秒に何回計算できるかを測る
-2. **メモリ帯域の上限**(`PeakReadBW`): キャッシュに収まらない 256MB の配列を先頭から末尾まで読み、1 秒に何 GB 運べるかを測る
-3. **読み書き混在の帯域**(`PeakTriadBW`): 2 つの配列を読んで計算し、結果を 3 つ目の配列に書き戻す標準ベンチ([STREAM](https://www.cs.virginia.edu/stream/) Triad)。メモリ帯域の一般的な指標として載せている
+1. 演算ピーク(`PeakFLOP_AVX2`)。メモリに一切触らず、レジスタ上で FMA(積和)命令だけを回し続けて、1 秒に何回計算できるかを測る
+2. メモリ帯域の上限(`PeakReadBW`)。キャッシュに収まらない 256MB の配列を先頭から末尾まで読み、1 秒に何 GB 運べるかを測る
+3. 読み書き混在の帯域(`PeakTriadBW`)。2 つの配列を読んで計算し、結果を 3 つ目の配列に書き戻す標準ベンチ([STREAM](https://www.cs.virginia.edu/stream/) Triad)。メモリ帯域の一般的な指標として載せている
 
 1 と 2 がルーフラインの式に入れる 2 つの数字です。今回の検索は DB ベクトルを読むだけで、大きな配列への書き込みはしません。そのためメモリ帯域には 2 の読むだけの値を使い、3 は他の資料の数字と見比べるための参考値です。実行します。
 
@@ -477,7 +481,7 @@ for len(a) >= 8 {
 
 そこでアキュムレータを `acc0` と `acc1` の 2 本にし、偶数番目の 8 要素は `acc0` に、奇数番目の 8 要素は `acc1` に足し込みます。2 本は互いの結果を待たないので、`acc0` の FMA が終わるのを待つ間に `acc1` の FMA を始められます。順番待ちの列が 2 本に分かれ、待ち時間が半分になります。ループが終わったら `acc0` と `acc1` を足して 1 本にし、その 8 レーンを足し合わせて 1 つの数にします(この最後の足し合わせを水平和と呼びます)。
 
-コードの最後の `archsimd.ClearAVXUpperBits()` は、Intel の CPU 向けの後始末です。Intel の CPU は、256bit の SIMD 命令を使った直後に SIMD でない浮動小数点命令(ここでは水平和のスカラの足し算)を実行すると、レジスタの上位半分に古い値が残っているせいで大きく遅くなることがあります。境界で VZEROUPPER という命令を 1 つ実行すると防げます。Go のコンパイラは 1.27 でもこの命令を自動では入れないので、標準 API で自分で呼びます。AMD では起きない現象ですが、呼んでも害はありません。詳しくは[付録](../appendix/README.md#1-go-の-simd-の-2-つの隠れた性能上限)にあります。
+コードの最後の `archsimd.ClearAVXUpperBits()` は、Intel の CPU 向けの後始末です。Intel の CPU は、256bit の SIMD 命令を使った直後に SIMD でない浮動小数点命令(ここでは水平和のスカラの足し算)を実行すると、レジスタの上位半分に古い値が残っているせいで大きく遅くなることがあります。境界で VZEROUPPER という命令を 1 つ実行すると防げます。Go のコンパイラは 1.27 でもこの命令を自動では入れないので、標準 API で自分で呼びます。AMD では起きない現象ですが、呼んでも害はありません。詳しくは[付録](../appendix/appendix.md#1-go-の-simd-の-2-つの隠れた性能上限)にあります。
 
 ```go
 // internal/vec/dot_simd.go  (GOEXPERIMENT=simd, amd64)
@@ -527,8 +531,8 @@ Stage 1 の点はメモリ帯域の上限に達しました。ここから先は
 
 点を上に動かせないなら、右に動かします。つまり算術強度(運ぶ 1 バイトあたりの計算回数)を上げます。やり方は 2 つあります。
 
-1. **再利用**: 運んだ DB ベクトル 1 本を、複数のクエリで使い回す。運ぶ量は同じで計算が増える。結果は正確なまま(Stage 2)
-2. **バイト削減**: DB ベクトルを小さい型で持ち、運ぶ量そのものを減らす。結果は近似になる(Stage 3 の int8、Stage 4 の 1bit)
+1. 再利用。運んだ DB ベクトル 1 本を、複数のクエリで使い回す。運ぶ量は同じで計算が増える。結果は正確なまま(Stage 2)
+2. バイト削減。DB ベクトルを小さい型で持ち、運ぶ量そのものを減らす。結果は近似になる(Stage 3 の int8、Stage 4 の 1bit)
 
 > **コラム: 端数はマスク付きロードでも書ける**
 >
@@ -646,7 +650,7 @@ B=32  SearchBatchSIMD    5.79 ms/query  13.26 GF   ← AI 16・SIMD で 5.9x。�
 
 B=32 でクエリを束ねると算術強度は 0.5 から 16 になり、リッジを越えて演算律速側に移りました。そこでは **SIMD がスカラより 5.9x 速くなります**。scalar batch が 34.2 ms/query、SIMD batch が 5.79 ms/query で、GFLOP/s は 2.24 から 13.3 です。Stage 1 では 4.5x で頭打ちだった SIMD が、算術強度を上げると効きます。1 クエリあたりの時間も 7.9 ms から 5.8 ms に縮みます。
 
-ちなみに「クエリが 32 本まとめて来る」という仮定は実際でも使われます。 [ColBERT](https://arxiv.org/abs/2004.12832) のようにクエリを複数のベクトルで表す検索方式(late interaction)では、DB ベクトル 1 本に対して複数の内積を取ることが方式そのものに含まれていて、最初から演算律速です。[付録の MaxSim](../appendix/README.md#2-maxsim) で実測しています(5.7x)。
+ちなみに「クエリが 32 本まとめて来る」という仮定は実際でも使われます。 [ColBERT](https://arxiv.org/abs/2004.12832) のようにクエリを複数のベクトルで表す検索方式(late interaction)では、DB ベクトル 1 本に対して複数の内積を取ることが方式そのものに含まれていて、最初から演算律速です。[付録の MaxSim](../appendix/appendix.md#2-maxsim) で実測しています(5.7x)。
 
 なぜ律速が入れ替わるのかは、時間の内訳で分かります。1 要素を処理する時間は、運ぶ時間(バイト数 ÷ メモリ帯域)と計算する時間(flop ÷ 演算ピーク)のうち長い方でおおよそ決まります。計算する時間は要素あたり 2 flop で全 Stage 同じですが、バッチ化は運ぶ時間だけを 1/32 にします。そのため長い方が、運ぶ時間から計算する時間に入れ替わります。下の図は §05 で測った演算ピーク 25.6 GFLOP/s と read 帯域 20.8 GB/s から計算したものです。
 
@@ -790,7 +794,7 @@ DB が 153MB から 4.8MB になってキャッシュに乗り、DRAM 帯域の�
 
 距離の計算には、通常の(SIMD でない)POPCNT 命令で十分です。SIMD 版の popcount(AVX-512 の VPOPCNT)に変えても速くなりません。データがキャッシュに乗っていて 1 ベクトルが 6 語と短く、popcount の計算で時間を使っていないからです。
 
-AVX-512 のある機械で測ると、SIMD 版が 0.75 ms、通常版が 0.68 ms でした。実測は[付録](../appendix/README.md#3-avx-512-の-simd-popcount)にあります(今回の Codespace の AMD CPU には VPOPCNT が無いので、手元では再現できません)。
+AVX-512 のある機械で測ると、SIMD 版が 0.75 ms、通常版が 0.68 ms でした。実測は[付録](../appendix/appendix.md#3-avx-512-の-simd-popcount)にあります(今回の Codespace の AMD CPU には VPOPCNT が無いので、手元では再現できません)。
 
 Stage 3 では SIMD が効きましたが、1bit では使う場所がありません。計算で詰まっていない所では SIMD は効きません。本編で AVX-512 を扱わないのはこのためです。
 
@@ -858,8 +862,8 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 
 本編で使った考え方(ルーフラインと、算術強度を上げる 2 つの方法)は、そのまま先へ延長できます。方向は 2 つあります。
 
-- **アルゴリズムの軸(HNSW、IVF)。** ここまでの対処は全て 10 万件全部を処理する前提でした。そもそも触る件数を減らすのが、全探索の O(N) を下回る唯一の方法です。実運用では [HNSW](https://arxiv.org/abs/1603.09320) や [IVF](https://github.com/facebookresearch/faiss/wiki/Faiss-indexes) などで候補を絞り、その候補を本ワークショップの方法で速くします
-- **検索方式の軸(MaxSim)。** クエリを複数のベクトルで表す late interaction では、Stage 2 のバッチ化と同じ構造が方式そのものに含まれていて、最初から演算律速です。[付録の MaxSim](../appendix/README.md#2-maxsim) で実装と実測をしています
+- アルゴリズムの軸(HNSW、IVF)。ここまでの対処は全て 10 万件全部を処理する前提でした。そもそも触る件数を減らすのが、全探索の O(N) を下回る唯一の方法です。実運用では [HNSW](https://arxiv.org/abs/1603.09320) や [IVF](https://github.com/facebookresearch/faiss/wiki/Faiss-indexes) などで候補を絞り、その候補を本ワークショップの方法で速くします
+- 検索方式の軸(MaxSim)。クエリを複数のベクトルで表す late interaction では、Stage 2 のバッチ化と同じ構造が方式そのものに含まれていて、最初から演算律速です。[付録の MaxSim](../appendix/appendix.md#2-maxsim) で実装と実測をしています
 
 ## 07. まとめ
 

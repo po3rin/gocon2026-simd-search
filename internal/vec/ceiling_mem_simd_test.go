@@ -38,7 +38,7 @@ func BenchmarkPeakReadBW(b *testing.B) {
 			x = x[64:]
 		}
 		sum := a0.Add(a1).Add(a2.Add(a3)).Add(a4.Add(a5).Add(a6.Add(a7)))
-		// ベクトル→スカラー境界(VZEROUPPER 対策。docs/appendix/README.md の 1 節)
+		// ベクトル→スカラー境界(VZEROUPPER 対策。docs/appendix/appendix.md の 1 節)
 		archsimd.ClearAVXUpperBits()
 		var buf [8]float32
 		sum.Store(buf[:])
