@@ -7,12 +7,14 @@
 
 ## 1. Codespace を起動する(30秒)
 
+[GitHub Codespaces](https://docs.github.com/en/codespaces) は、リポジトリの開発環境をブラウザ上の VS Code で開くサービスです。
+
 1. このリポジトリのページを開く
 2. 緑の `Code` ボタンを押し、`Codespaces` タブの `Create codespace on main` を選ぶ
 3. マシンは `4-core`(16 GB RAM)を選ぶ。全員ここで揃えます(理由は下記)
 4. しばらく待つ(初回はコンテナのビルドで 1〜3 分)。VS Code がブラウザで開けば準備完了
 
-`.devcontainer/` に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま使えます。
+[`.devcontainer/`](../../.devcontainer/)([Dev Container](https://containers.dev/) の設定)に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま使えます。
 
 ## 2. 動作確認(これが通れば準備OK)
 
@@ -30,16 +32,16 @@ make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 
 ## マシンサイズは `4-core` で固定
 
-**全員 `4-core`(16 GB RAM)を指定してください。** 起動時のマシン選択で `4-core` を選ぶだけです。
+**全員 `4-core`(16 GB RAM)を指定してください([マシンタイプの変え方](https://docs.github.com/en/codespaces/customizing-your-codespace/changing-the-machine-type-for-your-codespace))。** 起動時のマシン選択で `4-core` を選ぶだけです。
 バラバラのサイズだと比較しづらくなるので、条件を揃えるために統一します。8-core 以上は無料枠を早く消費するだけで不要、2-core はベンチが不安定になりがちなので避けます。
 
 > ただし Codespaces は当たる CPU(Intel/AMD・世代)を選べません。同じ 4-core でも CPU が違えば出る数字は変わります。
 
 ## 費用：かかりません
 
-- 計算リソースは起動した自分の GitHub アカウントの無料枠(月 120 コア時間)から引かれます。
+- 計算リソースは起動した自分の GitHub アカウントの無料枠(月 120 コア時間。[Codespaces の課金](https://docs.github.com/en/billing/managing-billing-for-your-products/about-billing-for-github-codespaces))から引かれます。
 - 40 分のワークショップは 4-core でも 3 コア時間弱で、無料枠の数 % です。実質 ¥0 です。
-- 終わったら Codespace は止めてOK(30分操作が無ければ自動停止。`Code → Codespaces` から手動停止/削除も可)。
+- 終わったら Codespace は止めてOK(30分操作が無ければ[自動停止](https://docs.github.com/en/codespaces/setting-your-user-preferences/setting-your-timeout-period-for-github-codespaces)。`Code → Codespaces` から手動停止/削除も可)。
 
 ## どの CPU が当たっても本編は動きます
 
@@ -61,7 +63,7 @@ Go 1.27 から `archsimd` が arm64 の Neon(128bit)に対応したので、手�
 
 ## Docker で amd64 を指定しても動かない理由
 
-Apple Silicon でも `docker run --platform linux/amd64` を使えば x86 として測れそうに見えますが、動きません。中身は QEMU のエミュレーション(または Rosetta)で、実際の x86 CPU ではないからです。
+Apple Silicon でも `docker run --platform linux/amd64` を使えば x86 として測れそうに見えますが、動きません。中身は QEMU のエミュレーション(または [Rosetta](https://developer.apple.com/documentation/apple-silicon/about-the-rosetta-translation-environment))で、実際の x86 CPU ではないからです([Docker のマルチプラットフォームビルド](https://docs.docker.com/build/building/multi-platform/))。
 
 - CPU の機能問い合わせ(CPUID)を正しく再現しないので `archsimd.X86.*()` が全て false になり、SIMD の分岐がスカラ実装に落ちます
 - QEMU が不安定で、ビルド中に SIGSEGV で落ちることがあります

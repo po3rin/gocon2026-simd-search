@@ -34,7 +34,7 @@ VZEROUPPER の遷移ペナルティと register spill の話です。本編の S
 
 **なぜ起きるか:** AVX2 命令(`Float32x8` の FMA など)を使うと、YMM レジスタ(256bit)の上位 128bit が「dirty(汚れた)」状態になります。その直後の水平和 `sum = buf[0]+buf[1]+…` はスカラの float32 計算で、Go はこれをレガシー SSE 命令(128bit だけを扱う古い命令)で出力します。上位が dirty なままレガシー SSE を実行すると CPU にペナルティが発生します。`VZEROUPPER` は上位 128bit をゼロに掃除する 1 命令で、境界で一度呼べばこのペナルティは消えます。命令自体のコストは小さいので、差し引きで大きく得をします。
 
-ペナルティの仕組みは CPU の世代で違います。
+ペナルティの仕組みは CPU の世代で違います(出典: Agner Fog, [The microarchitecture of Intel, AMD and VIA CPUs](https://www.agner.org/optimize/microarchitecture.pdf))。
 
 | CPU | ペナルティの仕組み | VZEROUPPER の効果 |
 |---|---|---|
@@ -60,7 +60,7 @@ VZEROUPPER の遷移ペナルティと register spill の話です。本編の S
 
 ※ 理論ピークは 2 FMA/cycle × 8 レーン × 2 flop × クロック(c7i は 3.75GHz)。検索カーネルは算術強度 0.5 の深いメモリ律速なので、この低さは検索の結論を変えません。ただし原因は見ておく価値があります。
 
-**なぜ起きるか:** `objdump` で内側ループを見ると、12 本のアキュムレータが全部レジスタに置けず、毎回スタックへ退避されて、同じ 1 本のレジスタを使い回していました。これが register spill(レジスタに収まらない、または置けない値をメモリへ追い出すこと)です。FMA 1 個ごとに load と store が必ず付くので、まず load/store ポートが飽和し、さらに次の周回の load が今回の store を待ちます(store-to-load forwarding、5〜7 サイクル)。アキュムレータを増やすほどこの待ち時間が隠れるので、4 本より 12 本の方が速くなります。待ち時間で律速しているときの典型的な傾向です。
+**なぜ起きるか:** [`go tool objdump`](https://pkg.go.dev/cmd/objdump) で内側ループを見ると、12 本のアキュムレータが全部レジスタに置けず、毎回スタックへ退避されて、同じ 1 本のレジスタを使い回していました。これが register spill(レジスタに収まらない、または置けない値をメモリへ追い出すこと)です。FMA 1 個ごとに load と store が必ず付くので、まず load/store ポートが飽和し、さらに次の周回の load が今回の store を待ちます(store-to-load forwarding、5〜7 サイクル)。アキュムレータを増やすほどこの待ち時間が隠れるので、4 本より 12 本の方が速くなります。待ち時間で律速しているときの典型的な傾向です。
 
 ![register spill: 理想(レジスタ常駐)vs 実際(スタック往復)](../images/register-spill.png)
 
@@ -91,7 +91,7 @@ VZEROUPPER の遷移ペナルティと register spill の話です。本編の S
 
 MaxSim(late interaction)は、最初から演算律速な検索方式です。本編の Stage 2 の考え方を、この方式に当てはめた実測です。`make bench-maxsim` で再現できます(Codespaces、AMD EPYC 7763)。
 
-本編の Stage 2 は「クエリが 32 本まとめて来る」状況を利用して、DB ベクトルを 1 回運ぶたびに 32 本と内積を取り、算術強度を上げました。MaxSim(ColBERT 系)は、クエリと文書をそれぞれ複数のトークンベクトルで表し、クエリトークンごとに文書トークンとの最大内積を取って足し合わせる検索方式です。次の図は 1 文書を採点する流れです。
+本編の Stage 2 は「クエリが 32 本まとめて来る」状況を利用して、DB ベクトルを 1 回運ぶたびに 32 本と内積を取り、算術強度を上げました。MaxSim([ColBERT](https://arxiv.org/abs/2004.12832) 系)は、クエリと文書をそれぞれ複数のトークンベクトルで表し、クエリトークンごとに文書トークンとの最大内積を取って足し合わせる検索方式です。次の図は 1 文書を採点する流れです。
 
 ![MaxSim の採点の流れ](../images/maxsim.png)
 
@@ -104,7 +104,7 @@ MaxSim(late interaction)は、最初から演算律速な検索方式です。�
 | スカラ(`SearchMaxSimNaive`) | 239 ms | 2.06 | 8.0 flop/byte |
 | SIMD(`SearchMaxSimSIMD`) | 42 ms | 11.7 | 8.0 flop/byte |
 
-SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメモリ帯域の上限に当たって 4.5x で止まりましたが、MaxSim は演算律速なので SIMD がそのまま効きます。Stage 2 で行った「算術強度を上げる工夫」が、この検索方式では最初から組み込まれています。実装は `internal/index/maxsim.go` にあります。
+SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメモリ帯域の上限に当たって 4.5x で止まりましたが、MaxSim は演算律速なので SIMD がそのまま効きます。Stage 2 で行った「算術強度を上げる工夫」が、この検索方式では最初から組み込まれています。実装は [`internal/index/maxsim.go`](../../internal/index/maxsim.go) にあります。
 
 ---
 
@@ -112,7 +112,7 @@ SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメ�
 
 本編の Stage 4 で、1bit 量子化後のハミング距離は通常の POPCNT 命令で足り、SIMD 版の popcount(AVX-512 の VPOPCNT)を使っても速くならないと書きました。その実測です。
 
-`vec.HammingSIMD` は、`Uint64x4.OnesCount`(VPOPCNTQ 命令)で 4 つの uint64 をまとめて popcount します。この命令は AVX-512 の拡張(AVX512VPOPCNTDQ)で、Codespaces に割り当てられる AMD EPYC 7763 にはありません。AVX-512 のある機械(AWS の c7i など)を自分で用意すれば `make bench-bonus` で測れます。
+[`vec.HammingSIMD`](../../internal/vec/hamming_simd.go) は、`Uint64x4.OnesCount`(VPOPCNTQ 命令)で 4 つの uint64 をまとめて popcount します。この命令は AVX-512 の拡張(AVX512VPOPCNTDQ)で、Codespaces に割り当てられる AMD EPYC 7763 にはありません。AVX-512 のある機械(AWS の c7i など)を自分で用意すれば `make bench-bonus` で測れます。
 
 | 機械 | 通常版 `SearchBinary`(POPCNT) | SIMD 版 `SearchBinarySIMD`(VPOPCNT) |
 |---|---|---|
@@ -223,10 +223,10 @@ Stage ごとに見ると次のとおりです。
 | `go test` / `go run` | ビルド中に panic や SIGSEGV で落ちる(QEMU エミュレーションの不安定さ) |
 | `make isa-report` | 実行はできるが `archsimd.X86` はすべて false |
 
-`docker run --platform linux/amd64` は Apple Silicon 上では QEMU 系のエミュレーションです。x86 の CPUID を正しくエミュレートしないため `archsimd.X86` は信頼できず、ベンチと SIMD 検証には使えません。amd64 Linux の実機か Codespaces を使ってください。
+`docker run --platform linux/amd64` は Apple Silicon 上では QEMU 系のエミュレーションです([Docker のマルチプラットフォームビルド](https://docs.docker.com/build/building/multi-platform/))。x86 の CPUID を正しくエミュレートしないため `archsimd.X86` は信頼できず、ベンチと SIMD 検証には使えません。amd64 Linux の実機か Codespaces を使ってください。
 
 ### amd64 実機(Codespaces / AWS c7i)
 
 本編の数字は Codespaces(AMD EPYC 7763、AVX2 + FMA)で取っています。AVX-512 と AVX512VPOPCNTDQ まで揃った c7i(Sapphire Rapids)の実測は `SearchNaive` 28.6 ms、`SearchBinary` 0.68 ms、`SearchBinaryRerank` 0.73 ms(Recall@10 0.87)でした。
 
-関連ファイル: `cmd/isa-report/main.go`(環境調査ツール)、`Makefile`(`isa-report` ターゲット)、[../workshop/setup.md](../workshop/setup.md)(Docker と Rosetta の説明)。
+関連ファイル: [`cmd/isa-report/main.go`](../../cmd/isa-report/main.go)(環境調査ツール)、[`Makefile`](../../Makefile)(`isa-report` ターゲット)、[../workshop/setup.md](../workshop/setup.md)(Docker と Rosetta の説明)。

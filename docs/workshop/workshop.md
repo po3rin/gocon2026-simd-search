@@ -2,7 +2,7 @@
 
 ## はじめに
 
-Go 1.27 の SIMD パッケージ(`simd/archsimd`。実験的機能)を使い、外部ライブラリなしの Pure Go でベクトル検索を高速化する教材です。題材は内積によるベクトル検索です。ただ速くするのではなく、ルーフラインモデルで「いま何が性能の上限になっているか」を測ってから対処を選んでいきます。
+Go 1.27 の SIMD パッケージ([`simd/archsimd`](https://pkg.go.dev/simd/archsimd)。実験的機能)を使い、外部ライブラリなしの Pure Go でベクトル検索を高速化する教材です。題材は内積によるベクトル検索です。ただ速くするのではなく、ルーフラインモデルで「いま何が性能の上限になっているか」を測ってから対処を選んでいきます。
 
 学べることは次の 4 つです。
 
@@ -35,7 +35,7 @@ for i := range a {
 
 ### Go の SIMD
 
-Go 1.27 では `GOEXPERIMENT=simd` を付けてビルドすると `simd/archsimd` パッケージが使えます。Go 1.26 で導入され、1.27 で API の改訂と、arm64(Apple Silicon などの Arm CPU)と WebAssembly への対応が入っています。1.27 でもまだ「実験的」の扱いで、このフラグを付けないとパッケージ自体が存在せず、Go 1 の互換性保証の対象外です。
+Go 1.27 では `GOEXPERIMENT=simd` を付けてビルドすると `simd/archsimd` パッケージが使えます。Go 1.26 で導入され、1.27 で API の改訂と、arm64(Apple Silicon などの Arm CPU)と WebAssembly への対応が入っています([Go 1.27 リリースノート](https://go.dev/doc/go1.27#archsimd))。1.27 でもまだ「実験的」の扱いで、このフラグを付けないとパッケージ自体が存在せず、Go 1 の互換性保証の対象外です。
 
 アセンブリも cgo も書かずにベクトル命令を直接扱え、メソッド呼び出しがほぼそのまま 1 つの CPU 命令にコンパイルされます。
 
@@ -57,7 +57,7 @@ acc = va.MulAdd(vb, acc)               // acc += va*vb を 8 レーン同時に(
 
 x86 では FMA が AVX2 とは別の機能として提供されるので、後の③のコードで両方を確認しています。Neon には FMA が最初から入っています。
 
-本編は amd64 で進めます。Apple Silicon の Mac で動かす場合は [setup.md](setup.md) の「Apple Silicon で動かす場合」を見てください。アーキに依存しない書き方ができる `simd` パッケージも 1.27 で入りました。Stage 1 のコラムで使います。
+本編は amd64 で進めます。Apple Silicon の Mac で動かす場合は [setup.md](setup.md) の「Apple Silicon で動かす場合」を見てください。アーキに依存しない書き方ができる [`simd`](https://pkg.go.dev/simd) パッケージも 1.27 で入りました。Stage 1 のコラムで使います。
 
 ### archsimd の API
 
@@ -110,7 +110,7 @@ var hasVPOPCNT = archsimd.X86.AVX512() && archsimd.X86.AVX512VPOPCNTDQ()   // On
 
 ![ベクトル検索のしくみ](../images/vector-search.png)
 
-計算の本体は「内積を 10 万回計算する」ことです。内積は掛け算と足し算の塊なので、SIMD が得意とする部分です。世のベクトル検索エンジン(Faiss、Qdrant、ClickHouse など)も、内積などの距離計算を SIMD で実装しています。本ワークショップでは、それを Pure Go で作ります。中心になる計算はクエリ a と DB ベクトル d の内積 `acc += a[i]*d[i]` で、これを 10 万本ぶん回します。
+計算の本体は「内積を 10 万回計算する」ことです。内積は掛け算と足し算の塊なので、SIMD が得意とする部分です。世のベクトル検索エンジン([Faiss](https://github.com/facebookresearch/faiss)、[Qdrant](https://qdrant.tech/documentation/guides/quantization/)、[ClickHouse](https://clickhouse.com/docs/engines/table-engines/mergetree-family/annindexes) など)も、内積などの距離計算を SIMD で実装しています。本ワークショップでは、それを Pure Go で作ります。中心になる計算はクエリ a と DB ベクトル d の内積 `acc += a[i]*d[i]` で、これを 10 万本ぶん回します。
 
 ### 今回の実験の前提
 
@@ -122,7 +122,7 @@ var hasVPOPCNT = archsimd.X86.AVX512() && archsimd.X86.AVX512VPOPCNTDQ()   // On
 | クエリ | 1本ずつ(最初の2段階) | 同時に多数のクエリが来る |
 | スレッド | 1コア(1クエリのレイテンシを測る。並列は §06 のコラムで実測) | マルチコアで並列処理 |
 | データ | メモリ上の配列 | ディスク・ネットワーク越し |
-| 次元 | 384次元 float32 | 同程度だが量子化も多い |
+| 次元 | 384次元 float32([all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) など小型の埋め込みモデルの出力次元) | 同程度だが量子化も多い |
 
 ## 03. まず動かしてみる
 
@@ -132,7 +132,7 @@ SIMD とベクトル検索の概要が分かったところで、一度動かし
 
 本編の環境は amd64(Intel/AMD)です。一番楽なのは GitHub Codespaces です。手元で動かす場合に必要なものは Go 1.27 と make だけです。Go 1.27 からは Apple Silicon でも Neon 版の SIMD が走りますが、レジスタ幅もメモリ帯域も違うので、本編とは別の数字になります。
 
-**① Codespaces(推奨)** リポジトリの `Code → Codespaces → Create`。`.devcontainer/` に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。マシンサイズの選び方、費用、困ったときのフォールバックは [setup.md](setup.md) にまとめてあります。
+**① Codespaces(推奨)** リポジトリの `Code → Codespaces → Create`。[`.devcontainer/`](../../.devcontainer/) に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。マシンサイズの選び方、費用、困ったときのフォールバックは [setup.md](setup.md) にまとめてあります。
 
 **② ローカル(amd64 Linux / Windows)**
 
@@ -237,7 +237,7 @@ CPU はまずレジスタとキャッシュにあるデータを使い、そこ�
 
 1. **演算ピーク**(`PeakFLOP_AVX2`): メモリに一切触らず、レジスタ上で FMA(積和)命令だけを回し続けて、1 秒に何回計算できるかを測る
 2. **メモリ帯域の上限**(`PeakReadBW`): キャッシュに収まらない 256MB の配列を先頭から末尾まで読み、1 秒に何 GB 運べるかを測る
-3. **読み書き混在の帯域**(`PeakTriadBW`): 2 つの配列を読んで計算し、結果を 3 つ目の配列に書き戻す標準ベンチ(STREAM Triad)。メモリ帯域の一般的な指標として載せている
+3. **読み書き混在の帯域**(`PeakTriadBW`): 2 つの配列を読んで計算し、結果を 3 つ目の配列に書き戻す標準ベンチ([STREAM](https://www.cs.virginia.edu/stream/) Triad)。メモリ帯域の一般的な指標として載せている
 
 1 と 2 がルーフラインの式に入れる 2 つの数字です。今回の検索は DB ベクトルを読むだけで、大きな配列への書き込みはしません。そのためメモリ帯域には 2 の読むだけの値を使い、3 は他の資料の数字と見比べるための参考値です。実行します。
 
@@ -304,7 +304,7 @@ b.ReportMetric(flop/sec/1e9, "GFLOP/s")      // ← これが 25.59
 
 ### 巨大な配列を流し読みしてメモリ帯域の上限を見る
 
-メモリ帯域は「DRAM から 1 スレッドで流し読みしたら何 GB/s 出るか」で測ります。キャッシュに収まると DRAM を測れないので、256MB(最後段のキャッシュ L3 を確実に溢れる)の配列を先頭から末尾まで順番に読みます。コードは `internal/vec/ceiling_mem_simd_test.go` にあります。次はその主要部分です。実コードの Triad は 4 組ずつ展開してありますが、やることは同じです。
+メモリ帯域は「DRAM から 1 スレッドで流し読みしたら何 GB/s 出るか」で測ります。キャッシュに収まると DRAM を測れないので、256MB(最後段のキャッシュ L3 を確実に溢れる)の配列を先頭から末尾まで順番に読みます。コードは [`internal/vec/ceiling_mem_simd_test.go`](../../internal/vec/ceiling_mem_simd_test.go) にあります。次はその主要部分です。実コードの Triad は 4 組ずつ展開してありますが、やることは同じです。
 
 ```go
 const memN = 1 << 26  // 67,108,864 float32 = 256 MB(L3 溢れ確実)
@@ -392,7 +392,7 @@ make roofline        # 上の結果をルーフライン図用に一覧
 make roofline-plot   # 実測から対話的ルーフライン HTML を生成(点が上限に近づくのを見る)
 ```
 
-各節に出てくる GFLOP/s と 算術強度は、これらのベンチが自動で計算して表示します(特別なプロファイラは不要です。算出の詳細は `internal/index/bench_test.go` にありますが、本編では検索コードに集中します)。
+各節に出てくる GFLOP/s と 算術強度は、これらのベンチが自動で計算して表示します(特別なプロファイラは不要です。算出の詳細は [`internal/index/bench_test.go`](../../internal/index/bench_test.go) にありますが、本編では検索コードに集中します)。
 
 ### Stage 0: スカラ基準(ベースライン)
 
@@ -438,7 +438,7 @@ BenchmarkSearchNaive   35.7 ms/op   2.15 GFLOP/s   0.5 AI(flop/byte)   153.6 MB/
 この待ち時間で、カーネル 1 回(384 要素)の実測 348 ns がほぼ説明できます。
 
 ```text
-足し算 1 回の待ち時間: 約 3 サイクル(Zen3 の float 加算。サイクルは CPU クロックの 1 拍)
+足し算 1 回の待ち時間: 約 3 サイクル(Zen3 の float 加算。サイクルは CPU クロックの 1 拍。出典は §08 の命令表)
 384 回 × 3 サイクル = 1152 サイクル
 1152 サイクル ÷ 約 3.5 GHz ≈ 330 ns   ← 実測 348 ns とほぼ同じ
 ```
@@ -504,7 +504,7 @@ func Dot(a, b []float32) float32 {
 }
 ```
 
-上のコードは主要部分だけです。長さのチェックと、8 の倍数に満たない端数の処理を含む完全なコードは `internal/vec/dot_simd.go` にあります。
+上のコードは主要部分だけです。長さのチェックと、8 の倍数に満たない端数の処理を含む完全なコードは [`internal/vec/dot_simd.go`](../../internal/vec/dot_simd.go) にあります。
 
 ```bash
 $ make bench1    # カーネル単体(internal/vec)と全探索(internal/index)の2粒度(表示は整形・抜粋)
@@ -646,7 +646,7 @@ B=32  SearchBatchSIMD    5.79 ms/query  13.26 GF   ← AI 16・SIMD で 5.9x。�
 
 B=32 でクエリを束ねると算術強度は 0.5 から 16 になり、リッジを越えて演算律速側に移りました。そこでは **SIMD がスカラより 5.9x 速くなります**。scalar batch が 34.2 ms/query、SIMD batch が 5.79 ms/query で、GFLOP/s は 2.24 から 13.3 です。Stage 1 では 4.5x で頭打ちだった SIMD が、算術強度を上げると効きます。1 クエリあたりの時間も 7.9 ms から 5.8 ms に縮みます。
 
-ちなみに「クエリが 32 本まとめて来る」という仮定は実際でも使われます。 ColBERT のようにクエリを複数のベクトルで表す検索方式(late interaction)では、DB ベクトル 1 本に対して複数の内積を取ることが方式そのものに含まれていて、最初から演算律速です。[付録の MaxSim](../appendix/README.md#2-maxsim) で実測しています(5.7x)。
+ちなみに「クエリが 32 本まとめて来る」という仮定は実際でも使われます。 [ColBERT](https://arxiv.org/abs/2004.12832) のようにクエリを複数のベクトルで表す検索方式(late interaction)では、DB ベクトル 1 本に対して複数の内積を取ることが方式そのものに含まれていて、最初から演算律速です。[付録の MaxSim](../appendix/README.md#2-maxsim) で実測しています(5.7x)。
 
 なぜ律速が入れ替わるのかは、時間の内訳で分かります。1 要素を処理する時間は、運ぶ時間(バイト数 ÷ メモリ帯域)と計算する時間(flop ÷ 演算ピーク)のうち長い方でおおよそ決まります。計算する時間は要素あたり 2 flop で全 Stage 同じですが、バッチ化は運ぶ時間だけを 1/32 にします。そのため長い方が、運ぶ時間から計算する時間に入れ替わります。下の図は §05 で測った演算ピーク 25.6 GFLOP/s と read 帯域 20.8 GB/s から計算したものです。
 
@@ -660,7 +660,7 @@ B=32 でクエリを束ねると算術強度は 0.5 から 16 になり、リッ
 
 > **コラム: goroutine で並列化すればいいのでは(`make bench-parallel`)**
 >
-> ここまでは全部 1 コアで測ってきました。goroutine で複数コアに分ければ速くなるのか、実測で確かめます。DB を workers 個に分けて goroutine で分担し、最後に各 goroutine の上位 k 件を 1 つにまとめます(`internal/index/parallel.go`)。
+> ここまでは全部 1 コアで測ってきました。goroutine で複数コアに分ければ速くなるのか、実測で確かめます。DB を workers 個に分けて goroutine で分担し、最後に各 goroutine の上位 k 件を 1 つにまとめます([`internal/index/parallel.go`](../../internal/index/parallel.go))。
 >
 > ```go
 > for w := 0; w < workers; w++ {
@@ -708,7 +708,7 @@ acc0 = acc0.Add(archsimd.LoadInt8x16(a).ExtendToInt16().       // VPMOVSXBW
     DotProductPairs(archsimd.LoadInt8x16(b).ExtendToInt16()))  // VPMADDWD
 ```
 
-int8 同士の積は最大 127 × 127 で、int32 に余裕で収まります。そのため桁あふれの対策なしで書けます。1 命令で 16 要素を処理でき、fp32 の 8 要素の 2 倍です。Go 1.27 の archsimd の arm64 API には VPMADDWD にあたるメソッドが無いので、`int8_arm64.go` では SMULL で掛けて int16 に広げ、SXTL で int32 に広げてから足す、という 3 段で同じ計算をします。
+int8 同士の積は最大 127 × 127 で、int32 に余裕で収まります。そのため桁あふれの対策なしで書けます。1 命令で 16 要素を処理でき、fp32 の 8 要素の 2 倍です。Go 1.27 の archsimd の arm64 API には VPMADDWD にあたるメソッドが無いので、[`int8_arm64.go`](../../internal/vec/int8_arm64.go) では SMULL で掛けて int16 に広げ、SXTL で int32 に広げてから足す、という 3 段で同じ計算をします。
 
 ```bash
 $ make bench-int8
@@ -727,7 +727,7 @@ Recall@10: int8=0.948                                   ← rerank なしで実�
 
 カーネルは 364 ns から 34.6 ns(**10.5x**)で、fp32 の SIMD カーネル(55 ns)より速くなりました。全探索は 4.2 ms で、fp32 の SIMD 全探索の約 2 倍の速さです。精度は Recall@10 = 0.948 でした。
 
-Recall@10 は次のように測ります。まず fp32 で正確に検索して上位 10 件を出し、これを正解とします。次に int8 で検索して上位 10 件を出し、そのうち正解に含まれていた件数を数えます。10 件中 9 件が一致すれば 0.9 です。0.948 は、平均して 10 件中 9.5 件が正解と一致したことを意味します。なお Recall の計測は速度のベンチとは別のデータで行っています。意味の近い文書がかたまりを作るように生成した 2 万件の合成データです(`internal/index/index_test.go`)。
+Recall@10 は次のように測ります。まず fp32 で正確に検索して上位 10 件を出し、これを正解とします。次に int8 で検索して上位 10 件を出し、そのうち正解に含まれていた件数を数えます。10 件中 9 件が一致すれば 0.9 です。0.948 は、平均して 10 件中 9.5 件が正解と一致したことを意味します。なお Recall の計測は速度のベンチとは別のデータで行っています。意味の近い文書がかたまりを作るように生成した 2 万件の合成データです([`internal/index/index_test.go`](../../internal/index/index_test.go))。
 
 精度がほとんど落ちない理由は、int8 でも 1 要素を -127 から 127 の 255 段階で持てるからです。元の値との差は小さく、内積の大小関係はほぼ変わりません。そのため int8 の検索結果は、精度を補う処理(Stage 5 で行う採点し直し)を加えなくても、そのまま使えます。
 
@@ -858,7 +858,7 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 
 本編で使った考え方(ルーフラインと、算術強度を上げる 2 つの方法)は、そのまま先へ延長できます。方向は 2 つあります。
 
-- **アルゴリズムの軸(HNSW、IVF)。** ここまでの対処は全て 10 万件全部を処理する前提でした。そもそも触る件数を減らすのが、全探索の O(N) を下回る唯一の方法です。実運用では HNSW や IVF などで候補を絞り、その候補を本ワークショップの方法で速くします
+- **アルゴリズムの軸(HNSW、IVF)。** ここまでの対処は全て 10 万件全部を処理する前提でした。そもそも触る件数を減らすのが、全探索の O(N) を下回る唯一の方法です。実運用では [HNSW](https://arxiv.org/abs/1603.09320) や [IVF](https://github.com/facebookresearch/faiss/wiki/Faiss-indexes) などで候補を絞り、その候補を本ワークショップの方法で速くします
 - **検索方式の軸(MaxSim)。** クエリを複数のベクトルで表す late interaction では、Stage 2 のバッチ化と同じ構造が方式そのものに含まれていて、最初から演算律速です。[付録の MaxSim](../appendix/README.md#2-maxsim) で実装と実測をしています
 
 ## 07. まとめ
@@ -893,3 +893,8 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 - Empirical Roofline Toolkit / NERSC ルーフライン解説. [docs.nersc.gov](https://docs.nersc.gov/tools/performance/roofline/)
 - Intel Advisor(自動ルーフライン作図). [intel.com](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-advisor-roofline.html)
 - Go × 内積 × SIMD の先行事例(archsimd 以前・アセンブリ実装): Sourcegraph, *"From slow to SIMD: A Go optimization story"*. [sourcegraph.com/blog/slow-to-simd](https://sourcegraph.com/blog/slow-to-simd)
+- Go の SIMD パッケージ: [Go 1.27 リリースノート(simd)](https://go.dev/doc/go1.27#simd)、[pkg.go.dev/simd](https://pkg.go.dev/simd)(ポータブル API)、[pkg.go.dev/simd/archsimd](https://pkg.go.dev/simd/archsimd)(アーキ固有 API。CPU 機能の表もここ)
+- CPU の命令ごとの待ち時間(レイテンシ)と発行数の表: Agner Fog, [Instruction tables](https://www.agner.org/optimize/instruction_tables.pdf)、[uops.info](https://uops.info/)。§06 の「加算 3 サイクル、FMA 4 サイクル」の出典
+- AVX と SSE を混ぜたときのペナルティ(付録 1 節): Agner Fog, [The microarchitecture of Intel, AMD and VIA CPUs](https://www.agner.org/optimize/microarchitecture.pdf)
+- late interaction(MaxSim): Khattab, Zaharia, *"ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT"*, SIGIR 2020. [arXiv:2004.12832](https://arxiv.org/abs/2004.12832)
+- 近似最近傍探索の索引: HNSW は Malkov, Yashunin, [arXiv:1603.09320](https://arxiv.org/abs/1603.09320)。IVF などの索引の種類は [Faiss wiki](https://github.com/facebookresearch/faiss/wiki/Faiss-indexes)
