@@ -3,7 +3,7 @@
 読者別に整理してある。各ファイルの役割は1つだけ。
 
 ## 参加者(ワークショップ受講者)向け
-- **[workshop/SETUP.md](workshop/SETUP.md)** — まずここ。Codespaces ワンクリック起動・マシンサイズ・費用・フォールバック。
+- **[workshop/setup.md](workshop/setup.md)** — まずここ。Codespaces ワンクリック起動・マシンサイズ・費用・フォールバック。
 - **[workshop/workshop.md](workshop/workshop.md)** — 教材本体(これ一つ)。
   ルーフラインの進め方(測る、AI を出す、上限を見る、上限に効く手を打つ)、
   各 Stage の図、Go コードと計測コマンド、上限の計測方法、原典。

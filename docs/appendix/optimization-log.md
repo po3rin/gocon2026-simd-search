@@ -403,7 +403,7 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
 
 ## Step 9: 4コア Codespace(参加者と同条件)で全編を再計測(2026-07-07)
 
-SETUP.md は参加者に **4-core** を指定しているのに、資料の実測例は 8コア機の記録だった。
+setup.md は参加者に **4-core** を指定しているのに、資料の実測例は 8コア機の記録だった。
 参加者と同じ **standardLinux32gb(4-core / 16GB)** の Codespace(AMD EPYC 7763 / Zen3、
 Go 1.26.4、GOEXPERIMENT=simd は devcontainer 済み)で全コマンドを流し、教材の正本数値を
 この 4コア実測に置き換えた。devcontainer はそのままで動作、`make test` は初回ビルド込み約10秒。
@@ -430,7 +430,7 @@ read 帯域は **19.31〜20.80 GB/s**、SearchSIMD は **7.90〜8.91 ms**(9.7〜
 **反映:** workshop.md の数値と図(`rl-stage0〜4` / `roofline-plot` / `memory-vs-compute-roofline` /
 `roofline-plot-example`※)を
 4コア実測へ更新(リッジ 1.4→1.3、メモリ上限 9.2→≈10 GF、達成 9.7 GF 等)。
-Makefile の既定天井を `PEAK=25.59` / `BW=20.80` に変更。8コア表記は撤去し SETUP.md の
+Makefile の既定天井を `PEAK=25.59` / `BW=20.80` に変更。8コア表記は撤去し setup.md の
 4-core 指定と条件を一致させた。
 ※ roofline-plot-example.png は、記録済みベンチ出力を `cmd/roofline-plot` に食わせて HTML を再生成し、
 ヘッドレス Chrome(`--window-size=960,600 --force-device-scale-factor=2`)で撮影。再計測不要で再現できる。

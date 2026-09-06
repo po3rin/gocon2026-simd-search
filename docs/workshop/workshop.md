@@ -11,7 +11,7 @@ Go 1.27 の標準 SIMD(`simd/archsimd`)を使い、外部ライブラリなし�
 - SIMD がどこで効くか
 - 高速化の各種方法
 
-手元で動かしながら読む場合は、先に [SETUP.md](SETUP.md) の手順で GitHub Codespaces を起動してください。GitHub アカウントとブラウザだけで済みます。
+手元で動かしながら読む場合は、先に [setup.md](setup.md) の手順で GitHub Codespaces を起動してください。GitHub アカウントとブラウザだけで済みます。
 
 
 ## 01. そもそも SIMD ってなに？
@@ -45,11 +45,19 @@ vb := archsimd.LoadFloat32x8(b)
 acc = va.MulAdd(vb, acc)               // acc += va*vb を 8 レーン同時に(FMA 命令)
 ```
 
-`MulAdd` が使う **FMA**(Fused Multiply-Add)は、「掛けて、その結果を足す」を 1 命令で行う CPU 命令です。内積の `sum += a[i] * b[i]` はまさに「掛けて足す」なので、FMA 1 命令で 1 要素ぶん(SIMD なら 8 要素ぶん)が終わります。掛け算と足し算を別々の 2 命令で行うより命令数が半分で済み、途中結果の丸めも 1 回になります。x86 では AVX2 とは別の機能フラグ(FMA)として提供され、Arm の Neon には最初から入っています。
+`MulAdd` は FMA(Fused Multiply-Add)という CPU 命令を使います。「a × b を計算して c に足す」を 1 命令で行う命令です。内積の `sum += a[i] * b[i]` はちょうどこの形なので、SIMD の FMA 1 命令で 8 要素ぶんの掛けて足すが終わります。
 
-`archsimd` はアーキテクチャ固有の API です。型も命令も CPU ごとに違います。名前の対応は次のとおりです。amd64 は Intel と AMD の 64bit CPU(x86)のことで、その SIMD 命令セットが AVX2(256bit)と AVX-512(512bit)です。arm64 は Arm 系の 64bit CPU(Apple Silicon、AWS Graviton など)のことで、その SIMD 命令セットが Neon(128bit)です。Neon は arm64 の必須機能なので、どの arm64 CPU でも使えます。WebAssembly はブラウザなどで動く実行形式で、128bit の SIMD を持ちます。Go 1.27 の `archsimd` はこの 3 つに対応しています。
+`archsimd` はアーキテクチャごとに型も命令も違う API で、Go 1.27 時点で次の 3 つに対応しています。
 
-本編のコードと数字は amd64 の Codespaces で取ったものです。Apple Silicon の Mac でも Go 1.27 からは Neon 版の `internal/vec/dot_arm64.go` が走りますが、環境が違うため、出てくる数字は本編とは別物になります([setup.md](setup.md) の「Apple Silicon で動かす場合」)。同じ内積をアーキに依存せず書けるポータブルな `simd` パッケージも 1.27 で入りました。Stage 1 のコラムで使います。
+| 呼び名 | どの CPU か | SIMD 命令セット(レジスタ幅) | 本ワークショップでの扱い |
+|---|---|---|---|
+| amd64 | Intel と AMD の 64bit CPU | AVX2(256bit)、AVX-512(512bit) | 本編の環境(Codespaces)。使うのは AVX2 と FMA だけ |
+| arm64 | Arm 系の 64bit CPU(Apple Silicon、AWS Graviton など) | Neon(128bit) | Mac 用の実装あり。出る数字は本編と別 |
+| WebAssembly | ブラウザなどで動く実行形式 | 128bit の SIMD | 扱わない |
+
+x86 では FMA が AVX2 とは別の機能として提供されるので、後の③のコードで両方を確認しています。Neon には FMA が最初から入っています。
+
+本編は amd64 で進めます。Apple Silicon の Mac で動かす場合は [setup.md](setup.md) の「Apple Silicon で動かす場合」を見てください。アーキに依存しない書き方ができる `simd` パッケージも 1.27 で入りました。Stage 1 のコラムで使います。
 
 ### archsimd の API
 

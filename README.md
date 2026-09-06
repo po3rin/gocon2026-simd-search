@@ -7,7 +7,7 @@ Go Conference 2026 ショートワークショップ
 
 必要なのは GitHub アカウントとブラウザだけです。
 
-1. **環境を用意する**: [docs/workshop/SETUP.md](docs/workshop/SETUP.md) の手順で GitHub Codespaces を起動します(`Code` → `Codespaces` → `Create codespace`、マシンは 4-core)。ブラウザで VS Code が開けば準備完了です
+1. **環境を用意する**: [docs/workshop/setup.md](docs/workshop/setup.md) の手順で GitHub Codespaces を起動します(`Code` → `Codespaces` → `Create codespace`、マシンは 4-core)。ブラウザで VS Code が開けば準備完了です
 2. **動作確認**: Codespace のターミナルで `make test` と `make bench0` を実行します
 3. **教材を読みながら進める**: [docs/workshop/workshop.md](docs/workshop/workshop.md) を上から順に読み、各 Stage の `make` コマンドを実行して自分の数字を見ます
 
@@ -83,7 +83,7 @@ Go 1.27 から `simd/archsimd` が arm64(Neon・128bit)に対応したので、A
 ```sh
 go install golang.org/dl/go1.27.1@latest && go1.27.1 download
 make GO=$(go env GOPATH)/bin/go1.27.1 test
-make GO=$(go env GOPATH)/bin/go1.27.1 bench1   # Neon 版の数字(本編の AVX2 とは別物。docs/workshop/SETUP.md)
+make GO=$(go env GOPATH)/bin/go1.27.1 bench1   # Neon 版の数字(本編の AVX2 とは別物。docs/workshop/setup.md)
 ```
 
 amd64 クロスビルド(Rosetta 実行)で amd64 側の SIMD パスのコンパイル確認も可能(Rosetta は FMA 非対応なので実行はスカラに落ちる):
