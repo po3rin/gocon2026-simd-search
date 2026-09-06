@@ -4,7 +4,7 @@
 
 ## 何を試したか
 
-`vec.HammingSIMD` は、`Uint64x4.OnesCount`(VPOPCNTQ 命令)で 4 つの uint64 をまとめて popcount します。この命令は AVX-512 の拡張(AVX512VPOPCNTDQ)で、Codespaces に割り当てられる AMD EPYC 7763 にはありません。AVX-512 のある機械(AWS の c7i など)で `make bench-bonus` を実行すると測れます。試したい人向けに、`infra/` に c7i を 1 台立てる Terraform を置いてあります(任意。自分の AWS アカウントで、料金は自己負担です)。立てたあとは `make remote-bench` でベンチ一式を VM 上で実行できます。
+`vec.HammingSIMD` は、`Uint64x4.OnesCount`(VPOPCNTQ 命令)で 4 つの uint64 をまとめて popcount します。この命令は AVX-512 の拡張(AVX512VPOPCNTDQ)で、Codespaces に割り当てられる AMD EPYC 7763 にはありません。AVX-512 のある機械(AWS の c7i など)を自分で用意すれば、`make bench-bonus` で測れます。
 
 ## 結果
 
