@@ -17,7 +17,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -95,5 +94,5 @@ func main() {
 	p(`<text x="480" y="428" font-size="10.5" fill="#9ca3af" text-anchor="middle">※ ルーフラインの理想値。実測は spill 等でこれより遅い(本文)。この内訳は pprof/trace では出せず、ルーフラインが与える。</text>` + "\n")
 	p(`</svg>` + "\n")
 
-	os.Stdout.WriteString(b.String())
+	fmt.Print(b.String())
 }

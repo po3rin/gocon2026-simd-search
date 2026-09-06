@@ -1,0 +1,19 @@
+# golangci-lint v2 の設定。実行時は GOEXPERIMENT=simd が必要(simd/archsimd を型検査するため)。
+# make lint がそれを付けて amd64 と arm64 の両方で回す。
+version: "2"
+
+linters:
+  default: standard   # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - errorlint       # errors.Is / As を使わない比較を検出
+    - gocritic        # よくある書き間違いと非効率
+    - misspell        # 英単語のつづり
+    - unconvert       # 不要な型変換
+    - unparam         # 使われない引数・常に同じ戻り値
+  settings:
+    misspell:
+      locale: US
+
+formatters:
+  enable:
+    - gofmt

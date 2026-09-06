@@ -4,9 +4,6 @@ package vec
 
 import "simd/archsimd"
 
-// hasInt8SIMD: Neon は arm64 の必須機能なので常に true。
-var hasInt8SIMD = true
-
 // DotInt8 は int8 ベクトルの内積を Neon で計算する(Stage 3 の arm64 版)。
 //
 // amd64 版(int8_simd.go)は VPMADDWD(DotProductPairs)1発で int16 ペアの積和を

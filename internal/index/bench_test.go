@@ -66,7 +66,7 @@ func reportFloatRoofline(b *testing.B, iters int) {
 // バイナリ表現では転送量が 1ベクトル 48 byte(1/32)。MB/query の激減が
 // 「横に動いて DRAM 律速を脱出した」ことを示す(演算が popcount に変わるため
 // flop ベースの AI は内積と直接比較しない)。
-func reportBinaryRoofline(b *testing.B, iters int) {
+func reportBinaryRoofline(b *testing.B) {
 	bytes := float64(benchN) * float64(vec.Words(benchDim)) * 8
 	b.ReportMetric(bytes/1e6, "MB/query")
 }
@@ -113,12 +113,10 @@ func BenchmarkSearchPortable(b *testing.B) {
 func BenchmarkSearchBinary(b *testing.B) {
 	benchSetup()
 	b.SetBytes(benchN * benchDim / 8)
-	iters := 0
 	for b.Loop() {
 		benchIx.SearchBinary(benchQ, 10)
-		iters++
 	}
-	reportBinaryRoofline(b, iters)
+	reportBinaryRoofline(b)
 }
 
 // 付録 3 節(本編フロー外): バイナリ量子化 + AVX-512 VPOPCNT。量子化後はキャッシュ律速で
@@ -126,12 +124,10 @@ func BenchmarkSearchBinary(b *testing.B) {
 func BenchmarkSearchBinarySIMD(b *testing.B) {
 	benchSetup()
 	b.SetBytes(benchN * benchDim / 8)
-	iters := 0
 	for b.Loop() {
 		benchIx.SearchBinarySIMD(benchQ, 10)
-		iters++
 	}
-	reportBinaryRoofline(b, iters)
+	reportBinaryRoofline(b)
 }
 
 // Stage 5(仕上げ): バイナリ検索 + float32 rerank(精度軸。Recall@10 0.18→0.87)。

@@ -213,5 +213,5 @@ func main() {
 	p("</script>\n")
 	p("</div></html>\n")
 
-	os.Stdout.WriteString(b.String())
+	fmt.Print(b.String())
 }

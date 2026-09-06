@@ -4,10 +4,21 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-figures roofline-plot spill recall cpuinfo isa-report isa-report-amd64
+.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-figures roofline-plot spill recall cpuinfo isa-report isa-report-amd64
 
 test:
 	$(GO) test ./...
+
+## lint: golangci-lint(.golangci.yml)を amd64 と arm64 の両方で回す(CI と同じ)。
+## golangci-lint は Go 1.27 でビルドされた v2.13 以上が要る: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+GOLANGCI ?= golangci-lint
+lint:
+	GOARCH=amd64 $(GOLANGCI) run ./...
+	GOARCH=arm64 $(GOLANGCI) run ./...
+
+## fmt: gofmt を全ファイルに適用(CI は差分が無いことだけ確認する)
+fmt:
+	$(GO) fmt ./...
 
 ## Stage 0: スカラー全探索(ベースライン)
 bench0:
