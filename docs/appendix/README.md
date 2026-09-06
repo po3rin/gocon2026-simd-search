@@ -203,15 +203,16 @@ Stage ごとに見ると次のとおりです。
 | 5 | `SearchBinaryRerank` | binary は動く。rerank の Dot は Naive | △ |
 | 付録 | `Uint64x4.OnesCount` | AVX512VPOPCNTDQ | ❌ |
 
-ベンチ参考(Rosetta、1 クエリ、Go 1.26.4):
+ベンチ参考(Rosetta、1 クエリ、Go 1.27.1、M3 Pro、2026-09-06 に 3 回計測した中央値):
 
 | | 1 クエリ |
 |---|---|
 | `SearchNaive` | 24.1 ms |
-| `SearchBinary` | 0.70 ms(スカラ量子化なので SIMD 不要) |
-| `SearchBinaryRerank` | 0.81 ms(rerank も `DotNaive`) |
+| `SearchSIMD` | 24 ms 前後(`hasSIMD` が false なので `DotNaive` と同じ経路) |
+| `SearchBinary` | 0.77 ms(スカラ量子化なので SIMD 不要) |
+| `SearchBinaryRerank` | 0.83 ms(rerank も `DotNaive`) |
 
-量子化 Stage は Rosetta でも約 34 倍のオーダー感は出ます。SIMD 内積と AVX-512 は再現できません。Apple のドキュメントにあるとおり Rosetta は AVX と AVX2 を翻訳し AVX-512 は非対応ですが、FMA も CPUID で false になるのが Rosetta の制約です(以前「AVX 全体が動かない」と書いていたのは誤りで、修正済み)。
+量子化 Stage は Rosetta でも約 30 倍のオーダー感は出ます。SIMD 内積と AVX-512 は再現できません。Apple のドキュメントにあるとおり Rosetta は AVX と AVX2 を翻訳し AVX-512 は非対応ですが、FMA も CPUID で false になるのが Rosetta の制約です(以前「AVX 全体が動かない」と書いていたのは誤りで、修正済み)。
 
 ### Docker `linux/amd64`(Apple Silicon ホスト)
 
