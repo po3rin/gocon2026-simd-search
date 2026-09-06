@@ -603,9 +603,8 @@ VM の揺れ。2 回目以降は 56 ns)。
 - **AVX-512 機での `GODEBUG=simd=512/256/128` 3 段比較は見送り**(2026-09-05)。ワークショップで
   使う環境は Codespaces だけに閉じる方針。Codespaces を EastUs / WestUs2 / WestEurope /
   SouthEastAsia の 4 リージョンで起動して確認したが、**全て AMD EPYC 7763(AVX-512 なし)**だった
-  ので、参加者が AVX-512 を踏むことはまず無い。`infra/` の c7i は 6 月の計測後に消えており
-  `terraform.tfstate` は古い(plan は 7 リソース新規作成)。付録 B を実機で試したい人向けに
-  Terraform 一式は残置。
+  ので、参加者が AVX-512 を踏むことはまず無い。6 月に計測に使った AWS c7i は計測後に削除済みで、
+  AVX-512 の実機は公開リポジトリには含めない。
 - PROPOSAL.md は Go 1.27 の一文を追記済み。PROPOSAL_NOTES.md の実測表(Go 1.26.4・c7i)は
   CFP 提出時点の史実として据え置き。
 
@@ -664,7 +663,6 @@ VM の揺れ。2 回目以降は 56 ns)。
   律速で popcount を SIMD 化しても速くならない(本ログ Step 5: SearchBinarySIMD 0.75ms ≧
   スカラ SearchBinary 0.68ms)うえ、全 CPU にあるとも限らないため。コードとこの実測は
   証拠として残置(`make bench-bonus`)。
-- AWS c7i(Sapphire Rapids / Xeon 8488C)は AVX-512 + VPOPCNTDQ をフル装備。**付録の AVX-512
-  を実機で確かめる用**として `infra/` の Terraform 一式 + `make remote-bench` を残す。
+- AWS c7i(Sapphire Rapids / Xeon 8488C)は AVX-512 + VPOPCNTDQ をフル装備。
   本ログの Step 0〜6 の実測はこの c7i 上の記録(=史実)。**Codespaces(EPYC 7763)での本編
   再計測は実施済み → Step 7**。
