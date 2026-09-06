@@ -43,7 +43,7 @@ func (ix *Index) SearchParallel(q []float32, k, workers int) []Result {
 // workers 本の goroutine で並列化する。分割の仕方は SearchParallel と同じ
 // DB チャンク分割(worker ごとの AI は 0.5×B のまま変わらない)。
 //
-// バッチは演算律速なので、こちらはコア数にほぼ比例して速くなるはず。
+// バッチは演算律速なので、こちらは物理コア数までほぼ比例して速くなる。
 func (ix *Index) SearchBatchParallel(qs [][]float32, k, workers int) [][]Result {
 	if workers <= 1 {
 		return ix.SearchBatchSIMD(qs, k)

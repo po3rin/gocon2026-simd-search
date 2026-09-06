@@ -21,15 +21,15 @@ import (
 
 func hsum8(v archsimd.Float32x8) float32 {
 	var buf [8]float32
-	v.StoreSlice(buf[:])
+	v.Store(buf[:])
 	return buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
 }
 
 func dotIdx2(a, b []float32) float32 {
 	var acc0, acc1 archsimd.Float32x8
 	for i := 0; i+16 <= len(a) && i+16 <= len(b); i += 16 {
-		acc0 = archsimd.LoadFloat32x8Slice(a[i:]).MulAdd(archsimd.LoadFloat32x8Slice(b[i:]), acc0)
-		acc1 = archsimd.LoadFloat32x8Slice(a[i+8:]).MulAdd(archsimd.LoadFloat32x8Slice(b[i+8:]), acc1)
+		acc0 = archsimd.LoadFloat32x8(a[i:]).MulAdd(archsimd.LoadFloat32x8(b[i:]), acc0)
+		acc1 = archsimd.LoadFloat32x8(a[i+8:]).MulAdd(archsimd.LoadFloat32x8(b[i+8:]), acc1)
 	}
 	return hsum8(acc0.Add(acc1))
 }
@@ -37,8 +37,8 @@ func dotIdx2(a, b []float32) float32 {
 func dotArr2(a, b []float32) float32 {
 	var acc0, acc1 archsimd.Float32x8
 	for i := 0; i+16 <= len(a) && i+16 <= len(b); i += 16 {
-		acc0 = archsimd.LoadFloat32x8((*[8]float32)(a[i : i+8])).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(b[i:i+8])), acc0)
-		acc1 = archsimd.LoadFloat32x8((*[8]float32)(a[i+8 : i+16])).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(b[i+8:i+16])), acc1)
+		acc0 = archsimd.LoadFloat32x8Array((*[8]float32)(a[i:i+8])).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(b[i:i+8])), acc0)
+		acc1 = archsimd.LoadFloat32x8Array((*[8]float32)(a[i+8:i+16])).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(b[i+8:i+16])), acc1)
 	}
 	return hsum8(acc0.Add(acc1))
 }
@@ -49,8 +49,8 @@ func dotUnsafe2(a, b []float32) float32 {
 	n := uintptr(min(len(a), len(b)) / 16 * 16 * 4)
 	var acc0, acc1 archsimd.Float32x8
 	for off := uintptr(0); off < n; off += 64 {
-		acc0 = archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pa, off))).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pb, off))), acc0)
-		acc1 = archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pa, off+32))).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pb, off+32))), acc1)
+		acc0 = archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pa, off))).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pb, off))), acc0)
+		acc1 = archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pa, off+32))).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pb, off+32))), acc1)
 	}
 	return hsum8(acc0.Add(acc1))
 }
@@ -61,10 +61,10 @@ func dotUnsafe4(a, b []float32) float32 {
 	n := uintptr(min(len(a), len(b)) / 32 * 32 * 4)
 	var acc0, acc1, acc2, acc3 archsimd.Float32x8
 	for off := uintptr(0); off < n; off += 128 {
-		acc0 = archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pa, off))).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pb, off))), acc0)
-		acc1 = archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pa, off+32))).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pb, off+32))), acc1)
-		acc2 = archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pa, off+64))).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pb, off+64))), acc2)
-		acc3 = archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pa, off+96))).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pb, off+96))), acc3)
+		acc0 = archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pa, off))).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pb, off))), acc0)
+		acc1 = archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pa, off+32))).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pb, off+32))), acc1)
+		acc2 = archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pa, off+64))).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pb, off+64))), acc2)
+		acc3 = archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pa, off+96))).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pb, off+96))), acc3)
 	}
 	return hsum8(acc0.Add(acc1).Add(acc2.Add(acc3)))
 }
@@ -77,11 +77,11 @@ func dotUnsafeVZ2(a, b []float32) float32 {
 	n := uintptr(min(len(a), len(b)) / 16 * 16 * 4)
 	var acc0, acc1 archsimd.Float32x8
 	for off := uintptr(0); off < n; off += 64 {
-		acc0 = archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pa, off))).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pb, off))), acc0)
-		acc1 = archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pa, off+32))).MulAdd(archsimd.LoadFloat32x8((*[8]float32)(unsafe.Add(pb, off+32))), acc1)
+		acc0 = archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pa, off))).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pb, off))), acc0)
+		acc1 = archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pa, off+32))).MulAdd(archsimd.LoadFloat32x8Array((*[8]float32)(unsafe.Add(pb, off+32))), acc1)
 	}
 	var buf [8]float32
-	acc0.Add(acc1).StoreSlice(buf[:])
+	acc0.Add(acc1).Store(buf[:])
 	archsimd.ClearAVXUpperBits() // ← ここだけが unsafe2 との違い
 	return buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]
 }

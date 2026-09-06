@@ -1,15 +1,8 @@
-# SIMD 最適化の記録 — 「速くならない」を一つずつ潰す
+# 付録: 最適化の記録(つまずきと診断のログ)
 
-ワークショップ教材用メモ。Go 1.26 `simd/archsimd` でベクトル検索を高速化する過程で
-実際に踏んだ罠と、その診断・修正の記録。すべて実測ベース。
+本ワークショップの実装を作る過程で実際に踏んだつまずきと、その診断と修正を時系列で記録したものです。すべて実測にもとづきます。各 Step がルーフライン上のどこにあたるかは本編([workshop.md](../workshop/workshop.md))に整理してあり、ここは「なぜそうなったか」と「どう測ったか」の側です。
 
-> **読み方**: このファイルは「罠と診断の生ログ」。各 Step が**ルーフライン上で
-> どの天井に当たっていたか**は [参加者教材 workshop.md](../workshop/workshop.md) に整理してある。
-> 対応の目安: Step 0/1 = AI 0.5 でメモリ斜線に張り付く(縦に上る)、Step 3 = byte を
-> 削って横に動く、Step 4(VZEROUPPER) = メモリ天井に届く前の隠れ sub-ceiling の掃除。
-
-測定環境: AWS c7i.large(Xeon Platinum 8488C / Sapphire Rapids、AVX-512 + VPOPCNTDQ あり)、
-Go 1.26.4、`GOEXPERIMENT=simd`。ベンチは 384 次元 float32、検索は 10 万ベクトル。
+Step 0〜6 の測定環境は AWS c7i.large(Xeon Platinum 8488C / Sapphire Rapids、AVX-512 と VPOPCNTDQ あり)、Go 1.26.4、`GOEXPERIMENT=simd`。Step 7 以降は GitHub Codespaces(AMD EPYC 7763)、Step 12 は Go 1.27.1 と Apple M3 Pro も含みます。ベンチは 384 次元 float32、検索は 10 万ベクトルです。
 
 ---
 
@@ -330,7 +323,7 @@ VMOVDQU X2, 0x398(SP)     # acc をスタックへ書き戻し
 
 本編(Stage 0/1/2 + rerank)を Codespaces 一本化したので、実際に **8-core Codespace
 (`premiumLinux`)** を立てて本編フルを取り直した。当たった CPU は **AMD EPYC 7763
-(Zen3、AVX2+FMA あり / AVX-512 VPOPCNTDQ なし)**。手順は [CODESPACES.md](CODESPACES.md)。
+(Zen3、AVX2+FMA あり / AVX-512 VPOPCNTDQ なし)**。手順は CODESPACES.md(非公開の運営メモ)。
 これで「本編は Codespaces のどの CPU でも再現／AVX-512 は保証されない」を実機で確認できた
 (付録 `SearchBinarySIMD` は VPOPCNT 非搭載のため fallback)。
 
@@ -382,7 +375,7 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
 上の「c7i 前提の数字・演出」と Codespaces(EPYC) のズレを、教材側を直して解消した(commit `b4576af`):
 - workshop.md の数値・ルーフライン図を EPYC 基準に統一(read 帯域=壁、リッジ 1.4、Stage1=4.2x で壁到達、
   Stage2 バッチ内 SIMD 5.8x、量子化 47x、rerank 43x)。図 6 枚(rl-stage0〜4 / roofline-plot)も再描画。
-- c7i 前提の付録(VZEROUPPER 税 / register spill)は本編から外し [`HIDDEN_CEILINGS.md`](HIDDEN_CEILINGS.md) へ分離。
+- c7i 前提の付録(VZEROUPPER 税 / register spill)は本編から外し [`hidden-ceilings.md`](hidden-ceilings.md) へ分離。
 - Stage 1 の演出は「1.6x 止まり=無力」→「効いた(4.2x)が壁に張り付く・倍率は CPU 次第」に再フレーム。
   倍率は機械依存だが「最後はメモリ壁で頭打ち/量子化が本命」という骨格は不変。
 
@@ -410,7 +403,7 @@ SearchBatchSIMD(B=32)   5.89 ms/q 13.05 GF   AI 16   ← batch内 naive比 5.8x
 
 ## Step 9: 4コア Codespace(参加者と同条件)で全編を再計測(2026-07-07)
 
-SETUP.md は参加者に **4-core** を指定しているのに、資料の実測例は 8コア機の記録だった。
+setup.md は参加者に **4-core** を指定しているのに、資料の実測例は 8コア機の記録だった。
 参加者と同じ **standardLinux32gb(4-core / 16GB)** の Codespace(AMD EPYC 7763 / Zen3、
 Go 1.26.4、GOEXPERIMENT=simd は devcontainer 済み)で全コマンドを流し、教材の正本数値を
 この 4コア実測に置き換えた。devcontainer はそのままで動作、`make test` は初回ビルド込み約10秒。
@@ -437,7 +430,7 @@ read 帯域は **19.31〜20.80 GB/s**、SearchSIMD は **7.90〜8.91 ms**(9.7〜
 **反映:** workshop.md の数値と図(`rl-stage0〜4` / `roofline-plot` / `memory-vs-compute-roofline` /
 `roofline-plot-example`※)を
 4コア実測へ更新(リッジ 1.4→1.3、メモリ上限 9.2→≈10 GF、達成 9.7 GF 等)。
-Makefile の既定天井を `PEAK=25.59` / `BW=20.80` に変更。8コア表記は撤去し SETUP.md の
+Makefile の既定天井を `PEAK=25.59` / `BW=20.80` に変更。8コア表記は撤去し setup.md の
 4-core 指定と条件を一致させた。
 ※ roofline-plot-example.png は、記録済みベンチ出力を `cmd/roofline-plot` に食わせて HTML を再生成し、
 ヘッドレス Chrome(`--window-size=960,600 --force-device-scale-factor=2`)で撮影。再計測不要で再現できる。
@@ -519,6 +512,102 @@ Stage 2 の正当化に使える。ColBERT / Qdrant マルチベクトルと同�
   コードコメントの番号もすべて追随。make ターゲット名は互換のため変更せず
   (bench2=Stage 4、bench3=Stage 5。対応は workshop.md のコマンド一覧に明記)。
 
+## Step 12: Go 1.27 対応 — archsimd API 改訂・arm64 Neon・ポータブル simd(2026-09-05)
+
+Go 1.27(2026-08 リリース。手元は 1.27.1)で SIMD 周りが動いたので追従した。
+測定環境はこの Step だけ **Apple M3 Pro(arm64 ネイティブ・Neon 128bit)**。Codespaces(amd64)の
+再計測は未実施(下記「未計測」)。
+
+### 何が変わったか(Go 1.26 → 1.27)
+
+| 項目 | 1.26 | 1.27 | 本リポへの影響 |
+|---|---|---|---|
+| `archsimd` の Load/Store 名 | `LoadFloat32x8Slice` / `StoreSlice` / `Store(*[8]T)` | `LoadFloat32x8` / `Store` / `StoreArray`、端数は `LoadFloat32x8Part` | **1.26 のコードは 1.27 でコンパイル不能**。全 `.go` と教材を機械置換 |
+| `archsimd` の対応アーキ | amd64 のみ | amd64 + arm64(Neon 128bit)+ wasm(128bit) | `dot_arm64.go` / `int8_arm64.go` / Neon 天井ベンチを追加。Mac で SIMD が走る |
+| ポータブル `simd` パッケージ | 無し | `simd.Float32s` 等(幅は実行時決定、`GODEBUG=simd=128` で狭められる) | `dot_portable.go` + `SearchPortable` + `make bench-portable` を追加 |
+| `GOEXPERIMENT=simd` | 必要 | 必要(デフォルト有効化 [#78979](https://github.com/golang/go/issues/78979) は保留) | Makefile / devcontainer はそのまま |
+| VZEROUPPER 自動挿入 | 無し | 無し(コンパイラの経路は `ClearAVXUpperBits` イントリンシックだけ) | Step 4 の結論は 1.27 でも有効 |
+| register spill(Step 6) | 12本 AVX2 ループで退避 | **同じ**(`make spill GO=go1.27.1` で 48 行の `VMOVDQU …(SP)`)。arm64 でも `FMOVQ …(SP)` | §05 のコラムの結論は変わらず |
+| Rosetta の FMA | false | false(macOS 26 + 1.27.1 で再確認) | amd64 側の数字は引き続き実機でしか取れない |
+
+### arm64(Neon)カーネルの設計メモ
+
+- **Dot**: `Float32x4.MulAdd`(FMLA)× アキュムレータ 4 本。レーンが 4 なので、amd64 の 2 本と同じ「1周 16 要素」にするには 4 本要る。`-S` で見るとループ本体は `FMOVQ`(ロード)+ `VFMLA` だけで spill なし。
+- **DotInt8**: Neon の archsimd には VPMADDWD(`DotProductPairs`)が無い。`MulWidenLo`(SMULL・int8→int16 の積)→ `ExtendLo4ToInt32`(SXTL)→ `Int32x4.Add` の 3 段。int16 のまま足すと 3 個目で溢れるので必ず int32 に広げてから蓄積。`-S`: SMULL×1 + SMULL2×1 + SXTL×2 + SXTL2×2 + ADD×7 / 16 要素。
+- **Hamming**: arm64 版は作らず。`bits.OnesCount64` が Go の intrinsic で既に CNT+ADDV(Neon)になるうえ、`Uint64x2` に `OnesCount` も `As*` 再解釈も無く、付録 B の趣旨(VPOPCNT は効かない)にも影響しない。
+- **ClearAVXUpperBits** は amd64 専用 API。ポータブル版 `dot_portable.go` からはビルドタグ付きの `clearAVXUpperBits()`(amd64: VZEROUPPER / 他: no-op)経由で呼ぶ。ポータブル API 自体に境界の後始末は無い。
+
+### M3 Pro 実測(go1.27.1・GOEXPERIMENT=simd・arm64)
+
+| ベンチ | 結果 | メモ |
+|---|---|---|
+| DotNaive → Dot(Neon) | 349 → 44.8 ns(**7.8x**) | Codespaces の AVX2 は 6.3x |
+| DotPortable(simd.Float32s, 128bit) | 63.1 ns | archsimd 版より遅い(2 本アキュムレータ・水平和がストア経由)。`GODEBUG=simd=0`(純 Go エミュ)だと 977 ns |
+| DotInt8Naive → DotInt8(Neon) | 116 → 23.2 ns(**5.0x**) | amd64 は 10.5x(VPMADDWD の有無が効く) |
+| SearchNaive → SearchSIMD | 34.6 → 4.59 ms(**7.5x**)、33.5 GB/s | Codespaces は 4.5x・19.4 GB/s。単コア帯域が M3 Pro の方が大きい |
+| SearchPortable | 6.25 ms、24.6 GB/s(128 vec-bits) | `GODEBUG=simd=128` でも同値(元から 128) |
+| SearchInt8 / SearchBinary / SearchBinaryRerank | 2.47 / 0.43 / 0.46 ms | 本編と同じ形(int8 でカーネル律速、1bit で脱出) |
+| PeakFLOP_NEON(12 本 FMLA) | 32.0 GFLOP/s | 理論 ~130 の 1/4。amd64 と同じく spill(`FMOVQ …(SP)`) |
+| PeakReadBW(Neon) | **34.2 read-GB/s** | 下記の罠 ⑦ |
+| PeakTriadBW(Neon) | 29.3 triad-GB/s | |
+
+**罠 ⑦: arm64 のメモリ天井ベンチが達成点を下回る。** スカラ縮約版は 10.7 GB/s、AVX2 版を写した
+「128bit ロード × 8 本 Add」は 26.6 GB/s、4 本 FMLA は 22.7 GB/s — いずれも SIMD 全探索の達成
+33.5 GB/s を下回り、ルーフライン上で点が屋根を突き抜ける。`-S` で見ると 8 本 Add ループは
+アキュムレータを毎回スタックへ退避していた(Step 6 と同根)。一方、検索カーネル `Dot`
+(4 本 FMLA・spill なし)で 1536 byte の行を順に流すと 34.2 GB/s。天井ベンチは
+「検索と同じ読み方で DRAM を流す」形(`ceiling_mem_arm64_test.go`)にした。教材の言い分
+(「天井ベンチも検索と同じ SIMD ロードで測る」)を arm64 でもそのまま適用した格好。
+
+### Codespaces(4コア・AMD EPYC 7763・go1.27.1)での再計測(2026-09-05)
+
+`gh codespace create -m standardLinux32gb` でブランチから立て、`make isa-report / test / bench1 /
+bench-portable / bench3 / bench-int8 / roofline-ceiling / roofline-batch / recall / spill` を一括実行。
+本編の数字は全て**教材の記述の範囲内**で再現(揺れは §05 の注どおり ±5〜10%):
+
+| ベンチ | 教材の値(Step 9) | 今回(1.27.1) |
+|---|---|---|
+| DotNaive → DotSIMD | 348 → 55.2 ns | 344 → 56.1 ns |
+| SearchNaive → SearchSIMD | 35.7 → 7.9 ms(19.4 GB/s) | 35.0 → 8.4〜8.6 ms(18.2 GB/s) |
+| PeakFLOP_AVX2 / ReadBW / TriadBW | 25.6 GF / 20.8 / 17.4 GB/s | 25.0 GF / 19.2 / 13.7 GB/s |
+| DotInt8Naive → DotInt8SIMD / SearchInt8 | 364 → 34.6 ns / 4.2 ms | 381 → 33.3 ns / 4.0 ms |
+| SearchBinary / BinaryRerank | 0.77 / 0.85 ms 前後 | 0.84 / 0.93 ms |
+| Batch B=32 naive / SIMD | — | 36.6 / 6.25 ms/query(12.3 GF) |
+| Recall@10 binary / rerank / int8 | 0.180 / 0.868 / 0.948 | 0.180 / 0.868 / 0.948(完全一致) |
+| spill(`make spill`) | あり | あり(`VMOVDQU Y2, a0+952(SP)` …) |
+
+**Go 1.26.8 vs 1.27.1 の A/B(同一 Codespace・交互 2 ラウンド):** HEAD~1(1.26 API のコード)を
+go1.26.8 + `GOTOOLCHAIN=local` で、HEAD を go1.27.1 で交互に測定。DotSIMD 57.5〜61.3 ns vs
+56.3〜60.0 ns、SearchSIMD 8.37〜8.89 ms vs 8.35〜8.45 ms で**差は揺れの範囲内**。API 改訂は名前
+だけでコード生成は変わっていない(容器起動直後の初回 `make bench1` で DotSIMD 71 ns が出たのは
+VM の揺れ。2 回目以降は 56 ns)。
+
+**罠 ⑧: `GODEBUG=simd=128` で「同じ ms」にならない。** ポータブル版コラムは当初「幅を半分に
+しても全探索の ms は変わらない(= メモリ律速の証拠)」を想定していたが、実測は逆:
+
+| | DotPortable カーネル | SearchPortable |
+|---|---|---|
+| 256bit(既定) | 56.8 ns(archsimd 版 56.1 と同じ) | 8.46 ms・18.1 GB/s(SearchSIMD 8.64 と同じ点) |
+| 128bit(`GODEBUG=simd=128`) | 107 ns | 11.9 ms・12.9 GB/s(**1.4x 遅い**) |
+
+アキュムレータを 2 本→4 本にしても同じ比率(2 本: 80 ns / 14.7 ms → 4 本: 107 ns / 11.9 ms。
+かえって 128bit カーネルは 4 本の方が遅い = レイテンシ連鎖ではなく命令数で律速)。
+読み解き: DB ベクトル 1 本(1536 byte)の DRAM 転送時間は 1536 / 19.2 GB/s ≈ 80 ns。256bit の
+カーネル 57 ns は 80 ns に隠れる(→壁に張り付く)が、128bit の 107 ns は 80 ns からはみ出す
+(→律速がカーネルに戻り、点は壁の下へ)。つまり「幅を広げても壁の上には行けない・狭めると
+壁の下に落ちる」。教材のコラムはこの実測に合わせて**書き直した**(想定の「変わらない」は撤回)。
+むしろ「点は壁の下側にしか動けない」の実証として Stage 1 の結論を補強する形になった。
+
+### 見送り(スコープ外と決めたもの)
+
+- **AVX-512 機での `GODEBUG=simd=512/256/128` 3 段比較は見送り**(2026-09-05)。ワークショップで
+  使う環境は Codespaces だけに閉じる方針。Codespaces を EastUs / WestUs2 / WestEurope /
+  SouthEastAsia の 4 リージョンで起動して確認したが、**全て AMD EPYC 7763(AVX-512 なし)**だった
+  ので、参加者が AVX-512 を踏むことはまず無い。6 月に計測に使った AWS c7i は計測後に削除済みで、
+  AVX-512 の実機は公開リポジトリには含めない。
+- PROPOSAL.md は Go 1.27 の一文を追記済み。PROPOSAL_NOTES.md の実測表(Go 1.26.4・c7i)は
+  CFP 提出時点の史実として据え置き。
+
 ## 高速化の階段(最終形)
 
 > 倍率は **AWS c7i** の史実。Codespaces(EPYC 7763)の実測は Step 7 を参照(SIMD 全探索の倍率が
@@ -574,7 +663,6 @@ Stage 2 の正当化に使える。ColBERT / Qdrant マルチベクトルと同�
   律速で popcount を SIMD 化しても速くならない(本ログ Step 5: SearchBinarySIMD 0.75ms ≧
   スカラ SearchBinary 0.68ms)うえ、全 CPU にあるとも限らないため。コードとこの実測は
   証拠として残置(`make bench-bonus`)。
-- AWS c7i(Sapphire Rapids / Xeon 8488C)は AVX-512 + VPOPCNTDQ をフル装備。**付録の AVX-512
-  を実機で確かめる用**として `infra/` の Terraform 一式 + `make remote-bench` を残す。
+- AWS c7i(Sapphire Rapids / Xeon 8488C)は AVX-512 + VPOPCNTDQ をフル装備。
   本ログの Step 0〜6 の実測はこの c7i 上の記録(=史実)。**Codespaces(EPYC 7763)での本編
   再計測は実施済み → Step 7**。

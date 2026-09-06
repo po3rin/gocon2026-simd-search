@@ -1,26 +1,21 @@
 # docs — ドキュメント索引
 
-読者別に整理してある。各ファイルの役割は1つだけ。
-
-## 参加者(ワークショップ受講者)向け
-- **[workshop/SETUP.md](workshop/SETUP.md)** — まずここ。Codespaces ワンクリック起動・マシンサイズ・費用・フォールバック。
+## ワークショップ向け
+- **[workshop/setup.md](workshop/setup.md)** — まずここ。Codespaces ワンクリック起動・マシンサイズ・費用・フォールバック。
 - **[workshop/workshop.md](workshop/workshop.md)** — 教材本体(これ一つ)。
-  ルーフライン(進め方: 測る→AI→当たる天井→その天井を狙う手) +
-  各 Stage の点と天井(静止画) + Go コードと計測コマンド + 天井の計測方法 + 原典。
+  ルーフラインの進め方(測る、AI を出す、上限を見る、上限に効く手を打つ)、
+  各 Stage の図、Go コードと計測コマンド、上限の計測方法、原典。
   本編は GitHub Codespaces(AMD EPYC 7763 で実測)前提。
   > 数値の正本はこの教材と、`make roofline` / `make roofline-ceiling`(実測・再現可能)。
 
-## 開発・運営向け
-- **[dev/OPTIMIZATION_LOG.md](dev/OPTIMIZATION_LOG.md)** — 実験の生ログ(罠と診断、Step 0〜7、objdump、天井の実測、Codespaces 再計測)。
-- **[dev/CODESPACES.md](dev/CODESPACES.md)** — CLI から Codespace を立ててベンチを回す手順(sshd feature / SKU 名 / 鍵の罠)。
-- **[dev/HIDDEN_CEILINGS.md](dev/HIDDEN_CEILINGS.md)** — (深掘り)VZEROUPPER 税 / register spill の調査(Intel c7i 実測。本編からは外した読み物)。
-- **[dev/ENVIRONMENT_SURVEY.md](dev/ENVIRONMENT_SURVEY.md)** — 実行環境リファレンス(arm64 / Rosetta / Docker / amd64)。
-- **[dev/VIZ_TOOLING_PLAN.md](dev/VIZ_TOOLING_PLAN.md)** — 可視化・プロファイルツール導入プラン(pprof / codegen 可視化 / 対話的ルーフライン)。
+## 付録
+- **[appendix/README.md](appendix/README.md)** — 付録の索引。
+- **[appendix/hidden-ceilings.md](appendix/hidden-ceilings.md)** — Go の SIMD の 2 つの隠れた性能上限(VZEROUPPER の遷移ペナルティ、register spill)。
+- **[appendix/environment-survey.md](appendix/environment-survey.md)** — 実行環境の調査(Apple Silicon、Rosetta、Docker、amd64 実機)。
+- **[appendix/optimization-log.md](appendix/optimization-log.md)** — 最適化の記録(Step 0〜12。つまずきと診断、本編の数字の出どころ)。
 
 ## 共有
 - **images/** — 図(SVG + PNG)。教材・記事から参照。
-
-ルートの `README.md` = 入口、`PROPOSAL.md` = CFP プロポーザル。
 
 ---
 

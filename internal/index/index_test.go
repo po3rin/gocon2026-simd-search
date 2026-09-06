@@ -26,10 +26,16 @@ func TestSearchAgreement(t *testing.T) {
 	if len(naive) != 10 || len(simd) != 10 {
 		t.Fatalf("got %d, %d results, want 10", len(naive), len(simd))
 	}
-	// SIMD は丸め差で順位が入れ替わりうるが、top-10 集合はほぼ一致するはず
+	// SIMD は丸め差で順位が入れ替わりうるが、top-10 集合はほぼ一致する
 	for i := range naive {
 		if naive[i].ID != simd[i].ID {
 			t.Errorf("rank %d: naive=%v simd=%v", i, naive[i], simd[i])
+		}
+	}
+	portable := ix.SearchPortable(q, 10)
+	for i := range naive {
+		if naive[i].ID != portable[i].ID {
+			t.Errorf("rank %d: naive=%v portable=%v", i, naive[i], portable[i])
 		}
 	}
 }

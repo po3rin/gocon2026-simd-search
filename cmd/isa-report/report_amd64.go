@@ -27,11 +27,11 @@ var features = []feature{
 
 // api is one archsimd (or related) operation used in this repo.
 type api struct {
-	stage   string
-	symbol  string
-	asm     string
-	need    string // CPU Feature from pkg.go.dev
-	check   func() bool
+	stage  string
+	symbol string
+	asm    string
+	need   string // CPU Feature from pkg.go.dev
+	check  func() bool
 }
 
 var apis = []api{
@@ -40,12 +40,12 @@ var apis = []api{
 	{"Stage 0", "vec.Hamming → bits.OnesCount64", "POPCNT", "(scalar POPCNT, not archsimd)", func() bool { return true }},
 
 	// Stage 1 — Float32x8 dot
-	{"Stage 1", "LoadFloat32x8Slice", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
+	{"Stage 1", "LoadFloat32x8", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
 	{"Stage 1", "Float32x8.MulAdd", "VFMADD213PS", "FMA", archsimd.X86.FMA},
 	{"Stage 1", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
 
 	// Stage 3 — int8 dot (AVX2 only)
-	{"Stage 3", "LoadInt8x16Slice", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
+	{"Stage 3", "LoadInt8x16", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
 	{"Stage 3", "Int8x16.ExtendToInt16", "VPMOVSXBW", "AVX2", archsimd.X86.AVX2},
 	{"Stage 3", "Int16x16.DotProductPairs", "VPMADDWD", "AVX2", archsimd.X86.AVX2},
 
@@ -53,7 +53,7 @@ var apis = []api{
 	{"Stage 4", "vec.Hamming (same as Stage 0)", "POPCNT", "(scalar)", func() bool { return true }},
 
 	// 付録B — Uint64x4 Hamming SIMD
-	{"付録B", "LoadUint64x4Slice", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
+	{"付録B", "LoadUint64x4", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
 	{"付録B", "Uint64x4.Xor", "VPXOR", "AVX2", archsimd.X86.AVX2},
 	{"付録B", "Uint64x4.OnesCount", "VPOPCNTQ", "AVX512VPOPCNTDQ", archsimd.X86.AVX512VPOPCNTDQ},
 	{"付録B", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
@@ -115,10 +115,11 @@ func run() {
 
 	fmt.Printf("\n=== Notes ===\n")
 	fmt.Printf("  • Feature checks: archsimd.X86.* — same API pkg.go.dev recommends.\n")
-	fmt.Printf("  • Apple Silicon: run with GOARCH=amd64 (Rosetta). AVX-512 unsupported;\n")
-	fmt.Printf("    FMA often false → HasSIMD=false. See Apple Rosetta docs.\n")
+	fmt.Printf("  • Apple Silicon: GOARCH=amd64 (Rosetta) では AVX-512 なし・FMA=false →\n")
+	fmt.Printf("    HasSIMD=false。Go 1.27 からは GOARCH=arm64 のまま Neon 版が走るので、\n")
+	fmt.Printf("    Mac では素の `make isa-report` / `make bench1` を使う(arm64 の一覧が出る)。\n")
 	fmt.Printf("  • Docker linux/amd64 on Apple Silicon emulates x86; not a substitute for\n")
-	fmt.Printf("    amd64 bare metal (Codespaces / make remote-bench).\n")
+	fmt.Printf("    amd64 bare metal (Codespaces).\n")
 }
 
 func stageSummaries(hasSIMD, hasVPOPCNT bool) []stageSummary {

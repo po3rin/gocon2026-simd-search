@@ -1,26 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" font-family="'Hiragino Sans','Noto Sans CJK JP',sans-serif">
-<style>.t{fill:#0f172a}.m{fill:#64748b}</style>
-<rect width="960" height="520" fill="#ffffff"/>
-<text x="40" y="40" font-size="21" font-weight="700" class="t">ルーフライン(屋根)の形 — 点を打つ前の「地図」</text>
-<text x="40" y="62" font-size="13" class="m">縦=出せる性能 / 横=算術強度。屋根は2本(メモリ斜線・演算水平線)。どんなコードもこの下にしか到達できない。</text>
-<path d="M 130 430 L 500 160 L 500 430 Z" fill="#eff6ff"/>
-<path d="M 500 160 L 880 160 L 880 430 L 500 430 Z" fill="#fffbeb"/>
-<line x1="130" y1="430" x2="880" y2="430" stroke="#0f172a" stroke-width="1.4"/>
-<line x1="130" y1="80" x2="130" y2="430" stroke="#0f172a" stroke-width="1.4"/>
-<text x="880" y="460" font-size="13" font-weight="600" class="t" text-anchor="end">算術強度 AI (flop/byte) →</text>
-<text x="40" y="74" font-size="13" font-weight="600" class="t">↑ 性能 (GFLOP/s)</text>
-<line x1="130" y1="430" x2="500" y2="160" stroke="#dc2626" stroke-width="2.6"/>
-<line x1="500" y1="160" x2="880" y2="160" stroke="#dc2626" stroke-width="2.6"/>
-<text x="250" y="333" font-size="13" fill="#dc2626" font-weight="600" transform="rotate(-33 250 333)">メモリ帯域で決まる斜線</text>
-<text x="880" y="150" font-size="13" fill="#dc2626" font-weight="600" text-anchor="end">演算ピークで決まる水平線</text>
-<line x1="500" y1="160" x2="500" y2="430" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3 4"/>
-<circle cx="500" cy="160" r="5" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
-<text x="500" y="146" font-size="13" fill="#0f172a" font-weight="700" text-anchor="middle">リッジ</text>
-<text x="500" y="460" font-size="12" class="m" text-anchor="middle">折れ点</text>
-<text x="300" y="250" font-size="15" font-weight="700" fill="#1d4ed8" text-anchor="middle">← メモリ律速</text>
-<text x="300" y="272" font-size="12" fill="#1d4ed8" text-anchor="middle">運ぶのが間に合わない</text>
-<text x="690" y="250" font-size="15" font-weight="700" fill="#b45309" text-anchor="middle">演算律速 →</text>
-<text x="690" y="272" font-size="12" fill="#b45309" text-anchor="middle">計算が間に合わない</text>
-<text x="300" y="408" font-size="11.5" class="m" text-anchor="middle">点が左にあれば「データ設計を変える(横へ)」</text>
-<text x="690" y="408" font-size="11.5" class="m" text-anchor="middle">点が右にあれば「計算を効率化(縦へ)」</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600">
+<style>text{font-family:'Helvetica Neue',Helvetica,Arial,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;fill:#111827}</style>
+<rect width="960" height="600" fill="#ffffff"/>
+<text x="480" y="32" font-size="18" font-weight="600" text-anchor="middle">ルーフラインの形</text>
+<text x="480" y="52" font-size="11.5" fill="#6b7280" text-anchor="middle">横軸は算術強度 AI(1 バイト運ぶごとに何回計算するか)、縦軸は性能。どのコードもこの線より上には行けない</text>
+<polygon points="315.6,225.3 900.0,225.3 900.0,510.0 315.6,510.0" fill="#ffedd5" opacity="0.5"/>
+<polygon points="80.0,365.2 315.6,225.3 315.6,510.0 80.0,510.0" fill="#dbeafe" opacity="0.5"/>
+<line x1="80.0" y1="70.0" x2="80.0" y2="510.0" stroke="#eef2f7"/>
+<line x1="182.5" y1="70.0" x2="182.5" y2="510.0" stroke="#eef2f7"/>
+<line x1="285.0" y1="70.0" x2="285.0" y2="510.0" stroke="#eef2f7"/>
+<line x1="387.5" y1="70.0" x2="387.5" y2="510.0" stroke="#eef2f7"/>
+<line x1="490.0" y1="70.0" x2="490.0" y2="510.0" stroke="#eef2f7"/>
+<line x1="592.5" y1="70.0" x2="592.5" y2="510.0" stroke="#eef2f7"/>
+<line x1="695.0" y1="70.0" x2="695.0" y2="510.0" stroke="#eef2f7"/>
+<line x1="797.5" y1="70.0" x2="797.5" y2="510.0" stroke="#eef2f7"/>
+<line x1="900.0" y1="70.0" x2="900.0" y2="510.0" stroke="#eef2f7"/>
+<line x1="80.0" y1="510.0" x2="900.0" y2="510.0" stroke="#eef2f7"/>
+<line x1="80.0" y1="449.1" x2="900.0" y2="449.1" stroke="#eef2f7"/>
+<line x1="80.0" y1="368.7" x2="900.0" y2="368.7" stroke="#eef2f7"/>
+<line x1="80.0" y1="307.8" x2="900.0" y2="307.8" stroke="#eef2f7"/>
+<line x1="80.0" y1="246.9" x2="900.0" y2="246.9" stroke="#eef2f7"/>
+<line x1="80.0" y1="166.5" x2="900.0" y2="166.5" stroke="#eef2f7"/>
+<line x1="80.0" y1="105.6" x2="900.0" y2="105.6" stroke="#eef2f7"/>
+<text x="490.0" y="550.0" font-size="12" fill="#374151" text-anchor="middle">算術強度 (flop/byte)。右ほど 1 バイトあたりの計算が多い</text>
+<text transform="translate(22,290.0) rotate(-90)" font-size="12" fill="#374151" text-anchor="middle">性能 (GFLOP/s)。上ほど速い</text>
+<polyline fill="none" stroke="#9ca3af" stroke-width="2.5" points="80.0,365.2 315.6,225.3 900.0,225.3"/>
+<text x="88.0" y="385.2" font-size="12" font-weight="600" fill="#60a5fa" text-anchor="start">メモリ帯域で決まる斜線</text>
+<text x="894.0" y="215.3" font-size="12" font-weight="600" fill="#fb923c" text-anchor="end">演算ピークで決まる水平線</text>
+<text x="209.5" y="426.1" font-size="14" font-weight="600" fill="#1d4ed8" text-anchor="middle">メモリ律速</text>
+<text x="209.5" y="444.1" font-size="11.5" fill="#1d4ed8" text-anchor="middle">データを運ぶのが間に合わない</text>
+<text x="209.5" y="462.1" font-size="11.5" fill="#1d4ed8" text-anchor="middle">点がここなら 算術強度 を上げる(データ表現を変える)</text>
+<text x="652.5" y="388.3" font-size="14" font-weight="600" fill="#c2410c" text-anchor="middle">演算律速</text>
+<text x="652.5" y="406.3" font-size="11.5" fill="#c2410c" text-anchor="middle">計算が間に合わない</text>
+<text x="652.5" y="424.3" font-size="11.5" fill="#c2410c" text-anchor="middle">点がここなら実装効率を上げる(SIMD など)</text>
+<line x1="315.6" y1="225.3" x2="315.6" y2="510.0" stroke="#9ca3af" stroke-dasharray="3 3"/>
+<circle cx="315.6" cy="225.3" r="4" fill="#ffffff" stroke="#9ca3af" stroke-width="2"/>
+<text x="315.6" y="215.3" font-size="11" fill="#6b7280" text-anchor="middle">リッジ(境目)</text>
 </svg>

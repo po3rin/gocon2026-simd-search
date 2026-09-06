@@ -16,7 +16,7 @@ func TestDotInt8MatchesNaive(t *testing.T) {
 		}
 		want := DotInt8Naive(a, b)
 		got := DotInt8(a, b)
-		if got != want { // 整数なので完全一致するはず
+		if got != want { // 整数なので完全一致する
 			t.Errorf("n=%d: DotInt8=%d DotInt8Naive=%d", n, got, want)
 		}
 	}
@@ -32,7 +32,7 @@ func TestQuantizeInt8RoundTrip(t *testing.T) {
 	scale := QuantizeInt8(v, q)
 	for i := range v {
 		got := float32(q[i]) * scale
-		if d := got - v[i]; d > scale || d < -scale { // 量子化誤差は ±scale/2 のはず
+		if d := got - v[i]; d > scale || d < -scale { // 量子化誤差は ±scale/2 以内
 			t.Errorf("i=%d: v=%f restored=%f (scale=%f)", i, v[i], got, scale)
 		}
 	}

@@ -23,7 +23,8 @@ __debug_bin*
 # `make isa-report` のビルド成果物(テストバイナリ)
 /.isa-report/
 
-# ---- Terraform ----
+# ---- Terraform(AVX-512 実機の個人用。公開しない) ----
+/infra/
 .terraform/
 .terraform.lock.hcl
 *.tfstate
@@ -40,3 +41,8 @@ crash.log
 *~
 .idea/
 .vscode/
+
+# ---- 個人メモ(公開しない。ローカルには残す) ----
+/PROPOSAL.md
+/PROPOSAL_NOTES.md
+/memo/

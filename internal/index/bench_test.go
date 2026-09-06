@@ -95,6 +95,20 @@ func BenchmarkSearchSIMD(b *testing.B) {
 	reportFloatRoofline(b, iters)
 }
 
+// Stage 1 コラム: ポータブル simd 版(simd.Float32s)。SearchSIMD と同じ点に乗る(Codespaces 実測で確認済み)。
+// GODEBUG=simd=128 で幅を半分にすると、カーネルが 1 ベクトルのメモリ時間からはみ出して壁の下に落ちる。
+func BenchmarkSearchPortable(b *testing.B) {
+	benchSetup()
+	b.SetBytes(benchN * benchDim * 4)
+	iters := 0
+	for b.Loop() {
+		benchIx.SearchPortable(benchQ, 10)
+		iters++
+	}
+	reportFloatRoofline(b, iters)
+	b.ReportMetric(float64(vec.PortableVectorBits()), "vec-bits")
+}
+
 // Stage 4: バイナリ量子化 + スカラー popcount。右上に動いて DRAM 律速を脱出。
 func BenchmarkSearchBinary(b *testing.B) {
 	benchSetup()

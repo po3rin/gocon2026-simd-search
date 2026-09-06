@@ -74,6 +74,17 @@ func (ix *Index) SearchSIMD(q []float32, k int) []Result {
 	return t.results()
 }
 
+// SearchPortable is Stage 1 written with the portable simd package
+// (Go 1.27 の simd.Float32s)。SearchSIMD と同じ走査で、カーネルだけ vec.DotPortable。
+// GODEBUG=simd=128 で幅を狭めると点がどこへ動くかを見る用(make bench-portable。workshop.md Stage 1 コラム)。
+func (ix *Index) SearchPortable(q []float32, k int) []Result {
+	t := newTopK(k)
+	for id := 0; id < ix.N; id++ {
+		t.push(id, vec.DotPortable(q, ix.Vec(id)))
+	}
+	return t.results()
+}
+
 // SearchBinary is Stage 4: scan over binary codes with Hamming distance.
 // Score は -距離(距離が小さいほど良い)。
 func (ix *Index) SearchBinary(q []float32, k int) []Result {

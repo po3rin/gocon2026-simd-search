@@ -1,10 +1,10 @@
-//go:build !(goexperiment.simd && amd64)
+//go:build !(goexperiment.simd && (amd64 || arm64))
 
 package vec
 
 import "testing"
 
-// メモリ天井(スカラー fallback)。amd64/SIMD が無い環境(arm64 等)向け。
+// メモリ天井(スカラー fallback)。SIMD が無いビルド(GOEXPERIMENT 未指定・wasm 等)向け。
 // 本番の天井計測は ceiling_mem_simd_test.go の SIMD 版で行う(こちらは縮約の
 // 発行/レイテンシで律速し帯域を過小評価しうる)。詳細は ceiling_mem_test.go。
 
