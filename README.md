@@ -62,8 +62,8 @@ make bench-parallel # コラム: goroutine 並列はどの上限に効くか
 make bench-nsweep   # Stage 1 コラム: DB サイズで SIMD 倍率が崩れる境界
 make bench-int8     # Stage 3: int8 量子化(カーネル 10x・Recall 0.948)
 make bench-portable # Stage 1 コラム: ポータブル simd 版(256bit で同じ結果)+ GODEBUG=simd=128 で幅を半分にすると遅くなる
-make bench-maxsim   # 付録A: MaxSim(late interaction・最初から演算律速)
-make bench-bonus    # 付録B: AVX-512 VPOPCNT。AVX-512機向け・速くならない確認用
+make bench-maxsim   # 付録: MaxSim(late interaction。最初から演算律速)
+make bench-bonus    # 付録: AVX-512 の SIMD popcount。速くならないことの確認用
 ```
 
 `make roofline` の出力例(上の 4 手の 1〜2 にあたる):
@@ -83,7 +83,7 @@ Go 1.27 から `simd/archsimd` が arm64(Neon・128bit)に対応したので、A
 ```sh
 go install golang.org/dl/go1.27.1@latest && go1.27.1 download
 make GO=$(go env GOPATH)/bin/go1.27.1 test
-make GO=$(go env GOPATH)/bin/go1.27.1 bench1   # Neon 版の数字(本編の AVX2 とは別物。workshop.md §09)
+make GO=$(go env GOPATH)/bin/go1.27.1 bench1   # Neon 版の数字(本編の AVX2 とは別物。docs/workshop/SETUP.md)
 ```
 
 amd64 クロスビルド(Rosetta 実行)で amd64 側の SIMD パスのコンパイル確認も可能(Rosetta は FMA 非対応なので実行はスカラに落ちる):
@@ -105,7 +105,7 @@ make isa-report-amd64 GO=$(go env GOPATH)/bin/go1.27.1   # Rosetta で amd64 側
 internal/vec/    距離カーネル(Stage ごとの内積・ハミング距離の実装)
 internal/index/  ミニ検索エンジン(Index / Search API)+ ベンチ + roofline 計測
 docs/workshop/   参加者教材 workshop.md(SIMD/ベクトル検索の基礎+進め方+図+計測方法+まとめ+原典)
-docs/appendix/   付録(隠れた性能上限 / 実行環境の調査 / 最適化の記録)
+docs/appendix/   付録(隠れた性能上限 / 実行環境の調査 / MaxSim / AVX-512 popcount / 最適化の記録)
 docs/images/     図(SVG+PNG)
 docs/README.md   ドキュメント索引
 ```

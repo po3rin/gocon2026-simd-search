@@ -39,7 +39,7 @@ bench3:
 
 bench: bench3
 
-## (付録B) AVX-512 VPOPCNT で popcount を SIMD 化。Stage 4 で見たとおり量子化後はキャッシュ
+## (付録 avx512-popcount.md) AVX-512 VPOPCNT で popcount を SIMD 化。Stage 4 で見たとおり量子化後はキャッシュ
 ## 律速で速くならない(SearchBinarySIMD ≧ SearchBinary)ことの確認用。本編フロー外。
 ## AVX-512 + VPOPCNTDQ 機(AWS c7i 等)以外ではスカラにフォールバックする。
 bench-bonus:
@@ -67,7 +67,7 @@ bench-int8:
 recall-int8:
 	$(GO) test ./internal/index -run 'TestRecallInt8$$' -v
 
-## 付録A: MaxSim(late interaction)。1ロードに多数の内積がタスクに内在
+## 付録 maxsim.md: MaxSim(late interaction)。1ロードに多数の内積がタスクに内在
 ## = 最初から演算律速で、SIMD が最初から効く検索方式。
 bench-maxsim:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s

@@ -47,7 +47,7 @@ acc = va.MulAdd(vb, acc)               // acc += va*vb を 8 レーン同時に(
 
 `archsimd` はアーキテクチャ固有の API です。型も命令も CPU ごとに違います。名前の対応は次のとおりです。amd64 は Intel と AMD の 64bit CPU(x86)のことで、その SIMD 命令セットが AVX2(256bit)と AVX-512(512bit)です。arm64 は Arm 系の 64bit CPU(Apple Silicon、AWS Graviton など)のことで、その SIMD 命令セットが Neon(128bit)です。Neon は arm64 の必須機能なので、どの arm64 CPU でも使えます。WebAssembly はブラウザなどで動く実行形式で、128bit の SIMD を持ちます。Go 1.27 の `archsimd` はこの 3 つに対応しています。
 
-本編のコードと数字は amd64 の Codespaces で取ったものです。Apple Silicon の Mac でも Go 1.27 からは Neon 版の `internal/vec/dot_arm64.go` が走りますが、環境が違うため、出てくる数字は本編とは別物になります(§09)。同じ内積をアーキに依存せず書けるポータブルな `simd` パッケージも 1.27 で入りました。Stage 1 のコラムで使います。
+本編のコードと数字は amd64 の Codespaces で取ったものです。Apple Silicon の Mac でも Go 1.27 からは Neon 版の `internal/vec/dot_arm64.go` が走りますが、環境が違うため、出てくる数字は本編とは別物になります([SETUP.md](SETUP.md) の「Apple Silicon で動かす場合」)。同じ内積をアーキに依存せず書けるポータブルな `simd` パッケージも 1.27 で入りました。Stage 1 のコラムで使います。
 
 ### archsimd の API
 
@@ -133,7 +133,7 @@ go install golang.org/dl/go1.27.1@latest && go1.27.1 download   # Go 1.27 を入
 make GO=$(go env GOPATH)/bin/go1.27.1 test                      # GOEXPERIMENT=simd は Makefile が付与
 ```
 
-**③ ローカル(Apple Silicon の Mac)** コマンドは②と同じです。Go 1.27 から `archsimd` が arm64 に対応したので、`make bench1` を実行すると Neon(128bit)版の SIMD が走ります。本編の数字(AVX2・256bit)とは別物なので、§09 の環境メモを読んでから自分の Mac の値として眺めてください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
+**③ ローカル(Apple Silicon の Mac)** コマンドは②と同じです。Go 1.27 から `archsimd` が arm64 に対応したので、`make bench1` を実行すると Neon(128bit)版の SIMD が走ります。本編の数字(AVX2・256bit)とは別物なので、[SETUP.md](SETUP.md) の「Apple Silicon で動かす場合」を読んでから、自分の Mac の値として眺めてください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
 
 ### 動かす
 
@@ -615,7 +615,7 @@ B=32  SearchBatchSIMD    5.79 ms/query  13.26 GF   ← AI 16・SIMD で 5.9x! �
 
 B=32 でクエリを束ねると算術強度は 0.5 から 16 になり、リッジを越えて演算律速側に移りました。そこでは **SIMD がスカラより 5.9x 速くなります**。scalar batch が 34.2 ms/query、SIMD batch が 5.79 ms/query で、GFLOP/s は 2.24 から 13.3 です。Stage 1 では 4.5x で頭打ちだった SIMD が、算術強度を上げると効きます。1 クエリあたりの時間も 7.9 ms から 5.8 ms に縮みます。
 
-ちなみに「クエリが 32 本まとめて来る」という仮定は実際でも使われます。 ColBERT のようにクエリを複数のベクトルで表す検索方式(late interaction)では、DB ベクトル 1 本に対して複数の内積を取ることが方式そのものに含まれていて、最初から演算律速です。付録 A で実測しています(5.7x)。
+ちなみに「クエリが 32 本まとめて来る」という仮定は実際でも使われます。 ColBERT のようにクエリを複数のベクトルで表す検索方式(late interaction)では、DB ベクトル 1 本に対して複数の内積を取ることが方式そのものに含まれていて、最初から演算律速です。[付録の MaxSim](../appendix/maxsim.md) で実測しています(5.7x)。
 
 なぜ律速が入れ替わるのかは、時間の内訳で分かります。1 要素を処理する時間は、運ぶ時間(バイト数 ÷ メモリ帯域)と計算する時間(flop ÷ 演算ピーク)のうち長い方でおおよそ決まります。計算する時間は要素あたり 2 flop で全 Stage 同じですが、バッチ化は運ぶ時間だけを 1/32 にします。そのため長い方が、運ぶ時間から計算する時間に入れ替わります。下の図は §05 で測った演算ピーク 25.6 GFLOP/s と read 帯域 20.8 GB/s から計算したものです。
 
@@ -749,7 +749,7 @@ Recall@10: binary=0.180 binary+rerank=0.868             ← binary 単体は 0.1
 
 DB が 153MB から 4.8MB になってキャッシュに乗り、DRAM 帯域の制約から外れました。0.77 ms、**46x** です。速くなった理由は SIMD ではなく、データを 1/32 にしたことです。
 
-距離の計算は通常の(SIMD でない)POPCNT 命令で足ります。AVX-512 の SIMD 版 popcount(VPOPCNT)を使っても速くなりません。データがキャッシュにあり、1 ベクトルが 6 語と小さいので、popcount で時間を使っていないからです。AVX-512 のある機械で測っても、SIMD 版の `SearchBinarySIMD` が 0.75 ms、通常版の `SearchBinary` が 0.68 ms でした(今回の Codespace の AMD CPU には AVX-512 の VPOPCNT が無く、この付録は動きません)。Stage 3 では SIMD が効きましたが、1bit では使う場所がありません。計算で詰まっていない所では SIMD は効きません。本編に AVX-512 の Stage を置かないのはこのためで、AVX-512 の話は付録 B にまとめてあります。
+距離の計算は通常の(SIMD でない)POPCNT 命令で足ります。AVX-512 の SIMD 版 popcount(VPOPCNT)を使っても速くなりません。データがキャッシュにあり、1 ベクトルが 6 語と小さいので、popcount で時間を使っていないからです。AVX-512 のある機械で測っても、SIMD 版の `SearchBinarySIMD` が 0.75 ms、通常版の `SearchBinary` が 0.68 ms でした(今回の Codespace の AMD CPU には AVX-512 の VPOPCNT が無く、この付録は動きません)。Stage 3 では SIMD が効きましたが、1bit では使う場所がありません。計算で詰まっていない所では SIMD は効きません。本編に AVX-512 の Stage を置かないのはこのためで、AVX-512 で試した結果は[付録](../appendix/avx512-popcount.md)にまとめてあります。
 
 ただし、良いことばかりではありません。1bit に減らしたぶん精度が大きく落ち、Recall@10 = 0.18 です。正解 10 件のうち 2 件弱しか当たりません。46x は正確な検索が速くなったのではなく、別の近似の問題に置き換えた結果で、このままでは使えません。
 
@@ -811,7 +811,7 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 
 ### 持ち帰り — この先へ進む3つの方向
 
-本編で使った考え方(ルーフラインと、算術強度を上げる 2 つの方法)は、そのまま先へ延長できます(MaxSim は付録で実装済み)。方向は 3 つあります。
+本編で使った考え方(ルーフラインと、算術強度を上げる 2 つの方法)は、そのまま先へ延長できます([MaxSim](../appendix/maxsim.md) は付録で実装済み)。方向は 3 つあります。
 
 - **アルゴリズムの軸(HNSW・IVF)。** ここまでの対処は全て10 万件全部を処理する前提でした。そもそも触る件数を減らすのが全探索の O(N) を下回る唯一の方法です。実運用ではHNSW/IVFなどで候補を絞り、候補を本ワークショップの技で速くします。
 
@@ -830,43 +830,13 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 
 6 つの遷移のうち 4 つで SIMD が速さの主因でした。効かない場所(メモリ帯域の上限に達したあと、量子化後の popcount)もはっきりあり、どちらになるかを事前に教えてくれるのがルーフラインでした。実装効率を上げる(SIMD、アキュムレータ)ことと、算術強度を上げる(バッチ化、量子化)ことは別の軸です。Stage 1 でメモリ帯域に達した時点で「次は実装効率ではなく 算術強度」と手が決まり、算術強度を上げた先でまた SIMD が効きました。速度と精度も別の軸で、1bit 量子化で落ちた精度は fp32 SIMD の Rerank で取り戻しました。
 
-本ワークショップで使った進め方をまとめると、次の 6 つです。
+本ワークショップで使った進め方をまとめると、次の 5 つです。
 
 1. 最適化の前に、ルーフラインで性能の上限を測る。本ワークショップでは、算術強度 0.5 がリッジ(約 1.3)より小さいことから、コードを書く前に「全探索はメモリ律速で、速くするには算術強度を上げる必要がある」と分かった
 2. 何もしていない状態の数字を最初に測っておく(Stage 0)。以降の変更が効いたかは、この数字との差で判断する
-3. カーネル単体と検索全体を別々に測る。2 つの点がどの上限に近いかを見比べると、どこで時間を使っているかが分かる(Stage 1 では、カーネル単体は 6.3x、全探索は 4.5x だった)
-4. メモリ帯域が上限のときは、SIMD の幅を広げても速くならない。速さはデータが届く速さで決まっている
-5. 速度と精度を両方測る。量子化で速くなっても、精度が落ちていれば使えない。1bit と rerank の組み合わせで、0.82 ms と Recall 0.87 の両方を得た
-6. 並列化にも上限がある。メモリ律速ではマシン全体の帯域で 1.8x、演算律速では物理コア数で頭打ちになった。コアを足す前に、何律速かを測る
-
-## 付録 — 本編の先へ(実装済み・当日は扱わない)
-
-本編で学んだ読み方を、そのまま別の対処と別の検索方式に適用します。すべて実装・実測済みで、コマンド 1 つで再現できます。
-
-### 付録A: MaxSim(late interaction) — 最初から演算律速な検索方式
-
-Stage 2 のバッチは「クエリが B 本まとめて来る」状況を利用しました。MaxSim(ColBERT 系)は、クエリを複数のトークンベクトルで表し、score = Σ(クエリトークンごとに文書トークンとの最大内積)を取る検索方式です。文書ベクトル 1 ロードに対し複数の内積、という Stage 2 と同じ構造が検索方式そのものに内在します。
-
-```go
-// internal/index/maxsim.go — 文書トークン dt はキャッシュ常駐でクエリ Tq 本と内積
-score(q, d) = Σ_{qt∈q} max_{dt∈d} dot(qt, dt)
-```
-
-#### どうなったか
-
-1 万文書 × 4 トークン、クエリ 16 トークンで測ります。
-
-```bash
-$ make bench-maxsim
-BenchmarkSearchMaxSimNaive   239 ms/op    2.06 GFLOP/s   8.0 AI(flop/byte)
-BenchmarkSearchMaxSimSIMD     42 ms/op   11.7  GFLOP/s   8.0 AI(flop/byte)  ← 5.7x
-```
-
-算術強度は Tq/2 = 8 flop/byte で、タスクの仕様として最初からリッジの右にあり、SIMD が最初から 5.7x 効きます。「算術強度を上げる工夫(Stage 2)」が、モダンな検索方式では仕様として組み込まれています。
-
-### 付録B: AVX-512 VPOPCNT — 「効かない SIMD」の確認用
-
-Stage 4 で述べたとおり、量子化後の Hamming 距離を AVX-512 VPOPCNT(`Uint64x4.OnesCount`)で SIMD 化しても速くなりません(キャッシュ律速 + 小ブロック)。`make bench-bonus` で AVX-512 機(AWS c7i 等。`infra/` に Terraform あり)なら再現できます。VPOPCNT の無い CPU ではフォールバック分岐のぶんスカラ版よりむしろ遅くなる(実測 1.0 ms 対 0.77 ms)ことも含めて、「計算で詰まっていない所に SIMD を足しても効かない」の証拠として残してあります。
+3. メモリ帯域が上限のときは、SIMD の幅を広げても速くならない。速さはデータが届く速さで決まっている
+4. 速度と精度を両方測る。量子化で速くなっても、精度が落ちていれば使えない。1bit と rerank の組み合わせで、0.82 ms と Recall 0.87 の両方を得た
+5. 並列化にも上限がある。メモリ律速ではマシン全体の帯域で 1.8x、演算律速では物理コア数で頭打ちになった。コアを足す前に、何律速かを測る
 
 ## 08. 原典・参照
 
@@ -875,28 +845,3 @@ Stage 4 で述べたとおり、量子化後の Hamming 距離を AVX-512 VPOPCN
 - Empirical Roofline Toolkit / NERSC ルーフライン解説. [docs.nersc.gov](https://docs.nersc.gov/tools/performance/roofline/)
 - Intel Advisor(自動ルーフライン作図). [intel.com](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-advisor-roofline.html)
 - Go × 内積 × SIMD の先行事例(archsimd 以前・アセンブリ実装): Sourcegraph, *"From slow to SIMD: A Go optimization story"*. [sourcegraph.com/blog/slow-to-simd](https://sourcegraph.com/blog/slow-to-simd)
-
-## 09. 環境メモ
-
-### Apple Silicon で動かす場合
-
-Go 1.27 から `archsimd` が arm64 の Neon(128bit)に対応したので、手元の Mac でも SIMD パスが走ります。`//go:build arm64` の `dot_arm64.go` と `int8_arm64.go` がそれで、上限を測るベンチも Neon 版があります。ただし本編の数字とは別物です。レジスタ幅は 256 から 128bit に半分になる一方、単コアのメモリ帯域は Codespaces より大きいので、点も倍率も本編とは違う位置に打たれます。M3 Pro の実測は次のとおりです。
-
-| 項目 | M3 Pro(Neon) | Codespaces(AVX2) |
-|---|---|---|
-| メモリ帯域の上限 | 約 34 GB/s | 約 20 GB/s |
-| 全探索 naive から SIMD | 34.6 ms から 4.6 ms(7.5x) | 35.7 ms から 7.9 ms(4.5x) |
-| binary | 0.43 ms | 0.77 ms |
-
-当日は GitHub Codespaces を共有環境にすれば、手元のアーキの違いによらず全員が同じ条件で達成性能と 算術強度を測れます。Mac の数字は自分の値として持ち帰ってください。
-
-### 本編が使う SIMD 命令と CPU
-
-本編で使う SIMD は AVX2 + FMA だけです(Stage 1/2/5 の内積。Stage 3 の int8 カーネルは AVX2 のみ)。過去 10 年の x86(Intel Haswell 2013 以降、AMD 2015 以降)がほぼ全て持つため、Codespaces にどの CPU に割り当てられても本編は再現します。AVX-512 の VPOPCNT は本編では使いません。Stage 4 で見たとおり量子化後は速くならないためです。 Faiss も同じ理由で AVX2 と Neon を主に使い、AVX-512 のカーネルは原則持っていません(ダウンクロックで AVX2 より遅くなることがあり、開発とコンパイルのコストも高いため)。AVX-512 を実機で確かめたい人だけ、`infra/` の AWS c7i(Sapphire Rapids)を使ってください。
-
-> **コラム: なぜ Docker で「amd64」を指定してもダメか**  
-Apple Silicon でも `docker run --platform linux/amd64` を使えば実際の x86 で測れる、と思いがちですが、これは落とし穴です。中身は QEMU エミュレーション(または Rosetta 経由)で、実際の x86 CPU ではありません。具体的には:  
-① CPU の機能問い合わせ(CPUID)を正しく真似ないので archsimd.X86.\*() がすべて false になり、SIMD ガードがスカラ実装にフォールバックして、SIMD パスがそもそも走りません。  
-② QEMU が不安定で、ビルド中に SIGSEGV で落ちることもあります。  
-③ Rosetta 経由にしても翻訳されるのは AVX/AVX2 までで、FMA が使えません(`X86.FMA()=false`。macOS 26 + Go 1.27.1 でも同じ)。本編の内積 SIMD は AVX2 + FMA が要るので、ここで落ちてスカラにフォールバックします。  
-linux/amd64 コンテナは実際の amd64 ではありません。SIMD のベンチは GitHub Codespaces(amd64 ホスト)で測ってください。本編は AVX2+FMA だけなのでこれで全ステージ足ります。詳細は [付録の実行環境の調査](../appendix/environment-survey.md)。
