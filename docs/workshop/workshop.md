@@ -11,7 +11,7 @@ Go 1.27 の標準 SIMD(`simd/archsimd`)を使い、外部ライブラリなし�
 - SIMD がどこで効くか
 - 高速化の各種方法
 
-手元で動かしながら読む場合は、先に [SETUP.md](SETUP.md) の手順で GitHub Codespaces を起動してください。GitHub アカウントとブラウザだけで済みます。手元の PC で動かす手順、Apple Silicon の Mac で動かす場合の注意、困ったときの対処も SETUP.md にあります。環境の話は §03 でもう一度出てきます。
+手元で動かしながら読む場合は、先に [SETUP.md](SETUP.md) の手順で GitHub Codespaces を起動してください。GitHub アカウントとブラウザだけで済みます。
 
 
 ## 01. そもそも SIMD ってなに？
