@@ -45,7 +45,7 @@ bench: bench3
 bench-bonus:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchBinarySIMD$$' -benchtime 2s
 
-## 寄り道: goroutine 並列はどの天井に効くか(workshop.md 寄り道節)。
+## コラム: goroutine 並列はどの上限に効くか(workshop.md §06 のコラム)。
 ## メモリ律速の全探索(B=1)はコアが DRAM 帯域を取り合うのでサブリニア、
 ## 演算律速のバッチ(B=32)はほぼリニアに伸びる。
 bench-parallel:

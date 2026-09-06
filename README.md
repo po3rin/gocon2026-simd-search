@@ -32,7 +32,7 @@ Go 1.27 の実験的 SIMD パッケージ(`GOEXPERIMENT=simd` / `simd/archsimd`)
 | 0 | スカラー全探索(ベースライン) | AI 0.5・どの天井にも未達 | `vec.DotNaive` |
 | 1 | 内積の SIMD 化(`Float32x8` + FMA) | **縦に上る** → メモリ斜線に張り付く | `vec.Dot` |
 | 2 | クエリのバッチ化(B=32・exact) | **横に動く**(AI 16)→ リッジを越えて演算側 | `vec.Dot`(DB ロードを再利用) |
-| 寄り道 | goroutine 並列(workers=1/2/4) | 別の天井(帯域 / 物理コア)に当たる | `Index.SearchParallel` |
+| コラム | goroutine 並列(workers=1/2/4) | 別の上限(マシン全体の帯域 / 物理コア数)に当たる | `Index.SearchParallel` |
 | 3 | int8 量子化(byte 1/4) | **右へ**(AI 2)→ リッジ越え・カーネル律速へ | `vec.QuantizeInt8` + `vec.DotInt8` |
 | 4 | バイナリ量子化 + ハミング距離(byte 1/32) | **右上へ** → DRAM 律速を脱出(Recall 0.18) | `vec.Quantize` + `vec.Hamming` |
 | 5 | binary で粗く絞って float32 で rerank | 精度軸(Recall@10 0.18→0.87) | `Index.SearchBinaryRerank` |
@@ -58,7 +58,7 @@ make test       # 正しさの確認
 make roofline   # 各 Stage の GFLOP/s・AI・MB/query を表示して「図に点を打つ」
 make bench      # 本編フル(スカラ/SIMD/バイナリ/rerank)。AVX2+FMA だけで完結
 make recall     # Recall@10(binary vs rerank vs int8)
-make bench-parallel # 寄り道: goroutine 並列はどの天井に効くか
+make bench-parallel # コラム: goroutine 並列はどの上限に効くか
 make bench-nsweep   # Stage 1 コラム: DB サイズで SIMD 倍率が崩れる境界
 make bench-int8     # Stage 3: int8 量子化(カーネル 10x・Recall 0.948)
 make bench-portable # Stage 1 コラム: ポータブル simd 版(256bit で同じ結果)+ GODEBUG=simd=128 で幅を半分にすると遅くなる
