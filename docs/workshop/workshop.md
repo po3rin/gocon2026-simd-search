@@ -708,7 +708,7 @@ acc0 = acc0.Add(archsimd.LoadInt8x16(a).ExtendToInt16().       // VPMOVSXBW
     DotProductPairs(archsimd.LoadInt8x16(b).ExtendToInt16()))  // VPMADDWD
 ```
 
-int8 同士の積は最大 127 × 127 で、int32 に余裕で収まります。そのため桁あふれの対策なしで書けます。1 命令で 16 要素を処理でき、fp32 の 8 要素の 2 倍です。arm64 の Neon には VPMADDWD にあたる命令が無いので、`int8_arm64.go` では SMULL で掛けて int16 に広げ、SXTL で int32 に広げてから足す、という 3 段で同じ計算をします。
+int8 同士の積は最大 127 × 127 で、int32 に余裕で収まります。そのため桁あふれの対策なしで書けます。1 命令で 16 要素を処理でき、fp32 の 8 要素の 2 倍です。Go 1.27 の archsimd の arm64 API には VPMADDWD にあたるメソッドが無いので、`int8_arm64.go` では SMULL で掛けて int16 に広げ、SXTL で int32 に広げてから足す、という 3 段で同じ計算をします。
 
 ```bash
 $ make bench-int8
