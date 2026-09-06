@@ -39,9 +39,9 @@ bench3:
 
 bench: bench3
 
-## (付録 avx512-popcount.md) AVX-512 VPOPCNT で popcount を SIMD 化。量子化後はキャッシュ律速で速くならない
-## (SearchBinarySIMD ≧ SearchBinary)ことの確認用。本編フロー外。AVX-512 + VPOPCNTDQ のある機械(AWS c7i 等を
-## 各自で用意)以外ではスカラにフォールバックする。
+## (付録 avx512-popcount.md) AVX-512 VPOPCNT で popcount を SIMD 化。Stage 4 で見たとおり量子化後はキャッシュ
+## 律速で速くならない(SearchBinarySIMD ≧ SearchBinary)ことの確認用。本編フロー外。
+## AVX-512 + VPOPCNTDQ のある機械(infra/ の Terraform で立てる AWS c7i 等)以外ではスカラにフォールバックする。
 bench-bonus:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchBinarySIMD$$' -benchtime 2s
 
@@ -148,3 +148,62 @@ isa-report:
 
 isa-report-amd64:
 	GOARCH=amd64 GOEXPERIMENT=simd $(GO) run ./cmd/isa-report/
+
+# ---- リモート実行 (infra/ の AVX-512 VM) ----------------------------------
+# 使い方: cd infra && terraform apply してから make remote-bench
+
+REMOTE_HOST ?= $(shell terraform -chdir=infra output -raw public_ip 2>/dev/null)
+SSH_OPTS    := -o StrictHostKeyChecking=accept-new
+REMOTE      := ubuntu@$(REMOTE_HOST)
+REMOTE_DIR  := simd-search
+REMOTE_RUN  = ssh $(SSH_OPTS) $(REMOTE) 'cd $(REMOTE_DIR) && GOEXPERIMENT=simd go
+
+.PHONY: remote-sync remote-test remote-bench remote-roofline remote-roofline-batch remote-roofline-ceiling remote-roofline-plot remote-recall remote-cpuinfo remote-dotlab remote-dotlab-v3 remote-steps
+
+remote-sync:
+	@test -n "$(REMOTE_HOST)" || (echo "VM がない: cd infra && terraform apply" && exit 1)
+	rsync -az --delete -e "ssh $(SSH_OPTS)" --exclude .git --exclude infra ./ $(REMOTE):$(REMOTE_DIR)/
+
+remote-test: remote-sync
+	$(REMOTE_RUN) test ./...'
+
+## AVX-512 VM で全ステージのベンチを実行(カーネル単体 + 全探索)
+remote-bench: remote-sync
+	$(REMOTE_RUN) test ./internal/... -run - -bench Benchmark -benchtime 2s'
+
+## AVX-512 VM でルーフラインの3点(GFLOP/s・AI・MB/query)を計測
+remote-roofline: remote-sync
+	$(REMOTE_RUN) test ./internal/index -run - -bench "BenchmarkSearch(Naive|SIMD|Binary)$$" -benchtime 2s'
+
+## AVX-512 VM でバッチ化の効き(B=1 vs B=32, scalar vs SIMD)を実測
+remote-roofline-batch: remote-sync
+	$(REMOTE_RUN) test ./internal/index -run - -bench "BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$" -benchtime 2s'
+
+## AVX-512 VM で天井そのもの(演算ピーク + メモリ帯域)を実測
+remote-roofline-ceiling: remote-sync
+	$(REMOTE_RUN) test ./internal/vec -run - -bench "BenchmarkPeak(FLOP_AVX2|ReadBW|TriadBW)$$" -benchtime 2s'
+
+## AVX-512 VM の実測でルーフライン HTML を生成(描画はローカルで)。天井は PEAK/BW で渡す。
+remote-roofline-plot: remote-sync
+	$(REMOTE_RUN) test ./internal/index -run - -bench "BenchmarkSearch(Naive|SIMD|BatchNaive|BatchSIMD)$$" -benchtime 2s' \
+	  | $(GO) run ./cmd/roofline-plot -peak $(PEAK) -bw $(BW) -tpeak $(TPEAK) > /tmp/roofline.html
+	@echo "open /tmp/roofline.html"
+
+remote-recall: remote-sync
+	$(REMOTE_RUN) test ./internal/index -run TestRecall -v'
+
+## Dot 実装のコード生成比較ラボ
+remote-dotlab: remote-sync
+	$(REMOTE_RUN) test ./internal/vec -run TestDotVariants -v -bench "BenchmarkDot" -benchtime 2s'
+
+## docs/appendix/optimization-log.md の「高速化の階段」を Step 順に再現
+remote-steps: remote-sync
+	$(REMOTE_RUN) test ./internal/vec -run TestStepsMatchNaive -v -bench BenchmarkStep -benchtime 2s'
+
+## 同上 + GOAMD64=v3(スカラーもVEXエンコードにしてSSE/AVX混在を消す実験)
+remote-dotlab-v3: remote-sync
+	ssh $(SSH_OPTS) $(REMOTE) 'cd $(REMOTE_DIR) && GOEXPERIMENT=simd GOAMD64=v3 go test ./internal/vec -run TestDotVariants -bench "BenchmarkDot" -benchtime 2s'
+
+## VM の CPU で AVX2 / AVX-512 が引けているか確認
+remote-cpuinfo: remote-sync
+	$(REMOTE_RUN) test ./internal/vec -run TestDotMatchesNaive -v' | grep -E 'HasSIMD|ok'

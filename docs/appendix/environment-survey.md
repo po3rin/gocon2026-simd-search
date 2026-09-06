@@ -17,7 +17,7 @@
 | **Docker `linux/amd64`** (Apple Silicon 上) | ❌ ビルドクラッシュ / CPUID 全 false | △ バイナリ実行のみ | ❌ | ❌ | ❌ 使わない |
 | **amd64 実機** (Codespaces / AWS c7i) | ✅ | ✅ | ✅ | ✅ | ✅ `make remote-bench` |
 
-**推奨**: 本編(Stage 0/1/2 + rerank)で使う SIMD は **AVX2 + FMA だけ**なので、参加者・記事の数字は **GitHub Codespaces 一本**で全ステージ取れる(当たる CPU の Intel/AMD・世代を問わず再現)。AVX-512 VPOPCNT は本編フロー外の**付録**で、AVX-512 のある機械(AWS c7i など)を用意した場合だけ実機確認する。Apple Silicon の手元では **arm64 で `make test`**（正しさ）、**Rosetta で Stage 2 まで動作確認**が現実的。
+**推奨**: 本編(Stage 0/1/2 + rerank)で使う SIMD は **AVX2 + FMA だけ**なので、参加者・記事の数字は **GitHub Codespaces 一本**で全ステージ取れる(当たる CPU の Intel/AMD・世代を問わず再現)。AVX-512 VPOPCNT は本編フロー外の**付録**で、AVX-512 のある機械(`infra/` の Terraform で立てる AWS c7i など)を用意した場合だけ実機確認する。Apple Silicon の手元では **arm64 で `make test`**（正しさ）、**Rosetta で Stage 2 まで動作確認**が現実的。
 
 ## 調査方法
 
