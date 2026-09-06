@@ -18,16 +18,15 @@ bench1:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD)$$' -benchtime 2s
 
-## Stage 1 コラム: ポータブル simd パッケージ(Go 1.27 の simd.Float32s)。
-## archsimd 版と同じ内積をベクトル長非依存で書いたもの(vec.DotPortable)。
-## 3行目は GODEBUG=simd=128 でレジスタ幅を半分(AVX2 機なら 256→128bit)にして同じ全探索を測る。
-## 256bit は archsimd 版と同じ点(壁)、128bit はカーネルが 1 ベクトルのメモリ時間からはみ出して
-## 壁の下に落ちる = 「幅は広げても壁の上に行けず、狭めると下に落ちる」(workshop.md Stage 1 コラム)。
-## arm64(Neon)は元から 128bit なので 2行目と 3行目は同じ数字になる。
+## Stage 1 コラム: ポータブル simd パッケージ(Go 1.27 の simd.Float32s)で書いた同じ内積(vec.DotPortable)。
+## 3、4 行目は GODEBUG=simd=128 でレジスタ幅を半分(AVX2 機なら 256bit から 128bit)にして同じ全探索とカーネルを測る。
+## 256bit は archsimd 版と同じ点(メモリ帯域の上限)に乗り、128bit はカーネルが遅くなって上限の下に落ちる
+## (workshop.md Stage 1 コラム)。arm64(Neon)は元から 128bit なので 2 行目と 3 行目は同じ数字になる。
 bench-portable:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD|Portable)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|Portable)$$' -benchtime 2s
 	GODEBUG=simd=128 $(GO) test ./internal/index -run - -bench 'BenchmarkSearchPortable$$' -benchtime 2s
+	GODEBUG=simd=128 $(GO) test ./internal/vec -run - -bench 'BenchmarkDotPortable$$' -benchtime 2s
 
 ## Stage 4: バイナリ量子化(1bit・1/32)
 bench2:
@@ -51,7 +50,7 @@ bench-bonus:
 bench-parallel:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Parallel|BatchParallel)$$' -benchtime 2s
 
-## N スイープ(workshop.md Stage 1 コラム): DB サイズを 1k→1M と振り、
+## N スイープ(workshop.md Stage 1 コラム): DB サイズを 1k から 1M まで振り、
 ## キャッシュに収まる間は SIMD が効き、DRAM に溢れると倍率が崩れるのを見る。
 ## 1M の index 構築(数秒)が初回に走る。
 bench-nsweep:
@@ -63,17 +62,17 @@ bench-int8:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDotInt8(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchInt8$$' -benchtime 2s
 
-## Stage 3 の精度: int8 単体の Recall@10(本編の進行用 — binary/rerank の行は Stage 4/5 で見る)
+## Stage 3 の精度: int8 単体の Recall@10(binary と rerank の行は Stage 4/5 で見る)
 recall-int8:
 	$(GO) test ./internal/index -run 'TestRecallInt8$$' -v
 
-## 付録 README.md 2 節: MaxSim(late interaction)。1ロードに多数の内積がタスクに内在
-## = 最初から演算律速で、SIMD が最初から効く検索方式。
+## 付録 README.md 2 節: MaxSim(late interaction)。1 回のロードに多数の内積が最初から含まれるので、
+## 最初から演算律速で SIMD が効く検索方式。
 bench-maxsim:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s
 
 ## ルーフライン: 各 Stage の GFLOP/s・AI・MB/query を表示して図に「点を打つ」
-## (Stage 0 naive → 1 SIMD → 4 binary の3点。docs/workshop/workshop.md 参照)
+## (Stage 0 naive、Stage 1 SIMD、Stage 4 binary の 3 点。docs/workshop/workshop.md 参照)
 roofline:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
@@ -84,7 +83,7 @@ roofline-batch:
 
 ## ルーフラインの天井そのものを実測: 演算ピーク(FMA飽和) + メモリ帯域(read/triad)
 ## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §05)
-## amd64 は FLOP_AVX2、arm64(Apple Silicon)は FLOP_NEON が走る(ReadBW/TriadBW は arm64 ではスカラ版)。
+## amd64 は FLOP_AVX2、arm64(Apple Silicon)は FLOP_NEON が走る(ReadBW/TriadBW も arm64 は Neon 版)。
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|FLOP_NEON|ReadBW|TriadBW)$$' -benchtime 2s
 
@@ -110,10 +109,10 @@ roofline-figures:
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
 ## 実測値から対話的ルーフライン HTML を生成(docs/workshop §06)。叩くたびに点が打たれ、
-## Stage 1(AI=0.5)はメモリ壁に張り付き、Stage 2 バッチ(AI=16)はリッジを越えて演算側へ動く。
+## Stage 1(AI=0.5)はメモリ帯域の上限に張り付き、Stage 2 バッチ(AI=16)はリッジを越えて演算側へ動く。
 ## 自分のマシンの天井で: make roofline-plot PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
 ## 理論ピークの線も出すなら TPEAK=100(AVX2 理論値・CPU 依存なので既定は off)。
-## ※ amd64 (Codespaces/AWS) で実行して初めて意味のある数字になる。arm64 はスカラ退避で潰れる。
+## ※ 本編の数字は amd64(Codespaces)のもの。arm64(Neon)でも動くが別の数字になる。
 TPEAK ?= 0
 roofline-plot:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s \
@@ -122,7 +121,7 @@ roofline-plot:
 
 ## register spill を見る(docs/workshop §05)。演算ピーク(12本アキュムレータ)ループ
 ## BenchmarkPeakFLOP_AVX2 の機械語をコンパイラ -S で出し、各アキュムレータ aN が毎回
-## 「ロード(SP)→VFMADD→ストア(SP)」とスタックへ退避(spill)している様子を表示する。
+## 「ロード(SP)、VFMADD、ストア(SP)」とスタックへ退避(spill)している様子を表示する。
 ## 12本+m+c=14 は使える 15本の Y レジスタ(Y15 は Go ABI の予約ゼロレジスタ:
 ## golang/go#76969)に収まる数なので、本数圧ではなく Go のコード生成の問題(1.26 / 1.27 とも退避する)。
 ## amd64 用にクロスコンパイルするので mac でも可(objdump と違い -S は VFMADD を正名で出す)。

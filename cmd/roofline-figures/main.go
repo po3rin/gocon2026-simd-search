@@ -58,7 +58,7 @@ func main() {
 	flag.Parse()
 
 	ridge := *peak / *bw
-	figs := figures(*peak, ridge)
+	figs := figures(*peak, *bw, ridge)
 	for _, f := range figs {
 		svg := render(f, *peak, *bw, *tpeak)
 		path := filepath.Join(*out, f.file+".svg")
@@ -73,7 +73,7 @@ func main() {
 // figures lists the figures and the measured points that appear in each.
 // The kernel-only point has no meaningful AI (data lives in L1); it is placed
 // at AI=16 as an indication, like the Stage 4/5 points whose flop is undefined.
-func figures(peak, ridge float64) []fig {
+func figures(peak, bw, ridge float64) []fig {
 	s0 := pt{name: "Stage 0 スカラ全探索", ai: 0.5, gf: 2.15}
 	s1 := pt{name: "Stage 1 SIMD 全探索", ai: 0.5, gf: 9.7}
 	k1 := pt{name: "カーネル単体(L1 常駐)", ai: 16, gf: 13.9, note: "13.9 GF・算術強度 は目安", vague: true}
@@ -114,7 +114,7 @@ func figures(peak, ridge float64) []fig {
 			points:   []pt{s5}},
 		{file: "roofline-plot",
 			title:    "実測ルーフライン全体像(Codespaces / AMD EPYC 7763)",
-			subtitle: "演算ピーク " + ftoa(peak) + " GFLOP/s、メモリ帯域 20.8 GB/s、リッジ " + strconv.FormatFloat(ridge, 'f', 2, 64) + " flop/byte",
+			subtitle: "演算ピーク " + ftoa(peak) + " GFLOP/s、メモリ帯域 " + ftoa(bw) + " GB/s、リッジ " + strconv.FormatFloat(ridge, 'f', 2, 64) + " flop/byte",
 			points:   []pt{s0, s1, {name: "カーネル単体(L1)", ai: 32, gf: 13.9, note: "算術強度 は目安", vague: true, side: "below"}, s2, s3, s4},
 			notes: []string{
 				"Stage 0 から 1: 縦に上がりメモリ帯域の上限で止まる(算術強度 0.5 はリッジの左)",

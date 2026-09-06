@@ -6,7 +6,7 @@
 //
 // Inputs are the machine's measured ceilings (from `make roofline-ceiling`):
 //
-//	go run ./cmd/roofline-decompose -peak 25.51 -bw 18.39 > out.svg
+//	go run ./cmd/roofline-decompose -peak 25.59 -bw 20.80 > out.svg
 //
 // Or: make roofline-decompose  (regenerates docs/images/memory-vs-compute-roofline.svg)
 //
@@ -35,8 +35,8 @@ type stage struct {
 }
 
 func main() {
-	peak := flag.Float64("peak", 25.51, "compute ceiling in GFLOP/s (from make roofline-ceiling)")
-	bw := flag.Float64("bw", 18.39, "memory read bandwidth in GB/s (from make roofline-ceiling)")
+	peak := flag.Float64("peak", 25.59, "compute ceiling in GFLOP/s (from make roofline-ceiling)")
+	bw := flag.Float64("bw", 20.80, "memory read bandwidth in GB/s (from make roofline-ceiling)")
 	flag.Parse()
 
 	stages := []stage{

@@ -7,7 +7,7 @@ import (
 	"github.com/po3rin/gocon2026-simd-search/internal/vec"
 )
 
-// MultiIndex は文書を「トークンベクトルの集合」で持つ(付録A: late interaction)。
+// MultiIndex は文書を「トークンベクトルの集合」で持つ(付録 2 節: late interaction)。
 // ColBERT 系の検索方式で、スコアは MaxSim:
 //
 //	score(q, d) = Σ_{qt∈q} max_{dt∈d} dot(qt, dt)

@@ -23,7 +23,6 @@ type api struct {
 
 var apis = []api{
 	{"Stage 0", "vec.DotNaive (scalar loop)", "FMUL/FADD (scalar)"},
-	{"Stage 0", "vec.Hamming → bits.OnesCount64", "CNT + ADDV (Go intrinsic)"},
 	{"Stage 1", "LoadFloat32x4", "LDR Q / VLD1"},
 	{"Stage 1", "Float32x4.MulAdd", "FMLA"},
 	{"Stage 1", "Float32x4.Store", "STR Q / VST1"},
@@ -32,7 +31,7 @@ var apis = []api{
 	{"Stage 3", "Int8x16.HiToLo", "EXT"},
 	{"Stage 3", "Int16x8.ExtendLo4ToInt32", "SXTL"},
 	{"Stage 3", "Int32x4.ReduceSum", "ADDV"},
-	{"Stage 4", "vec.Hamming (same as Stage 0)", "CNT + ADDV"},
+	{"Stage 4", "vec.Hamming → bits.OnesCount64", "CNT + ADDV (Go intrinsic)"},
 	{"Stage 5", "vec.Dot in SearchBinaryRerank", "(Stage 1 APIs)"},
 }
 
@@ -41,7 +40,7 @@ func run() {
 	fmt.Printf("(see %s)\n\n", docURL)
 	fmt.Printf("  %-20s ✓ true   (Neon 128bit は ARMv8-A 必須。機能チェック不要)\n", "NEON")
 	fmt.Printf("  %-20s   %v  (repo guard: dot_arm64.go / int8_arm64.go)\n", "HasSIMD", true)
-	fmt.Printf("  %-20s   %v  (AVX-512 専用の付録B。arm64 ではスカラ Hamming)\n", "HasVPOPCNT", false)
+	fmt.Printf("  %-20s   %v  (AVX-512 専用。付録 3 節。arm64 ではスカラ Hamming)\n", "HasVPOPCNT", false)
 
 	fmt.Printf("\n=== portable simd package (Go 1.27) ===\n")
 	fmt.Printf("  %-20s   %d bit  (simd.Float32s = %d lanes)\n", "VectorBitSize", simd.VectorBitSize(), simd.Float32s{}.Len())

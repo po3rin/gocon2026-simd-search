@@ -37,7 +37,6 @@ type api struct {
 var apis = []api{
 	// Stage 0 — scalar, no archsimd
 	{"Stage 0", "vec.DotNaive (scalar loop)", "ADDSS/MULSS", "(scalar SSE, not archsimd)", func() bool { return true }},
-	{"Stage 0", "vec.Hamming → bits.OnesCount64", "POPCNT", "(scalar POPCNT, not archsimd)", func() bool { return true }},
 
 	// Stage 1 — Float32x8 dot
 	{"Stage 1", "LoadFloat32x8", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
@@ -50,13 +49,13 @@ var apis = []api{
 	{"Stage 3", "Int16x16.DotProductPairs", "VPMADDWD", "AVX2", archsimd.X86.AVX2},
 
 	// Stage 4 — binary search (scalar path in production)
-	{"Stage 4", "vec.Hamming (same as Stage 0)", "POPCNT", "(scalar)", func() bool { return true }},
+	{"Stage 4", "vec.Hamming → bits.OnesCount64", "POPCNT", "(scalar POPCNT, not archsimd)", func() bool { return true }},
 
-	// 付録B — Uint64x4 Hamming SIMD
-	{"付録B", "LoadUint64x4", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
-	{"付録B", "Uint64x4.Xor", "VPXOR", "AVX2", archsimd.X86.AVX2},
-	{"付録B", "Uint64x4.OnesCount", "VPOPCNTQ", "AVX512VPOPCNTDQ", archsimd.X86.AVX512VPOPCNTDQ},
-	{"付録B", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
+	// 付録 3 節 — Uint64x4 Hamming SIMD
+	{"付録 3 節", "LoadUint64x4", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
+	{"付録 3 節", "Uint64x4.Xor", "VPXOR", "AVX2", archsimd.X86.AVX2},
+	{"付録 3 節", "Uint64x4.OnesCount", "VPOPCNTQ", "AVX512VPOPCNTDQ", archsimd.X86.AVX512VPOPCNTDQ},
+	{"付録 3 節", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
 
 	// Stage 5 — rerank calls vec.Dot (Stage 1 guard)
 	{"Stage 5", "vec.Dot in SearchBinaryRerank", "(Stage 1 APIs)", "AVX2+FMA", func() bool {
@@ -146,7 +145,7 @@ func stageSummaries(hasSIMD, hasVPOPCNT bool) []stageSummary {
 		{"Stage 3: int8 quantization", "archsimd.X86.AVX2()", dot8},
 		{"Stage 4: binary quantization", "scalar Hamming (POPCNT)", "yes"},
 		{"Stage 5: binary + rerank", "Hamming + Dot guard", rerank},
-		{"付録B: AVX-512 Hamming", "AVX512() && AVX512VPOPCNTDQ()", bonus},
+		{"付録 3 節: AVX-512 Hamming", "AVX512() && AVX512VPOPCNTDQ()", bonus},
 	}
 }
 
@@ -155,7 +154,7 @@ func sortedKeys(m map[string][]api) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	order := map[string]int{"Stage 0": 0, "Stage 1": 1, "Stage 3": 2, "Stage 4": 3, "Stage 5": 4, "付録B": 5}
+	order := map[string]int{"Stage 0": 0, "Stage 1": 1, "Stage 3": 2, "Stage 4": 3, "Stage 5": 4, "付録 3 節": 5}
 	sort.Slice(keys, func(i, j int) bool {
 		oi, oj := order[keys[i]], order[keys[j]]
 		if oi != oj {

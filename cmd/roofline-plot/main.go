@@ -12,7 +12,7 @@
 //
 //	go test ./internal/index -run - \
 //	  -bench 'BenchmarkSearch(Naive|SIMD|BatchNaive|BatchSIMD)$' -benchtime 2s \
-//	  | go run ./cmd/roofline-plot -peak 25.51 -bw 18.39 > roofline.html
+//	  | go run ./cmd/roofline-plot -peak 25.59 -bw 20.80 > roofline.html
 //
 // Ceilings default to the EPYC 7763 example; pass your own from
 // `make roofline-ceiling`. Zero dependencies — same hand-built-SVG style as
@@ -84,8 +84,8 @@ func parseBench(r *bufio.Scanner) []point {
 }
 
 func main() {
-	peak := flag.Float64("peak", 25.51, "compute ceiling in GFLOP/s (from make roofline-ceiling)")
-	bw := flag.Float64("bw", 18.39, "memory read bandwidth in GB/s (from make roofline-ceiling)")
+	peak := flag.Float64("peak", 25.59, "compute ceiling in GFLOP/s (from make roofline-ceiling)")
+	bw := flag.Float64("bw", 20.80, "memory read bandwidth in GB/s (from make roofline-ceiling)")
 	tpeak := flag.Float64("tpeak", 0, "optional theoretical compute peak (e.g. AVX2 ~100); 0 = hide")
 	flag.Parse()
 

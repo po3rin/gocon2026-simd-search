@@ -88,6 +88,6 @@
 <rect x="40" y="420" width="880" height="96" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
 <text x="60" y="446" font-size="12.5" font-weight="600">Stage 2 のバッチ化と同じ構造が、検索方式そのものに入っている</text>
 <text x="60" y="468" font-size="11.5" fill="#374151">文書側のトークンを 1 回運ぶたびに 16 本のクエリトークンと内積を取るので、1 byte 運ぶごとの計算回数(算術強度)は 16 / 2 = 8 flop/byte。</text>
-<text x="60" y="488" font-size="11.5" fill="#374151">Stage 0 の全探索(0.5 flop/byte)と違い、何もしなくてもリッジ(約 1.3)の右にある。つまり最初から演算律速で、SIMD がそのまま効く(実測 5.7x)。</text>
+<text x="60" y="488" font-size="11.5" fill="#374151">Stage 0 の全探索(0.5 flop/byte)と違い、何もしなくてもリッジ(約 1.2)の右にある。つまり最初から演算律速で、SIMD がそのまま効く(実測 5.7x)。</text>
 <text x="60" y="508" font-size="11" fill="#6b7280">数値は説明用の例。実装は internal/index/maxsim.go、計測は make bench-maxsim</text>
 </svg>

@@ -4,7 +4,7 @@
 
 | 節 | 内容 | こんなときに |
 |---|---|---|
-| [1. Go の SIMD の 2 つの隠れた性能上限](#1-go-の-simd-の-2-つの隠れた性能上限) | VZEROUPPER の遷移ペナルティと register spill | 「演算ピークが理論値の 1/3 なのはなぜか」を知りたい |
+| [1. Go の SIMD の 2 つの隠れた性能上限](#1-go-の-simd-の-2-つの隠れた性能上限) | VZEROUPPER の遷移ペナルティと register spill | 「演算ピークが理論値の 1/3〜1/4 で止まるのはなぜか」を知りたい |
 | [2. MaxSim](#2-maxsim) | 最初から演算律速な検索方式(late interaction)での SIMD の効き | Stage 2 の考え方を別の検索方式で見たい |
 | [3. AVX-512 の SIMD popcount](#3-avx-512-の-simd-popcount) | AVX-512 の SIMD popcount を試して速くならなかった実測 | Stage 4 の「SIMD 版 popcount は効かない」の根拠を見たい |
 | [4. 実行環境の調査](#4-実行環境の調査) | Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くか | 手元の Mac や Docker で数字が出ない理由を知りたい |
@@ -13,7 +13,7 @@
 
 ## 1. Go の SIMD の 2 つの隠れた性能上限
 
-VZEROUPPER の遷移ペナルティと register spill の話です。本編の Stage 0〜4 とは独立した読み物で、Go 1.26 / 1.27 の archsimd が出す機械語の現状に踏み込みたい人向けです。どちらもハードの限界ではなく、Go のコード生成がまだ発展途上であることが原因です。
+VZEROUPPER の遷移ペナルティと register spill の話です。本編の Stage 0〜5 とは独立した読み物で、Go 1.26 / 1.27 の archsimd が出す機械語の現状に踏み込みたい人向けです。どちらもハードの限界ではなく、Go のコード生成がまだ発展途上であることが原因です。
 
 この調査は AWS c7i(Intel Xeon 8488C / Sapphire Rapids)で行いました。本編の Codespaces(AMD EPYC 7763)とは CPU のメーカーが違うので、2 つの現象の出方も違います。
 
@@ -48,9 +48,9 @@ VZEROUPPER の遷移ペナルティと register spill の話です。本編の S
 
 **どこまで確かか:** 「VZEROUPPER 1 命令で同一コードが 7 倍速くなった」は実測で確認済みです。ただし効果の大きさはメーカーと世代に依存し、ここの値は Sapphire Rapids のものです。また 550 サイクルの固定費を命令単位まで分解したわけではありません。次元数を変えて固定費を分離し、VZEROUPPER を入れて 7 倍を確認した、という状況証拠による特定です。
 
-### 隠れた上限②: なぜ FMA は AVX2 ピークの約 1/3 か(register spill)
+### 隠れた上限②: なぜ FMA は理論ピークの 1/3〜1/4 で止まるか(register spill)
 
-演算ピークを測るベンチ(`make roofline-ceiling`)では、独立なアキュムレータを 12 本持って FMA を回し続けます。理論上はメモリに触らず FMA だけが並ぶはずですが、実測は理論値の 1/3 前後で止まります。
+演算ピークを測るベンチ(`make roofline-ceiling`)では、独立なアキュムレータを 12 本持って FMA を回し続けます。理論上はメモリに触らず FMA だけが並ぶはずですが、実測は理論値の 1/3〜1/4 で止まります。
 
 | | c7i(Sapphire Rapids) | Codespaces(EPYC 7763) | M3 Pro(Neon) |
 |---|---|---|---|
@@ -64,7 +64,7 @@ VZEROUPPER の遷移ペナルティと register spill の話です。本編の S
 
 ![register spill: 理想(レジスタ常駐)vs 実際(スタック往復)](../images/register-spill.png)
 
-**Go 側の事情:** これはハードの限界ではなく、Go の archsimd のレジスタ割り当てが発展途上であることによるものです(VZEROUPPER を自動挿入しないのと共通の課題)。既知 issue [golang/go#76969](https://github.com/golang/go/issues/76969)(closed / not planned)と同件です。[#78753](https://github.com/golang/go/issues/78753)(AVX-512 の上位 16 本の ZMM が割り当てられない件)は Go 1.27 で閉じましたが、この 12 本 AVX2 ループの spill は Go 1.27.1 でも残っています(`make spill GO=go1.27.1` で 48 行の `VMOVDQU …(SP)` が出ます)。arm64(Neon)でも同じで、M3 Pro の 12 本 FMLA ループは `FMOVQ …(SP)` に挟まれます。将来このピークは上がる見込みですが、1.27 ではまだです。
+**Go 側の事情:** これはハードの限界ではなく、Go の archsimd のレジスタ割り当てが発展途上であることによるものです(VZEROUPPER を自動挿入しないのと共通の課題)。既知 issue [golang/go#76969](https://github.com/golang/go/issues/76969)(closed / not planned)と同件です。[#78753](https://github.com/golang/go/issues/78753)(AVX-512 の上位 16 本の ZMM が割り当てられない件)は Go 1.27 で閉じましたが、この 12 本 AVX2 ループの spill は Go 1.27.1 でも残っています(`make spill GO=go1.27.1` で `VMOVDQU …(SP)` が 40 行余り出ます)。arm64(Neon)でも同じで、M3 Pro の 12 本 FMLA ループは `FMOVQ …(SP)` に挟まれます。将来このピークは上がる見込みですが、1.27 ではまだです。
 
 **どこまで確かか:** 確認できたのは「spill が存在する」こと(objdump で 4 本、12 本とも FMA に load と store が付く)と、メモリポート律速の見積り(約 0.6 FMA/cycle)が実測 0.65 とほぼ一致することまでです。「spill さえ消せば理論ピークに届く」は未検証です。Go 1.26 / 1.27 の archsimd は常に spill し、Go コードでは消せないため、VZEROUPPER のような「1 命令足したら 7 倍」の決定的な介入実験ができていません。本節は状況証拠による推定です。
 
@@ -95,7 +95,7 @@ MaxSim(late interaction)は、最初から演算律速な検索方式です。�
 
 ![MaxSim の採点の流れ](../images/maxsim.png)
 
-文書側のトークンを 1 回運ぶたびにクエリトークン全部と内積を取るので、Stage 2 と同じ構造が検索方式そのものに含まれています。クエリのトークン数を Tq とすると算術強度は Tq/2 で、Tq = 16 なら 8 flop/byte です。何もしなくても最初からリッジ(約 1.3)の右にあります。
+文書側のトークンを 1 回運ぶたびにクエリトークン全部と内積を取るので、Stage 2 と同じ構造が検索方式そのものに含まれています。クエリのトークン数を Tq とすると算術強度は Tq/2 で、Tq = 16 なら 8 flop/byte です。何もしなくても最初からリッジ(約 1.2)の右にあります。
 
 1 万文書 × 4 トークン、クエリ 16 トークンで測った結果です。
 
@@ -134,7 +134,7 @@ Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くかを調
 
 ### 結論
 
-| 環境 | 正しさのテスト | Stage 0/2(スカラ) | Stage 1 SIMD 内積 | 付録 AVX-512 | 本編ベンチ再現 |
+| 環境 | 正しさのテスト | スカラ実装(Stage 0/4) | Stage 1 SIMD 内積 | 付録 AVX-512 | 本編ベンチ再現 |
 |---|---|---|---|---|---|
 | arm64 ネイティブ(Apple M3 Pro) | ✅ `make test` | ✅ | ✅ Neon 128bit(Go 1.27 から。1.26 はスカラに落ちる) | ❌ | △ 動くが本編(AVX2)とは別の点 |
 | Rosetta(`GOARCH=amd64`) | ✅ | ✅ | ❌ FMA=false でスカラに落ちる | ❌ AVX-512 非対応 | △ 量子化は再現、SIMD 内積は不可 |
@@ -195,11 +195,11 @@ Stage ごとに見ると次のとおりです。
 
 | Stage | API | 要求 feature | Rosetta |
 |---|---|---|---|
-| 0 | `bits.OnesCount64` | スカラ POPCNT | ✅ |
+| 0 | `DotNaive` | なし(スカラ) | ✅ |
 | 1 | `LoadFloat32x8` | AVX2 | ✅ |
 | 1 | `Float32x8.MulAdd` | FMA | ❌ |
 | 1 | `archsimd.ClearAVXUpperBits` | AVX | ✅(到達前にガードで落ちる) |
-| 4 | `Hamming` | スカラ POPCNT | ✅ |
+| 4 | `Hamming`(`bits.OnesCount64`) | スカラ POPCNT | ✅ |
 | 5 | `SearchBinaryRerank` | binary は動く。rerank の Dot は Naive | △ |
 | 付録 | `Uint64x4.OnesCount` | AVX512VPOPCNTDQ | ❌ |
 
