@@ -40,8 +40,10 @@ Go 1.27 では `GOEXPERIMENT=simd` を付けてビルドすると `simd/archsimd
 ```go
 va := archsimd.LoadFloat32x8(a)        // float32 を8個ロード
 vb := archsimd.LoadFloat32x8(b)
-acc = va.MulAdd(vb, acc)               // acc += va*vb(FMA: 掛けて足すまでを1命令でやる積和命令)
+acc = va.MulAdd(vb, acc)               // acc += va*vb を 8 レーン同時に(FMA 命令)
 ```
+
+`MulAdd` が使う **FMA**(Fused Multiply-Add)は、「掛けて、その結果を足す」を 1 命令で行う CPU 命令です。内積の `sum += a[i] * b[i]` はまさに「掛けて足す」なので、FMA 1 命令で 1 要素ぶん(SIMD なら 8 要素ぶん)が終わります。掛け算と足し算を別々の 2 命令で行うより命令数が半分で済み、途中結果の丸めも 1 回になります。x86 では AVX2 とは別の機能フラグ(FMA)として提供され、Arm の Neon には最初から入っています。
 
 注意点として、`archsimd` はアーキテクチャ固有の API です。型も命令も CPU ごとに違います。ここで出てくる名前を整理しておきます。amd64 は Intel と AMD の 64bit CPU(x86)のことで、その SIMD 命令セットが AVX2(256bit)と AVX-512(512bit)です。arm64 は Arm 系の 64bit CPU(Apple Silicon、AWS Graviton など)のことで、その SIMD 命令セットが Neon(128bit)です。Neon は arm64 の必須機能なので、どの arm64 CPU でも使えます。WebAssembly はブラウザなどで動く実行形式で、128bit の SIMD を持ちます。Go 1.27 の `archsimd` はこの 3 つに対応しています。
 
@@ -419,11 +421,11 @@ BenchmarkSearchNaive   35.7 ms/op   2.15 GFLOP/s   0.5 AI(flop/byte)   153.6 MB/
 
 ### Stage 1 — AVX2 で SIMD化
 
-Stage 0 の点はどちらの上限からも遠く、打つ手は「コードの並列度を上げる」でした(§04 の表の 1 番目)。SIMD 化では 2 つの工夫を一度にやりがちなので、混乱しないよう 1a「8 個まとめて読む」、1b「待ち時間を隠す」の順に分けて理解します。
+それでは SIMD による高速化を試していきます。まずは SIMD 化を 1a「まとめて読む」、1b「待ち時間を隠す」の順に分けて理解します。
 
-#### Stage 1a — まず「8個まとめて読む」(Float32x8)
+#### Stage 1a — まとめて読む (Float32x8)
 
-最初の一歩は、1 個ずつの内積を 8 個まとめてに置き換えるだけです。`Float32x8` でスライスから 8 要素をベクトルレジスタにロードし、`MulAdd`(FMA。掛けて足す)でアキュムレータに足し込みます。「1 命令で 8 個」を体験するための最小形です:
+最初の一歩は、1 個ずつの内積を 8 個まとめて処理する形に置き換えるだけです。`Float32x8` でスライスから 8 要素をベクトルレジスタにロードし、`MulAdd`(FMA。掛けて足す)でアキュムレータに足し込みます。「1 命令で 8 個」を体験するための最小形です:
 
 ```go
 // まず最小形:アキュムレータ1本で「8個まとめて」
