@@ -4,12 +4,14 @@
 
 Go 1.27 の標準 SIMD(`simd/archsimd`)を使い、外部ライブラリなしの Pure Go でベクトル検索を高速化する教材です。題材は内積によるベクトル検索です。ただ速くするのではなく、ルーフラインモデルで「いま何が性能の上限になっているか」を測ってから対処を選んでいきます。
 
-学べることは次の 5 つです。
+学べることは次の 4 つです。
 
-- Go の標準 SIMD　の書き方
+- Go の標準 SIMD の書き方
 - ルーフラインモデルの使い方
 - SIMD がどこで効くか
 - 高速化の各種方法
+
+手元で動かしながら読む場合は、先に [SETUP.md](SETUP.md) の手順で GitHub Codespaces を起動してください。GitHub アカウントとブラウザだけで済みます。手元の PC で動かす手順、Apple Silicon の Mac で動かす場合の注意、困ったときの対処も SETUP.md にあります。環境の話は §03 でもう一度出てきます。
 
 
 ## 01. そもそも SIMD ってなに？
@@ -47,7 +49,7 @@ acc = va.MulAdd(vb, acc)               // acc += va*vb を 8 レーン同時に(
 
 `archsimd` はアーキテクチャ固有の API です。型も命令も CPU ごとに違います。名前の対応は次のとおりです。amd64 は Intel と AMD の 64bit CPU(x86)のことで、その SIMD 命令セットが AVX2(256bit)と AVX-512(512bit)です。arm64 は Arm 系の 64bit CPU(Apple Silicon、AWS Graviton など)のことで、その SIMD 命令セットが Neon(128bit)です。Neon は arm64 の必須機能なので、どの arm64 CPU でも使えます。WebAssembly はブラウザなどで動く実行形式で、128bit の SIMD を持ちます。Go 1.27 の `archsimd` はこの 3 つに対応しています。
 
-本編のコードと数字は amd64 の Codespaces で取ったものです。Apple Silicon の Mac でも Go 1.27 からは Neon 版の `internal/vec/dot_arm64.go` が走りますが、環境が違うため、出てくる数字は本編とは別物になります([SETUP.md](SETUP.md) の「Apple Silicon で動かす場合」)。同じ内積をアーキに依存せず書けるポータブルな `simd` パッケージも 1.27 で入りました。Stage 1 のコラムで使います。
+本編のコードと数字は amd64 の Codespaces で取ったものです。Apple Silicon の Mac でも Go 1.27 からは Neon 版の `internal/vec/dot_arm64.go` が走りますが、環境が違うため、出てくる数字は本編とは別物になります([setup.md](setup.md) の「Apple Silicon で動かす場合」)。同じ内積をアーキに依存せず書けるポータブルな `simd` パッケージも 1.27 で入りました。Stage 1 のコラムで使います。
 
 ### archsimd の API
 
@@ -122,7 +124,7 @@ SIMD とベクトル検索の概要が分かったところで、一度動かし
 
 本編の環境は amd64(Intel/AMD)です。一番楽なのは GitHub Codespacesでのセットアップです。Go 1.27 からは Apple Silicon 上でも Neon 版の SIMD が走りますが、幅も帯域も違う別の結果になります。必要なものは Go 1.27 と make だけです。
 
-**① Codespaces(推奨)** リポジトリの `Code → Codespaces → Create`。`.devcontainer/` に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。マシンサイズの選び方、費用、困ったときのフォールバックは [SETUP.md](SETUP.md) にまとめてあります。
+**① Codespaces(推奨)** リポジトリの `Code → Codespaces → Create`。`.devcontainer/` に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま下の「動かす」に進めます。マシンサイズの選び方、費用、困ったときのフォールバックは [setup.md](setup.md) にまとめてあります。
 
 **② ローカル(amd64 Linux / Windows)**
 
@@ -133,7 +135,7 @@ go install golang.org/dl/go1.27.1@latest && go1.27.1 download   # Go 1.27 を入
 make GO=$(go env GOPATH)/bin/go1.27.1 test                      # GOEXPERIMENT=simd は Makefile が付与
 ```
 
-**③ ローカル(Apple Silicon の Mac)** コマンドは②と同じです。Go 1.27 から `archsimd` が arm64 に対応したので、`make bench1` を実行すると Neon(128bit)版の SIMD が走ります。本編の数字(AVX2・256bit)とは別物なので、[SETUP.md](SETUP.md) の「Apple Silicon で動かす場合」を読んでから、自分の Mac の値として眺めてください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
+**③ ローカル(Apple Silicon の Mac)** コマンドは②と同じです。Go 1.27 から `archsimd` が arm64 に対応したので、`make bench1` を実行すると Neon(128bit)版の SIMD が走ります。本編の数字(AVX2・256bit)とは別物なので、[setup.md](setup.md) の「Apple Silicon で動かす場合」を読んでから、自分の Mac の値として眺めてください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
 
 ### 動かす
 
@@ -217,7 +219,7 @@ make roofline-ceiling
 # 中身: go test ./internal/vec -run - \
 #         -bench 'BenchmarkPeak(FLOP_AVX2|ReadBW|TriadBW)$' -benchtime 2s
 
-# ↓ 4コア Codespace(SETUP.md の指定サイズ・AMD EPYC 7763 / Zen3・1コア)での実際の出力:
+# ↓ 4コア Codespace(setup.md の指定サイズ・AMD EPYC 7763 / Zen3・1コア)での実際の出力:
 BenchmarkPeakFLOP_AVX2     25.59 GFLOP/s     ← 演算ピーク(FMA を飽和させた値)
 BenchmarkPeakReadBW        20.80 read-GB/s   ← 順次 read(SIMD で DRAM 読みを飽和)
 BenchmarkPeakTriadBW       17.36 triad-GB/s  ← STREAM Triad(read+write の標準指標)
@@ -840,7 +842,7 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 
 ## 08. 原典・参照
 
-- 原典: Williams, Waterman, Patterson, *"Roofline: An Insightful Visual Performance Model for Multicore Architectures"*, CACM 52(4), 2009. [[論文 (ACM)]](https://dl.acm.org/doi/10.1145/1498765.1498785)
+- Williams, Waterman, Patterson, *"Roofline: An Insightful Visual Performance Model for Multicore Architectures"*, CACM 52(4), 2009. [[論文 (ACM)]](https://dl.acm.org/doi/10.1145/1498765.1498785)
 - STREAM(メモリ帯域ベンチの定番), J. McCalpin. [cs.virginia.edu/stream](https://www.cs.virginia.edu/stream/)
 - Empirical Roofline Toolkit / NERSC ルーフライン解説. [docs.nersc.gov](https://docs.nersc.gov/tools/performance/roofline/)
 - Intel Advisor(自動ルーフライン作図). [intel.com](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-advisor-roofline.html)
