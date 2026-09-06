@@ -208,7 +208,7 @@ Stage ごとに見ると次のとおりです。
 | | 1 クエリ |
 |---|---|
 | `SearchNaive` | 24.1 ms |
-| `SearchSIMD` | 24 ms 前後(`hasSIMD` が false なので `DotNaive` と同じ経路) |
+| `SearchSIMD` | 24.7 ms(`hasSIMD` が false なので `DotNaive` と同じ経路。速くならない) |
 | `SearchBinary` | 0.77 ms(スカラ量子化なので SIMD 不要) |
 | `SearchBinaryRerank` | 0.83 ms(rerank も `DotNaive`) |
 
