@@ -4,7 +4,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-figures roofline-plot spill recall cpuinfo isa-report isa-report-amd64
+.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-figures roofline-plot concept-images spill recall cpuinfo isa-report isa-report-amd64
 
 test:
 	$(GO) test ./...
@@ -24,20 +24,16 @@ fmt:
 bench0:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchNaive$$' -benchtime 2s
 
-## Stage 1: SIMD 内積(カーネル単体 + 全探索の2粒度。workshop.md Stage 1 の 6.3x / 4.5x を再現)
+## Stage 1: SIMD 内積(内積単体 + 全探索の2粒度。workshop.md Stage 1 の 6.3x / 4.5x を再現)
 bench1:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD)$$' -benchtime 2s
 
-## Stage 1 コラム: ポータブル simd パッケージ(Go 1.27 の simd.Float32s)で書いた同じ内積(vec.DotPortable)。
-## 3、4 行目は GODEBUG=simd=128 でレジスタ幅を半分(AVX2 機なら 256bit から 128bit)にして同じ全探索とカーネルを測る。
-## 256bit は archsimd 版と同じ点(メモリ帯域の上限)に乗り、128bit はカーネルが遅くなって上限の下に落ちる
-## (workshop.md Stage 1 コラム)。arm64(Neon)は元から 128bit なので 2 行目と 3 行目は同じ数字になる。
+## ポータブル simd パッケージ(Go 1.27 の simd.Float32s)で書いた同じ内積(vec.DotPortable)。
+## archsimd 版と同じ速さになることを確認する(workshop.md §01「ポータブルな simd パッケージ」)。
 bench-portable:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD|Portable)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|Portable)$$' -benchtime 2s
-	GODEBUG=simd=128 $(GO) test ./internal/index -run - -bench 'BenchmarkSearchPortable$$' -benchtime 2s
-	GODEBUG=simd=128 $(GO) test ./internal/vec -run - -bench 'BenchmarkDotPortable$$' -benchtime 2s
 
 ## Stage 4: バイナリ量子化(1bit・1/32)
 bench2:
@@ -61,13 +57,13 @@ bench-bonus:
 bench-parallel:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Parallel|BatchParallel)$$' -benchtime 2s
 
-## N スイープ(workshop.md Stage 1 コラム): DB サイズを 1k から 1M まで振り、
+## N スイープ(付録 appendix.md 6 節): DB サイズを 1k から 1M まで振り、
 ## キャッシュに収まる間は SIMD が効き、DRAM に溢れると倍率が崩れるのを見る。
 ## 1M の index 構築(数秒)が初回に走る。
 bench-nsweep:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchSweep$$' -benchtime 1s -timeout 30m
 
-## Stage 3: int8 量子化(1/4 サイズ)。カーネル(VPMOVSXBW+VPMADDWD)と全探索。
+## Stage 3: int8 量子化(1/4 サイズ)。内積単体(VPMOVSXBW+VPMADDWD)と全探索。
 ## 精度は make recall(TestRecallInt8 も走る)で確認。
 bench-int8:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDotInt8(Naive|SIMD)$$' -benchtime 2s
@@ -119,10 +115,17 @@ roofline-figures:
 	       rsvg-convert -w 1920 docs/images/$$f.svg -o docs/images/$$f.png; done \
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
+## 手描きの概念図(生成コマンドを持たない docs/images/*.svg)を PNG 化。SVG を編集したら叩く。
+concept-images:
+	@command -v rsvg-convert >/dev/null 2>&1 \
+	  && for f in scalar-vs-simd vector-search embedding-similarity memory-wall register-spill vzeroupper maxsim rerank masked-load recall; do \
+	       rsvg-convert -w 1920 docs/images/$$f.svg -o docs/images/$$f.png; done \
+	  || echo "(PNG はスキップ: rsvg-convert が無い)"
+
 ## 実測値から対話的ルーフライン HTML を生成(docs/workshop §06)。叩くたびに点が打たれ、
 ## Stage 1(AI=0.5)はメモリ帯域の上限に張り付き、Stage 2 バッチ(AI=16)はリッジを越えて演算側へ動く。
 ## 自分のマシンの天井で: make roofline-plot PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
-## 理論ピークの線も出すなら TPEAK=100(AVX2 理論値・CPU 依存なので既定は off)。
+## 理論ピークの線も出すなら TPEAK=110(AVX2 理論値・CPU 依存なので既定は off)。
 ## ※ 本編の数字は amd64(Codespaces)のもの。arm64(Neon)でも動くが別の数字になる。
 TPEAK ?= 0
 roofline-plot:
@@ -151,7 +154,7 @@ cpuinfo:
 	$(GO) test ./internal/vec -run TestDotMatchesNaive -v | grep -E 'HasSIMD|ok|FAIL'
 
 ## 各 Stage の archsimd API と CPU 機能の対応を一覧 (pkg.go.dev 準拠)。
-## amd64 なら archsimd.X86.* のチェック結果、arm64(Apple Silicon)なら Neon 版カーネルの一覧が出る。
+## amd64 なら archsimd.X86.* のチェック結果、arm64(Apple Silicon)なら Neon 版の内積・距離関数の一覧が出る。
 ## Mac から amd64 側の一覧を見たいときは: make isa-report-amd64 (Rosetta 実行・FMA=false になる)
 isa-report:
 	GOEXPERIMENT=simd $(GO) run ./cmd/isa-report/

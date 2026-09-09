@@ -8,6 +8,8 @@
 | [2. MaxSim](#2-maxsim) | 最初から演算律速な検索方式(late interaction)での SIMD の効き | Stage 2 の考え方を別の検索方式で見たい |
 | [3. AVX-512 の SIMD popcount](#3-avx-512-の-simd-popcount) | AVX-512 の SIMD popcount を試して速くならなかった実測 | Stage 4 の「SIMD 版 popcount は効かない」の根拠を見たい |
 | [4. 実行環境の調査](#4-実行環境の調査) | Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くか | 手元の Mac や Docker で数字が出ない理由を知りたい |
+| [5. 上限ベンチの中身](#5-上限ベンチの中身演算ピークとメモリ帯域の測り方) | 演算ピークとメモリ帯域を測るベンチのコード | 本編 §05 の `make roofline-ceiling` の数字がどう出ているかを知りたい |
+| [6. SIMD が効く境界はデータサイズの軸にもある](#6-simd-が効く境界はデータサイズの軸にもあるmake-bench-nsweep) | DB 件数を 1k〜1M に振って SIMD の倍率が落ちる境界を実測 | Stage 1 の内積単体 6.3x と全探索 4.5x の差を深掘りしたい |
 
 ---
 
@@ -26,9 +28,9 @@ VZEROUPPER の遷移ペナルティと register spill の話です。本編の S
 
 ### 隠れた上限①: VZEROUPPER の遷移ペナルティ(SIMD からスカラへ戻る境界で起きる)
 
-内積カーネルを SIMD 化したのに、全探索の見かけの帯域が 5.7 GB/s と低く、カーネル単体も 167ns で頭打ちでした。SIMD からスカラへ戻る境界に `VZEROUPPER` を 1 命令置くだけで 23ns(7.1x)まで速くなり、見かけの帯域の上限も消えました。
+内積を SIMD 化したのに、全探索の見かけの帯域が 5.7 GB/s と低く、内積単体も 167ns で頭打ちでした。SIMD からスカラへ戻る境界に `VZEROUPPER` を 1 命令置くだけで 23ns(7.1x)まで速くなり、見かけの帯域の上限も消えました。
 
-次の図は、同じ内積カーネルを VZEROUPPER なし(左)とあり(右)で実行したときに CPU の中で何が起きるかを、上から順に追ったものです。
+次の図は、同じ SIMD 内積を VZEROUPPER なし(左)とあり(右)で実行したときに CPU の中で何が起きるかを、上から順に追ったものです。
 
 ![VZEROUPPER のあり/なし比較](../images/vzeroupper.png)
 
@@ -54,21 +56,23 @@ Go の archsimd はこの VZEROUPPER を自動挿入しません(1.26、1.27 と
 
 | | c7i(Sapphire Rapids) | Codespaces(EPYC 7763) | M3 Pro(Neon) |
 |---|---|---|---|
-| 理論ピーク | 約 120 GFLOP/s | 約 100 GFLOP/s | 未算出 |
+| 理論ピーク | 約 120 GFLOP/s | 約 110 GFLOP/s | 未算出 |
 | アキュムレータ 4 本 | 23 GFLOP/s | 13.4 GFLOP/s | 未計測 |
 | アキュムレータ 12 本 | 39 GFLOP/s | 25.5 GFLOP/s | 32 GFLOP/s |
 
-※ 理論ピークは 2 FMA/cycle × 8 レーン × 2 flop × クロック(c7i は 3.75GHz)。検索カーネルは算術強度 0.5 の深いメモリ律速なので、この低さは検索の結論を変えません。ただし原因は見ておく価値があります。
+※ 理論ピークは 2 FMA/cycle × 8 レーン × 2 flop × クロック(c7i は 3.75GHz、EPYC 7763 は単コアブーストの約 3.5GHz)。検索の内積は算術強度 0.5 の深いメモリ律速なので、この低さは検索の結論を変えません。ただし原因は見ておく価値があります。
+
+言葉を 2 つ定義します。レジスタは CPU の中にある一番速い値の置き場で、SIMD 用(YMM)は 16 本、そのうち Go が使えるのは 15 本です。スタックはメモリ上の作業領域で、レジスタよりずっと遅い場所です。
 
 原因は機械語を見ると分かります。[`go tool objdump`](https://pkg.go.dev/cmd/objdump) で内側ループを見ると、12 本のアキュムレータが全部レジスタに置けず、毎回スタックへ退避されて、同じ 1 本のレジスタを使い回していました。これが register spill(レジスタに収まらない、または置けない値をメモリへ追い出すこと)です。FMA 1 個ごとに load と store が必ず付くので、まず load/store ポートが飽和し、さらに次の周回の load が今回の store を待ちます(store-to-load forwarding、5〜7 サイクル)。アキュムレータを増やすほどこの待ち時間が隠れるので、4 本より 12 本の方が速くなります。待ち時間で律速しているときの典型的な傾向です。
 
 ![register spill: 理想(レジスタ常駐)vs 実際(スタック往復)](../images/register-spill.png)
 
-これはハードの限界ではなく、Go の archsimd のレジスタ割り当てが発展途上であることによるものです(VZEROUPPER を自動挿入しないのと共通の課題)。既知 issue [golang/go#76969](https://github.com/golang/go/issues/76969)(closed / not planned)と同件です。[#78753](https://github.com/golang/go/issues/78753)(AVX-512 の上位 16 本の ZMM が割り当てられない件)は Go 1.27 で閉じましたが、この 12 本 AVX2 ループの spill は Go 1.27.1 でも残っています(`make spill GO=go1.27.1` で `VMOVDQU …(SP)` が 40 行余り出ます)。arm64(Neon)でも同じで、M3 Pro の 12 本 FMLA ループは `FMOVQ …(SP)` に挟まれます。将来このピークは上がる見込みですが、1.27 ではまだです。
+本数が多すぎるわけではありません。12 本のアキュムレータに定数の 2 本を足した 14 本は、使える 15 本に収まります。レジスタが足りないのではなく、コンパイラが載せてくれないのが原因です。これはハードの限界ではなく、Go の archsimd のレジスタ割り当てが発展途上であることによるものです(VZEROUPPER を自動挿入しないのと共通の課題)。既知 issue [golang/go#76969](https://github.com/golang/go/issues/76969)(closed / not planned)と同件です。[#78753](https://github.com/golang/go/issues/78753)(AVX-512 の上位 16 本の ZMM が割り当てられない件)は Go 1.27 で閉じましたが、この 12 本 AVX2 ループの spill は Go 1.27.1 でも残っています(`make spill GO=go1.27.1` で `VMOVDQU …(SP)` が 40 行余り出ます。amd64 向けにクロスコンパイルするだけなので mac でも動きます)。arm64(Neon)でも同じで、M3 Pro の 12 本 FMLA ループは `FMOVQ …(SP)` に挟まれます。将来このピークは上がる見込みですが、1.27 ではまだです。
 
 この節で確認できているのは「spill が存在する」こと(objdump で 4 本、12 本とも FMA に load と store が付く)と、メモリポート律速の見積り(約 0.6 FMA/cycle)が実測 0.65 とほぼ一致することまでです。「spill さえ消せば理論ピークに届く」は未検証です。Go 1.26 / 1.27 の archsimd は常に spill し、Go コードでは消せないため、VZEROUPPER のような「1 命令足したら 7 倍」の決定的な介入実験ができていません。本節は状況証拠による推定です。
 
-`make spill` で見える機械語の一部です。アキュムレータ 1 本ぶんで、FMA の前後に読み書きが付いています。
+その `go tool objdump` の出力の一部です。アキュムレータ 1 本ぶんで、FMA の前後に読み書きが付いています(`make spill` はコンパイラの `-S` 出力を使うので、同じ往復が `VFMADD213PS` の正名で見えます)。
 
 ```text
 // go tool objdump で見た内側ループ(アキュムレータ 1 本ぶん)
@@ -150,13 +154,13 @@ Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くかを調
 | 正しさだけ確認したい | Apple Silicon(arm64) | `make test` |
 | Neon 版の SIMD を手元で見たい | Apple Silicon(arm64) | `make GO=$(go env GOPATH)/bin/go1.27.1 bench1`(本編の数字とは別物) |
 | amd64 側の SIMD パスのコンパイル確認をしたい | Apple Silicon(Rosetta) | `GOARCH=amd64 GOEXPERIMENT=simd go1.27.1 test ./...`(FMA 非対応なので実行はスカラ) |
-| 本編(全 Stage)を再現したい | Codespaces / devcontainer(amd64 ホスト) | `make bench` |
+| 本編の最終形(Stage 0/1/4/5)を再現したい | Codespaces / devcontainer(amd64 ホスト) | `make bench`(Stage 2/3 は `roofline-batch` / `bench-int8`) |
 | AVX-512 VPOPCNT を実機で確かめたい | AVX-512 のある機械を自分で用意(AWS c7i など) | `make bench-bonus` |
 | CPU 機能の有無を確認したい | どこでも | `make isa-report`(Rosetta 側は `make isa-report-amd64`) |
 
 ### 調査方法
 
-`cmd/isa-report` が pkg.go.dev の CPU Feature 表に沿って、本リポが使う API と `archsimd.X86.*()` の対応を一覧します。arm64 では Neon 版カーネルの一覧が出ます。
+`cmd/isa-report` が pkg.go.dev の CPU Feature 表に沿って、本リポが使う API と `archsimd.X86.*()` の対応を一覧します。arm64 では Neon 版の内積・距離関数の一覧が出ます。
 
 ```sh
 make isa-report GO=$(go env GOPATH)/bin/go1.27.1         # 実行中のアーキの一覧(Mac なら arm64 = Neon 版)
@@ -230,3 +234,77 @@ Stage ごとに見ると次のとおりです。
 本編の数字は Codespaces(AMD EPYC 7763、AVX2 + FMA)で取っています。AVX-512 と AVX512VPOPCNTDQ まで揃った c7i(Sapphire Rapids)の実測は `SearchNaive` 28.6 ms、`SearchBinary` 0.68 ms、`SearchBinaryRerank` 0.73 ms(Recall@10 0.87)でした。
 
 関連ファイル: [`cmd/isa-report/main.go`](../../cmd/isa-report/main.go)(環境調査ツール)、[`Makefile`](../../Makefile)(`isa-report` ターゲット)、[../workshop/setup.md](../workshop/setup.md)(Docker と Rosetta の説明)。
+
+---
+
+## 5. 上限ベンチの中身(演算ピークとメモリ帯域の測り方)
+
+本編の [05. 性能の上限を測る](../workshop/workshop.md#05-性能の上限を測る)で `make roofline-ceiling` が出す数字を、どんなコードで測っているかです。数値は 4 コア Codespace(AMD EPYC 7763(Zen3 世代)・1 コア)のものです。測り方が分かっていれば、自分のマシンで出た数字が読めます。
+
+### FMA をレジスタ上で連打して演算ピークを見る
+
+演算ピークは「メモリも依存連鎖(前の計算が終わるまで次の計算を待つこと)も挟まず、FMA だけを限界まで回したら何 GFLOP/s 出るか」で測れます。
+
+そのため、独立したアキュムレータ(途中結果をためる変数)を 12 本用意し、レジスタ上だけで FMA を連打します。
+
+```go
+// 12本の独立アキュムレータ。漸化式 a = a*m + c はメモリにも触れない
+m, c := fill8(0.9999), fill8(1.0)
+a0, a1, /* … */ a11 := fill8(0.5), fill8(1.5), /* … */ fill8(11.5)
+for b.Loop() {
+    for j := 0; j < inner; j++ {
+        a0 = a0.MulAdd(m, c)   // ← FMA。互いに独立なので 12本が並んで走る
+        a1 = a1.MulAdd(m, c)
+        /* … a2 〜 a11 も同様 … */
+    }
+}
+flop := float64(iters) * inner * 12 * 8 * 2  // 12acc × 8lane × 2flop/FMA
+b.ReportMetric(flop/sec/1e9, "GFLOP/s")      // ← これが 25.59
+```
+
+実測は 25.5 GFLOP/s です。試しにアキュムレータを 4 本に減らした `BenchmarkPeakFLOP_AVX2_4acc` を測ると 13.4 GFLOP/s まで落ちます(本数を減らすと遅くなる)。理論ピークは約 110 GFLOP/s で、実測はその約 1/4 です。なぜ 1/4 で止まるのか、なぜ本数を減らすと遅くなるのかは、[1. Go の SIMD の 2 つの隠れた性能上限](#1-go-の-simd-の-2-つの隠れた性能上限)の隠れた上限②(register spill)で説明しています。
+
+### 巨大な配列を流し読みしてメモリ帯域の上限を見る
+
+メモリ帯域は「DRAM から 1 スレッドで流し読みしたら何 GB/s 出るか」で測ります。キャッシュに収まると DRAM を測れないので、256MB(最後段のキャッシュ L3 を確実に溢れる)の配列を先頭から末尾まで順番に読みます。コードは [`internal/vec/ceiling_mem_simd_test.go`](../../internal/vec/ceiling_mem_simd_test.go) にあります。次はその主要部分です。実コードの Triad は 4 組ずつ展開してありますが、やることは同じです。
+
+```go
+const memN = 1 << 26  // 67,108,864 float32 = 256 MB(L3 溢れ確実)
+
+// read 帯域: 検索の内積と同じ 256bit ロード(8本のアキュムレータ)で
+// DRAM 読みを飽和させる。スカラ縮約だと足し算の発行律速で過小評価するため SIMD で測る
+for b.Loop() {
+    var a0 archsimd.Float32x8 /* … a7 まで … */
+    for len(x) >= 64 {
+        a0 = archsimd.LoadFloat32x8(x).Add(a0)   /* … x[8:] 〜 x[56:] も … */
+        x = x[64:]
+    }
+}
+b.ReportMetric(gb, "read-GB/s")    // ← 20.80
+
+// Triad(STREAM 標準): a = b + s*c。read b + read c + write a で3配列ぶん(SIMD)
+for len(aa) >= 8 {
+    archsimd.LoadFloat32x8(cc).MulAdd(s, archsimd.LoadFloat32x8(bb)).Store(aa)
+    aa, bb, cc = aa[8:], bb[8:], cc[8:]
+}
+b.ReportMetric(gb, "triad-GB/s")   // ← 17.36
+```
+
+帯域の数字が 2 つある理由です。`BenchmarkPeakReadBW`(約 20 GB/s)は読むだけの帯域で、検索の内積と同じ SIMD のロードで測っています。`BenchmarkPeakTriadBW`(17.4 GB/s)は [STREAM](https://www.cs.virginia.edu/stream/) という標準ベンチで、読み書き両方を含むぶん少し低くなります。本編の検索は DB ベクトルを読むだけなので、メモリ帯域の上限には読むだけの約 20 GB/s を使っています。SIMD 全探索の達成 19.4 GB/s がこの値とほぼ一致します。
+
+---
+
+## 6. SIMD が効く境界はデータサイズの軸にもある(make bench-nsweep)
+
+本編の Stage 1 では、内積単体の SIMD 化は 6.3x なのに全探索は 4.5x で止まりました。差はデータの居場所です。内積単体のベンチはデータが L1 キャッシュに載ったままで計算の速さだけが出ますが、全探索は 154 MB を DRAM から運びます。ちなみに、この内積関数のように大量のデータへ繰り返し適用される中核ルーチンを、性能の分野では「カーネル」と呼びます(ルーフラインの文献にもこの語で出てきます)。
+
+`make bench-nsweep` で DB 件数を 1,000 から 1,000,000 まで振ると、SIMD の倍率がキャッシュに収まらなくなる所で落ちるのが見えます(4 コア Codespace。本編とは別インスタンスの実測なので、Stage 1 本文と絶対値が少し違います)。
+
+| DB 件数     | データ量           | naive   | SIMD    | 倍率   |
+| --------- | -------------- | ------- | ------- | ---- |
+| 1,000     | 1.5 MB(キャッシュ内) | 351 µs  | 61 µs   | 5.8x |
+| 10,000    | 15 MB(L3)      | 3.5 ms  | 0.61 ms | 5.7x |
+| 100,000   | 154 MB(DRAM)   | 34.8 ms | 8.8 ms  | 3.9x |
+| 1,000,000 | 1.5 GB(DRAM)   | 347 ms  | 89.5 ms | 3.9x |
+
+L3 に収まる間は内積単体に近い 5.7〜5.8x、DRAM に溢れた瞬間に 3.9x へ落ちて以後一定です。本編の 10 万件(154MB)は、意図的に DRAM から読む側に置いた設定です。本編は算術強度の軸で SIMD が効く境界を探しましたが、同じ境界はデータサイズの軸にも現れます。

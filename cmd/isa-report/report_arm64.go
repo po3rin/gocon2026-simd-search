@@ -60,6 +60,6 @@ func run() {
 	fmt.Printf("  • 本編(workshop.md)の数字は Codespaces(amd64 / AVX2+FMA・256bit)のもの。\n")
 	fmt.Printf("    ここ(Neon 128bit)で出る倍率は「自分の Mac の点」として読む。\n")
 	fmt.Printf("  • Neon の archsimd には VPMADDWD(DotProductPairs)や 64bit popcount が無い。\n")
-	fmt.Printf("    int8 カーネルは SMULL+SXTL の 3 段、Hamming はスカラ(CNT 内蔵)のまま。\n")
+	fmt.Printf("    int8 内積は SMULL+SXTL の 3 段、Hamming はスカラ(CNT 内蔵)のまま。\n")
 	fmt.Printf("  • amd64 の一覧は: GOARCH=amd64 GOEXPERIMENT=simd go run ./cmd/isa-report/\n")
 }

@@ -13,14 +13,12 @@ import "simd"
 //   - 命令が無いアーキでは純 Go でエミュレートされる(simd.Emulated() で判定)
 //
 // 幅が実行時に決まるので、ループ 1 周の要素数は n = acc.Len() から組み立てる。
-// GODEBUG=simd=128 のように幅を狭めて実行できるので、同じバイナリで「幅を半分に
-// すると点がどこへ動くか」を確かめられる(make bench-portable)。Codespaces(EPYC 7763)
-// 実測: 256bit は archsimd 版と同じ点(8.5 ms・壁)、128bit はカーネルが 57→107 ns と
-// 2倍遅くなって 1 ベクトルのメモリ時間(~80 ns)からはみ出し、全探索 11.9 ms と壁の下に落ちる。
+// Codespaces(EPYC 7763)実測では 256bit で archsimd 版と同じ点(メモリ帯域の上限)に乗る
+// (make bench-portable)。
 //
 // 一方、Stage 3 の int8 積和(VPMADDWD / SMULL)や付録 B の popcount は
 // ポータブル API には無い(アーキ間で共通に持てる演算だけが入っている)ので、
-// 量子化カーネルは archsimd のままにしてある。
+// 量子化版の内積とハミング距離は archsimd のままにしてある。
 func DotPortable(a, b []float32) float32 {
 	if len(b) < len(a) {
 		a = a[:len(b)]

@@ -6,7 +6,7 @@ import "sync"
 // 検索ワークロード(DB を順次ストリーム読み)に合わせ、シングルスレッドで測る。
 //
 // 実体の Benchmark は2つに分かれている:
-//   - ceiling_mem_simd_test.go   : AVX2 ストリーミング(検索カーネルと同じロード幅)。
+//   - ceiling_mem_simd_test.go   : AVX2 ストリーミング(検索の内積と同じロード幅)。
 //     単コアが DRAM から実際に引ける帯域を測れるので、これが天井の実測値。
 //   - ceiling_mem_arm64_test.go  : 同じものの Neon(128bit)版。Apple Silicon はこちら。
 //   - ceiling_mem_scalar_test.go : SIMD の無いビルド向けのスカラー fallback。

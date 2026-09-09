@@ -53,7 +53,7 @@ const (
 func main() {
 	peak := flag.Float64("peak", 25.59, "compute ceiling in GFLOP/s (make roofline-ceiling)")
 	bw := flag.Float64("bw", 20.80, "memory read bandwidth in GB/s (make roofline-ceiling)")
-	tpeak := flag.Float64("tpeak", 100, "theoretical compute peak line (0 = hide)")
+	tpeak := flag.Float64("tpeak", 110, "theoretical compute peak line (0 = hide)")
 	out := flag.String("out", "docs/images", "output directory")
 	flag.Parse()
 
@@ -71,12 +71,9 @@ func main() {
 }
 
 // figures lists the figures and the measured points that appear in each.
-// The kernel-only point has no meaningful AI (data lives in L1); it is placed
-// at AI=16 as an indication, like the Stage 4/5 points whose flop is undefined.
 func figures(peak, bw, ridge float64) []fig {
 	s0 := pt{name: "Stage 0 スカラ全探索", ai: 0.5, gf: 2.15}
 	s1 := pt{name: "Stage 1 SIMD 全探索", ai: 0.5, gf: 9.7}
-	k1 := pt{name: "カーネル単体(L1 常駐)", ai: 16, gf: 13.9, note: "13.9 GF・算術強度 は目安", vague: true}
 	s2 := pt{name: "Stage 2 SIMD バッチ(B=32)", ai: 16, gf: 13.3}
 	s2s := pt{name: "Stage 2 スカラ バッチ(B=32)", ai: 16, gf: 2.24, side: "below"}
 	s3 := pt{name: "Stage 3 int8", ai: 2, gf: 18.3, note: "18.3 Gop/s・上限の 72%"}
@@ -94,15 +91,15 @@ func figures(peak, bw, ridge float64) []fig {
 			points:   []pt{s0}},
 		{file: "rl-stage1",
 			title:    "Stage 1: SIMD 化",
-			subtitle: "全探索はメモリ帯域の上限に達する(9.7 GF、上限の 93%)。カーネル単体は右上の別の点",
-			points:   []pt{ghost(s0), s1, k1}},
+			subtitle: "全探索はメモリ帯域の上限に達する(9.7 GF、上限の 93%)",
+			points:   []pt{ghost(s0), s1}},
 		{file: "rl-stage2",
 			title:    "Stage 2: クエリのバッチ化(B=32)",
 			subtitle: "算術強度 が 0.5 から 16 に動き、リッジを越えて演算律速側へ。exact のまま SIMD がスカラより 5.9x 速い",
 			points:   []pt{ghost(s1), s2, s2s}},
 		{file: "rl-stage3",
 			title:    "Stage 3: int8 量子化",
-			subtitle: "算術強度 が 0.5 から 2 に動きリッジを越える。ただし演算ピークの下(カーネル律速)。Recall 0.948",
+			subtitle: "算術強度 が 0.5 から 2 に動きリッジを越える。ただし演算ピークの下(int8 内積の速さで頭打ち)。Recall 0.948",
 			points:   []pt{ghost(s1), s3}},
 		{file: "rl-stage4",
 			title:    "Stage 4: 1bit 量子化",
@@ -115,7 +112,7 @@ func figures(peak, bw, ridge float64) []fig {
 		{file: "roofline-plot",
 			title:    "実測ルーフライン全体像(Codespaces / AMD EPYC 7763)",
 			subtitle: "演算ピーク " + ftoa(peak) + " GFLOP/s、メモリ帯域 " + ftoa(bw) + " GB/s、リッジ " + strconv.FormatFloat(ridge, 'f', 2, 64) + " flop/byte",
-			points:   []pt{s0, s1, {name: "カーネル単体(L1)", ai: 32, gf: 13.9, note: "算術強度 は目安", vague: true, side: "below"}, s2, s3, s4},
+			points:   []pt{s0, s1, s2, s3, s4},
 			notes: []string{
 				"Stage 0 から 1: 縦に上がりメモリ帯域の上限で止まる(算術強度 0.5 はリッジの左)",
 				"Stage 1 から 2 / 3: 算術強度 を右に動かすとリッジを越え、SIMD が効く側に入る",

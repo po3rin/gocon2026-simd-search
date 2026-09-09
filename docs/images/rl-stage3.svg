@@ -2,7 +2,7 @@
 <style>text{font-family:'Helvetica Neue',Helvetica,Arial,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;fill:#111827}</style>
 <rect width="960" height="600" fill="#ffffff"/>
 <text x="480" y="32" font-size="18" font-weight="600" text-anchor="middle">Stage 3: int8 量子化</text>
-<text x="480" y="52" font-size="11.5" fill="#6b7280" text-anchor="middle">算術強度 が 0.5 から 2 に動きリッジを越える。ただし演算ピークの下(カーネル律速)。Recall 0.948</text>
+<text x="480" y="52" font-size="11.5" fill="#6b7280" text-anchor="middle">算術強度 が 0.5 から 2 に動きリッジを越える。ただし演算ピークの下(int8 内積の速さで頭打ち)。Recall 0.948</text>
 <line x1="80.0" y1="70.0" x2="80.0" y2="510.0" stroke="#eef2f7"/>
 <text x="80.0" y="526.0" font-size="10.5" fill="#6b7280" text-anchor="middle">0.25</text>
 <line x1="182.5" y1="70.0" x2="182.5" y2="510.0" stroke="#eef2f7"/>
@@ -43,8 +43,8 @@
 <line x1="315.6" y1="225.3" x2="315.6" y2="510.0" stroke="#9ca3af" stroke-dasharray="3 3"/>
 <circle cx="315.6" cy="225.3" r="4" fill="#ffffff" stroke="#9ca3af" stroke-width="2"/>
 <text x="315.6" y="217.3" font-size="10" fill="#6b7280" text-anchor="middle">リッジ 1.23</text>
-<line x1="80.0" y1="105.6" x2="900.0" y2="105.6" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 4"/>
-<text x="88.0" y="101.6" font-size="10.5" fill="#94a3b8" text-anchor="start">AVX2 の理論ピーク 100(register spill で届かない)</text>
+<line x1="80.0" y1="97.2" x2="900.0" y2="97.2" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="88.0" y="93.2" font-size="10.5" fill="#94a3b8" text-anchor="start">AVX2 の理論ピーク 110(register spill で届かない)</text>
 <circle cx="182.5" cy="310.5" r="7" fill="#f3f4f6" stroke="#cbd5e1" stroke-width="2"/>
 <text x="182.5" y="298.5" font-size="11" font-weight="600" fill="#9ca3af" text-anchor="middle">Stage 1 SIMD 全探索</text>
 <line x1="387.5" y1="254.7" x2="387.5" y2="225.3" stroke="#fb923c" stroke-width="1.2" stroke-dasharray="2 3"/>
