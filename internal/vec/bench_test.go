@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// カーネル単体ベンチ(データはL1キャッシュ内)。
+// 内積・距離の単体ベンチ(データはL1キャッシュ内)。
 // 全探索ベンチ(internal/index)との対比で「ALUの速さ」と
 // 「メモリ帯域の壁」を切り分けるのが目的。
 const benchDim = 384
@@ -13,8 +13,6 @@ const benchDim = 384
 var (
 	benchA, benchB   []float32
 	benchCA, benchCB []uint64
-	benchBigA        []uint64
-	benchBigB        []uint64
 	sinkF            float32
 	sinkI            int
 )
@@ -31,13 +29,6 @@ func init() {
 	benchCB = make([]uint64, Words(benchDim))
 	Quantize(benchA, benchCA)
 	Quantize(benchB, benchCB)
-	// VPOPCNT の真価を測る用の大きめ配列(32KB×2、L1ギリギリ)
-	benchBigA = make([]uint64, 4096)
-	benchBigB = make([]uint64, 4096)
-	for i := range benchBigA {
-		benchBigA[i] = r.Uint64()
-		benchBigB[i] = r.Uint64()
-	}
 }
 
 func BenchmarkDotNaive(b *testing.B) {
@@ -64,20 +55,7 @@ func BenchmarkHammingSIMD(b *testing.B) {
 	}
 }
 
-func BenchmarkHammingScalarBig(b *testing.B) {
-	for b.Loop() {
-		sinkI = Hamming(benchBigA, benchBigB)
-	}
-}
-
-func BenchmarkHammingSIMDBig(b *testing.B) {
-	for b.Loop() {
-		sinkI = HammingSIMD(benchBigA, benchBigB)
-	}
-}
-
-// Stage 1 コラム: ポータブル simd パッケージ版。archsimd 版(DotSIMD)との差と、
-// GODEBUG=simd=128 で幅を狭めたときの変化を見る(make bench-portable)。
+// ポータブル simd パッケージ版(workshop.md §01)。archsimd 版(DotSIMD)との差を見る(make bench-portable)。
 func BenchmarkDotPortable(b *testing.B) {
 	for b.Loop() {
 		sinkF = DotPortable(benchA, benchB)

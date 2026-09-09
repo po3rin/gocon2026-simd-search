@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440">
+<defs><marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker></defs>
+<style>text{font-family:'Helvetica Neue', Helvetica, Arial, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;}</style>
+<rect width="960" height="440" fill="#ffffff"/>
+<text x="480" y="36" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">端数のマスク付きロード(LoadFloat32x8Part)</text>
+<text x="480" y="60" font-size="12" fill="#6b7280" text-anchor="middle">例: 長さ 20 の配列を 8 個ずつ処理すると、最後に 4 個が余る(端数)</text>
+
+<!-- array: 20 cells, w=40 gap=2, x0=61, y=84 -->
+<rect x="61" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="81" y="109" font-size="10" fill="#111827" text-anchor="middle">a[0]</text>
+<rect x="103" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="123" y="109" font-size="10" fill="#111827" text-anchor="middle">a[1]</text>
+<rect x="145" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="165" y="109" font-size="10" fill="#111827" text-anchor="middle">a[2]</text>
+<rect x="187" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="207" y="109" font-size="10" fill="#111827" text-anchor="middle">a[3]</text>
+<rect x="229" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="249" y="109" font-size="10" fill="#111827" text-anchor="middle">a[4]</text>
+<rect x="271" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="291" y="109" font-size="10" fill="#111827" text-anchor="middle">a[5]</text>
+<rect x="313" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="333" y="109" font-size="10" fill="#111827" text-anchor="middle">a[6]</text>
+<rect x="355" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="375" y="109" font-size="10" fill="#111827" text-anchor="middle">a[7]</text>
+<rect x="397" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="417" y="109" font-size="10" fill="#111827" text-anchor="middle">a[8]</text>
+<rect x="439" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="459" y="109" font-size="10" fill="#111827" text-anchor="middle">a[9]</text>
+<rect x="481" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="501" y="109" font-size="10" fill="#111827" text-anchor="middle">a[10]</text>
+<rect x="523" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="543" y="109" font-size="10" fill="#111827" text-anchor="middle">a[11]</text>
+<rect x="565" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="585" y="109" font-size="10" fill="#111827" text-anchor="middle">a[12]</text>
+<rect x="607" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="627" y="109" font-size="10" fill="#111827" text-anchor="middle">a[13]</text>
+<rect x="649" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="669" y="109" font-size="10" fill="#111827" text-anchor="middle">a[14]</text>
+<rect x="691" y="84" width="40" height="40" rx="4" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/><text x="711" y="109" font-size="10" fill="#111827" text-anchor="middle">a[15]</text>
+<rect x="733" y="84" width="40" height="40" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/><text x="753" y="109" font-size="10" fill="#111827" text-anchor="middle">a[16]</text>
+<rect x="775" y="84" width="40" height="40" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/><text x="795" y="109" font-size="10" fill="#111827" text-anchor="middle">a[17]</text>
+<rect x="817" y="84" width="40" height="40" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/><text x="837" y="109" font-size="10" fill="#111827" text-anchor="middle">a[18]</text>
+<rect x="859" y="84" width="40" height="40" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/><text x="879" y="109" font-size="10" fill="#111827" text-anchor="middle">a[19]</text>
+
+<!-- group labels -->
+<line x1="63" y1="136" x2="393" y2="136" stroke="#9ca3af" stroke-width="1"/>
+<text x="228" y="154" font-size="12" fill="#6b7280" text-anchor="middle">1回目: LoadFloat32x8(8個)</text>
+<line x1="399" y1="136" x2="729" y2="136" stroke="#9ca3af" stroke-width="1"/>
+<text x="564" y="154" font-size="12" fill="#6b7280" text-anchor="middle">2回目: LoadFloat32x8(8個)</text>
+<line x1="735" y1="136" x2="897" y2="136" stroke="#ea580c" stroke-width="1.5"/>
+<text x="816" y="154" font-size="12" font-weight="600" fill="#ea580c" text-anchor="middle">端数(4個しか無い)</text>
+
+<!-- arrow -->
+<line x1="816" y1="166" x2="500" y2="234" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+<text x="740" y="196" font-size="12" fill="#2563eb" text-anchor="middle">LoadFloat32x8Part(a[16:])</text>
+
+<!-- register: 8 lanes, w=60 gap=2, x0=233, y=236 -->
+<text x="233" y="232" font-size="12" fill="#6b7280" text-anchor="start">返ってくるレジスタ(8 レーン)</text>
+<rect x="233" y="242" width="60" height="44" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/><text x="263" y="269" font-size="11" fill="#111827" text-anchor="middle">a[16]</text>
+<rect x="295" y="242" width="60" height="44" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/><text x="325" y="269" font-size="11" fill="#111827" text-anchor="middle">a[17]</text>
+<rect x="357" y="242" width="60" height="44" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/><text x="387" y="269" font-size="11" fill="#111827" text-anchor="middle">a[18]</text>
+<rect x="419" y="242" width="60" height="44" rx="4" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/><text x="449" y="269" font-size="11" fill="#111827" text-anchor="middle">a[19]</text>
+<rect x="481" y="242" width="60" height="44" rx="4" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.2"/><text x="511" y="269" font-size="11" fill="#6b7280" text-anchor="middle">0</text>
+<rect x="543" y="242" width="60" height="44" rx="4" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.2"/><text x="573" y="269" font-size="11" fill="#6b7280" text-anchor="middle">0</text>
+<rect x="605" y="242" width="60" height="44" rx="4" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.2"/><text x="635" y="269" font-size="11" fill="#6b7280" text-anchor="middle">0</text>
+<rect x="667" y="242" width="60" height="44" rx="4" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.2"/><text x="697" y="269" font-size="11" fill="#6b7280" text-anchor="middle">0</text>
+<line x1="481" y1="298" x2="727" y2="298" stroke="#9ca3af" stroke-width="1"/>
+<text x="604" y="316" font-size="12" fill="#6b7280" text-anchor="middle">足りないレーンはゼロ埋め</text>
+
+<!-- bottom note -->
+<rect x="160" y="352" width="640" height="52" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<text x="480" y="384" font-size="13" fill="#111827" text-anchor="middle">内積ではゼロ埋めのレーンは「0 を掛けて足す」だけなので、結果は変わらない</text>
+</svg>

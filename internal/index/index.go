@@ -1,5 +1,5 @@
 // Package index implements a minimal brute-force vector search engine.
-// 高速化の対象は距離カーネル(internal/vec)で、Index 自体は全ステージ共通。
+// 高速化の対象は距離計算(internal/vec)で、Index 自体は全ステージ共通。
 package index
 
 import (
@@ -75,8 +75,8 @@ func (ix *Index) SearchSIMD(q []float32, k int) []Result {
 }
 
 // SearchPortable is Stage 1 written with the portable simd package
-// (Go 1.27 の simd.Float32s)。SearchSIMD と同じ走査で、カーネルだけ vec.DotPortable。
-// GODEBUG=simd=128 で幅を狭めると点がどこへ動くかを見る用(make bench-portable。workshop.md Stage 1 コラム)。
+// (Go 1.27 の simd.Float32s)。SearchSIMD と同じ走査で、内積だけ vec.DotPortable
+// (make bench-portable。workshop.md §01「ポータブルな simd パッケージ」)。
 func (ix *Index) SearchPortable(q []float32, k int) []Result {
 	t := newTopK(k)
 	for id := 0; id < ix.N; id++ {

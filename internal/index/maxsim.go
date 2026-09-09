@@ -47,7 +47,7 @@ func (mx *MultiIndex) DocToken(id, t int) []float32 {
 	return mx.Data[off : off+mx.Dim]
 }
 
-// maxSim は1文書ぶんの MaxSim スコアを計算する。dot は内積カーネル
+// maxSim は1文書ぶんの MaxSim スコアを計算する。dot は内積関数
 // (DotNaive / Dot)を差し替えて naive/SIMD を比較する。
 func (mx *MultiIndex) maxSim(q [][]float32, id int, dot func(a, b []float32) float32) float32 {
 	var s float32

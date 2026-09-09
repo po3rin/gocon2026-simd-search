@@ -26,7 +26,7 @@
 <text x="70" y="380" font-size="12">1 周 = FMA が 12 回。メモリには触らない</text>
 <text x="70" y="400" font-size="12">12 本 + 定数 2 本 = 14 本。使える 15 本に収まる</text>
 <rect x="70" y="418" width="360" height="30" rx="6" fill="#16a34a"/>
-<text x="250" y="438" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">理論ピーク 約 100 GFLOP/s(FMA だけが回るとき)</text>
+<text x="250" y="438" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">理論ピーク 約 110 GFLOP/s(FMA だけが回るとき)</text>
 
 <!-- 右: 実際 -->
 <rect x="500" y="80" width="420" height="380" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>

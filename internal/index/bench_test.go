@@ -50,7 +50,7 @@ func benchSetup() {
 }
 
 // reportFloatRoofline は内積系 Stage の「ルーフライン上の点」を出力する。
-// 内積カーネルは要素あたり mul+add = 2 flop、DB を fp32 で1回読むので 4 byte。
+// 内積は要素あたり mul+add = 2 flop、DB を fp32 で1回読むので 4 byte。
 // → AI = 0.5 flop/byte(クエリは10万件で使い回すのでキャッシュ常駐、DRAM 転送に数えない)。
 // 詳細は docs/workshop/workshop.md。
 func reportFloatRoofline(b *testing.B, iters int) {
@@ -95,8 +95,7 @@ func BenchmarkSearchSIMD(b *testing.B) {
 	reportFloatRoofline(b, iters)
 }
 
-// Stage 1 コラム: ポータブル simd 版(simd.Float32s)。SearchSIMD と同じ点に乗る(Codespaces 実測で確認済み)。
-// GODEBUG=simd=128 で幅を半分にすると、カーネルが 1 ベクトルのメモリ時間からはみ出して壁の下に落ちる。
+// ポータブル simd 版(simd.Float32s。workshop.md §01)。SearchSIMD と同じ点に乗る(Codespaces 実測で確認済み)。
 func BenchmarkSearchPortable(b *testing.B) {
 	benchSetup()
 	b.SetBytes(benchN * benchDim * 4)

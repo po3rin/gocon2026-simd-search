@@ -25,14 +25,14 @@ make test     # 正しさ確認。PASS が出ればOK(初回はビルド込み�
 make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 ```
 
-数字が出たら [workshop.md](workshop.md) の「03. まず動かす」へ進んでください。
+数字が出たら [workshop.md](workshop.md) の「03. まず動かしてみる」へ進んでください。
 ベンチの数字は共有 VM の揺れで実行ごとに ±5% ほど変わりますが、それで正常です。
 
 ---
 
 ## マシンサイズは `4-core` で固定
 
-全員 `4-core`(16 GB RAM)を指定してください([マシンタイプの変え方](https://docs.github.com/en/codespaces/customizing-your-codespace/changing-the-machine-type-for-your-codespace))。** 起動時のマシン選択で `4-core` を選ぶだけです。
+全員 `4-core`(16 GB RAM)を指定してください([マシンタイプの変え方](https://docs.github.com/en/codespaces/customizing-your-codespace/changing-the-machine-type-for-your-codespace))。起動時のマシン選択で `4-core` を選ぶだけです。
 バラバラのサイズだと比較しづらくなるので、条件を揃えるために統一します。8-core 以上は無料枠を早く消費するだけで不要、2-core はベンチが不安定になりがちなので避けます。
 
 > ただし Codespaces は当たる CPU(Intel/AMD・世代)を選べません。同じ 4-core でも CPU が違えば出る数字は変わります。
@@ -45,13 +45,24 @@ make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 
 ## どの CPU が当たっても本編は動きます
 
-Codespaces は割り当てられる CPU(Intel/AMD、世代)を選べませんが、本編が使う SIMD は AVX2 + FMA だけです(Stage 1/2/5 の内積。Stage 3 の int8 カーネルは AVX2 のみ)。過去 10 年の x86(Intel は Haswell 2013 年以降、AMD は 2015 年以降)がほぼ全て持つので、どの CPU でも全ステージ再現します。ただし出る数字は CPU で変わります。教材は各自の数字で進める作りになっているので、それで問題ありません。
+Codespaces は割り当てられる CPU(Intel/AMD、世代)を選べませんが、本編が使う SIMD は AVX2 + FMA だけです(Stage 1/2/5 の内積。Stage 3 の int8 内積は AVX2 のみ)。過去 10 年の x86(Intel は Haswell 2013 年以降、AMD は 2015 年以降)がほぼ全て持つので、どの CPU でも全ステージ再現します。ただし出る数字は CPU で変わります。教材は各自の数字で進める作りになっているので、それで問題ありません。
 
 AVX-512 は本編では使いません。Stage 4 で見るとおり、量子化後は popcount を SIMD 化しても速くならないためです。AVX-512 を実機で確かめたい人向けの実測は[付録](../appendix/appendix.md#3-avx-512-の-simd-popcount)にあります。
 
+## ローカル(amd64 Linux / Windows)で動かす場合
+
+Codespaces を使わず手元で動かす場合に必要なのは Go 1.27 と make だけです。
+
+```bash
+git clone https://github.com/po3rin/gocon2026-simd-search
+cd gocon2026-simd-search
+go install golang.org/dl/go1.27.1@latest && go1.27.1 download   # Go 1.27 を入れる
+make GO=$(go env GOPATH)/bin/go1.27.1 test                      # GOEXPERIMENT=simd は Makefile が付与
+```
+
 ## Apple Silicon で動かす場合
 
-Go 1.27 から `archsimd` が arm64 の Neon(128bit)に対応したので、手元の Mac でも SIMD が動きます(`dot_arm64.go` と `int8_arm64.go`。上限を測るベンチも Neon 版があります)。ただし本編の数字とは別物です。レジスタ幅は 256bit から 128bit に半分になる一方、単コアのメモリ帯域は Codespaces より大きいので、ルーフライン上の点も倍率も本編とは違う位置になります。M3 Pro の実測は次のとおりです。
+コマンドは上の amd64 ローカルと同じです。Go 1.27 から `archsimd` が arm64 の Neon(128bit)に対応したので、手元の Mac でも SIMD が動きます(`dot_arm64.go` と `int8_arm64.go`。上限を測るベンチも Neon 版があります)。ただし本編の数字とは別物です。レジスタ幅は 256bit から 128bit に半分になる一方、単コアのメモリ帯域は Codespaces より大きいので、ルーフライン上の点も倍率も本編とは違う位置になります。M3 Pro の実測は次のとおりです。
 
 | 項目 | M3 Pro(Neon) | Codespaces(AVX2) |
 |---|---|---|
@@ -59,7 +70,7 @@ Go 1.27 から `archsimd` が arm64 の Neon(128bit)に対応したので、手�
 | 全探索 naive から SIMD | 34.6 ms から 4.6 ms(7.5x) | 35.7 ms から 7.9 ms(4.5x) |
 | binary | 0.43 ms | 0.77 ms |
 
-当日は Codespaces を使えば、手元のアーキの違いによらず全員が同じ条件で測れます。Mac の数字は自分の環境の値として持ち帰ってください。
+当日は Codespaces を使えば、手元のアーキの違いによらず全員が同じ条件で測れます。Mac の数字は自分の環境の値として持ち帰ってください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
 
 ## Docker で amd64 を指定しても動かない理由
 
