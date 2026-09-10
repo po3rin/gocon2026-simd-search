@@ -2,7 +2,7 @@
 
 ## はじめに
 
-Go 1.27 の SIMD パッケージ([`simd/archsimd`](https://pkg.go.dev/simd/archsimd)。実験的機能)を使い、外部ライブラリなしの Pure Go でベクトル検索を高速化する教材です。題材は内積によるベクトル検索です。ただ速くするのではなく、ルーフラインモデルで「いま何が性能の上限になっているか」を測ってから対処を選んでいきます。
+Go 1.27 の SIMD パッケージ([`simd/archsimd`](https://pkg.go.dev/simd/archsimd))を使い、ベクトル検索を高速化するワークショップ教材です。題材は内積によるベクトル検索です。ただ速くするのではなく、ルーフラインモデルで「いま何が性能の上限になっているか」を測ってから対処を選んでいきます。
 
 学べることは次の 4 つです。
 
@@ -29,7 +29,7 @@ Go 1.27 の SIMD パッケージ([`simd/archsimd`](https://pkg.go.dev/simd/archs
 
 ![ベクトル検索のしくみ](../images/vector-search.png)
 
-計算の本体は「内積を 10 万回計算する」ことです。内積は掛け算と足し算の塊なので、SIMD が得意とする部分です。世のベクトル検索エンジン([Faiss](https://github.com/facebookresearch/faiss)、[Qdrant](https://qdrant.tech/documentation/guides/quantization/)、[ClickHouse](https://clickhouse.com/docs/engines/table-engines/mergetree-family/annindexes) など)も、内積などの距離計算を SIMD で実装しています。本ワークショップでは、それを Pure Go で実装したものを題材にします。中心になる計算はクエリ a と DB ベクトル d の内積 `acc += a[i]*d[i]` です。
+計算の本体は「内積を 10 万回計算する」ことです。内積は掛け算と足し算の塊なので、SIMD が得意とする部分です。世のベクトル検索エンジン([Faiss](https://github.com/facebookresearch/faiss)、[Qdrant](https://qdrant.tech/documentation/guides/quantization/) など)も、内積などの距離計算を SIMD で実装しています。
 
 ### 今回の実験の前提
 
@@ -148,7 +148,7 @@ for len(a) >= n {
 
 ## 03. ルーフラインモデルってなに？
 
-ルーフラインモデルは、そのコードが達成できる性能の上限を求める性能モデルです(原典は [Williams, Waterman, Patterson, 2009](https://dl.acm.org/doi/10.1145/1498765.1498785)。§08 に書誌情報)。必要な数字は 3 つだけです。
+ルーフラインモデルは、そのコードが達成できる性能の上限を求める性能モデルです(元論文は [Williams, Waterman, Patterson, 2009](https://dl.acm.org/doi/10.1145/1498765.1498785)。§08 にも載せています)。必要な数字は 3 つだけです。
 
 - コードの算術強度(メモリから 1 バイト運ぶごとに何回計算するか)
 - マシンの演算ピーク(1 秒に何回計算できるか)
@@ -206,7 +206,7 @@ CPU はまずレジスタとキャッシュにあるデータを使い、そこ�
 | 水平線(演算ピーク)のすぐ下      | 演算律速。計算の速さで頭打ち              | 実装効率を上げて演算ピークに近づける                         |
 
 
-点がどの上限の下にあるかで、どの最適化から始めるべきかが決まる、というのが原典の Williams らの主張です。本ワークショップは、まず計算側の対処(並列度、SIMD)で点を線まで上げ、次にメモリ側の対処(算術強度)で点を右へ動かす順で進みます。
+点がどの上限の下にあるかで、どの最適化から始めるべきかが決まる、というのが元論文の Williams らの主張です。本ワークショップは、まず計算側の対処(並列度、SIMD)で点を線まで上げ、次にメモリ側の対処(算術強度)で点を右へ動かす順で進みます。
 
 道具が揃いました。次章でまず現状のコードを動かして、この図に載せる最初の点(ベースライン)を測ります。
 
@@ -673,7 +673,7 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 
 「SIMDを使ってるのに早くならない！」と諦めるのではなく、計測によってSIMDが効くポイントを理解した上で、SIMDと仲良くしていきましょう。
 
-## 08. 原典・参照
+## 08. 参考文献
 
 - Williams, Waterman, Patterson, *"Roofline: An Insightful Visual Performance Model for Multicore Architectures"*, CACM 52(4), 2009. [[論文 (ACM)]]([https://dl.acm.org/doi/10.1145/1498765.1498785](https://dl.acm.org/doi/10.1145/1498765.1498785))
 - STREAM(メモリ帯域ベンチの定番), J. McCalpin. [cs.virginia.edu/stream](https://www.cs.virginia.edu/stream/)
