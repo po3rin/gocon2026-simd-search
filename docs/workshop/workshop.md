@@ -81,14 +81,14 @@ acc = va.MulAdd(vb, acc)               // acc += va*vb を 8 レーン同時に(
 `archsimd` はアーキテクチャごとに型も命令も違う API で、Go 1.27 時点で対応するアーキテクチャは次の 3 つです。
 
 
-| 呼び名         | どの CPU か                                        | archsimd が出している SIMD 命令セット(レジスタ幅) |
-| ----------- | ----------------------------------------------- | -------------------------------- |
-| amd64       | Intel と AMD の 64bit CPU                         | AVX2(256bit)、AVX-512(512bit)     |
-| arm64       | Arm 系の 64bit CPU(Apple Silicon、AWS Graviton など) | Neon(128bit)                     |
-| WebAssembly | ブラウザなどで動く実行形式                                   | 128bit の SIMD                    |
+| 呼び名         | どの CPU か                                        | SIMD 命令セットの例(レジスタ幅)          |
+| ----------- | ----------------------------------------------- | ---------------------------- |
+| amd64       | Intel と AMD の 64bit CPU                         | AVX2(256bit)、AVX-512(512bit) |
+| arm64       | Arm 系の 64bit CPU(Apple Silicon、AWS Graviton など) | Neon(128bit)                 |
+| WebAssembly | ブラウザなどで動く実行形式                                   | 128bit の SIMD                |
 
 
-表の 3 列目は各 CPU が持つ SIMD 命令セットの全てではありません。x86 には AVX より古い SSE 系(128bit)があり、Arm にはレジスタ幅が実装依存の SVE もありますが、Go 1.27 の archsimd が API として出しているのは表の範囲です。
+3 列目は本編に出てくるものだけ挙げています。SIMD 命令セットはほかにもあり、x86 には AVX より古い SSE 系(128bit)、Arm にはレジスタ幅が実装依存の SVE などがあります。
 
 本編は amd64(Codespaces)で進め、使うのは AVX2 と FMA だけです。Apple Silicon の Mac で動かす場合は [setup.md](setup.md) の「Apple Silicon で動かす場合」を見てください。WebAssembly は扱いません。
 
