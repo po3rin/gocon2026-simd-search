@@ -4,7 +4,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 bench-maxsim recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-figures roofline-plot concept-images spill recall cpuinfo isa-report isa-report-amd64
+.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-figures roofline-plot concept-images spill recall cpuinfo isa-report isa-report-amd64
 
 test:
 	$(GO) test ./...
@@ -73,11 +73,6 @@ bench-int8:
 recall-int8:
 	$(GO) test ./internal/index -run 'TestRecallInt8$$' -v
 
-## 付録 appendix.md 7 節: MaxSim(late interaction)。1 回のロードに多数の内積が最初から含まれるので、
-## 最初から演算律速で SIMD が効く検索方式。
-bench-maxsim:
-	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s
-
 ## ルーフライン: 図に「点を打つ」ための計測(bench2 と同じコマンドなのでエイリアス)。
 ## Stage 0/1 は GFLOP/s・AI・MB/query、Stage 3(binary)は MB/query のみ
 ## (popcount なので flop 軸に乗らない)。docs/workshop/workshop.md 参照
@@ -118,7 +113,7 @@ roofline-figures:
 ## 手描きの概念図(生成コマンドを持たない docs/images/*.svg)を PNG 化。SVG を編集したら叩く。
 concept-images:
 	@command -v rsvg-convert >/dev/null 2>&1 \
-	  && for f in scalar-vs-simd vector-search embedding-similarity memory-wall register-spill vzeroupper maxsim rerank masked-load recall int8-quantization; do \
+	  && for f in scalar-vs-simd vector-search embedding-similarity memory-wall register-spill vzeroupper rerank masked-load recall int8-quantization; do \
 	       rsvg-convert -w 1920 docs/images/$$f.svg -o docs/images/$$f.png; done \
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
