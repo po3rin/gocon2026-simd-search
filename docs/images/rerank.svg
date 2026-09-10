@@ -2,7 +2,7 @@
 <defs><marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker></defs>
 <style>text{font-family:'Helvetica Neue',Helvetica,Arial,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;fill:#111827}</style>
 <rect width="960" height="520" fill="#ffffff"/>
-<text x="480" y="34" font-size="18" font-weight="600" text-anchor="middle">Stage 5 の手順: 1bit で候補を絞り、fp32 で採点し直す</text>
+<text x="480" y="34" font-size="18" font-weight="600" text-anchor="middle">Stage 4 の手順: 1bit で候補を絞り、fp32 で採点し直す</text>
 <text x="480" y="56" font-size="11.5" fill="#6b7280" text-anchor="middle">k = 10 件を返す検索。1 段目で k × 10 = 100 件まで絞り、2 段目でその 100 件だけを正確に計算する</text>
 
 <!-- 入力 -->
@@ -16,7 +16,7 @@
 
 <!-- 1 段目 -->
 <rect x="290" y="100" width="280" height="160" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
-<text x="430" y="128" font-size="14" font-weight="600" text-anchor="middle">1 段目: 1bit で絞る(Stage 4)</text>
+<text x="430" y="128" font-size="14" font-weight="600" text-anchor="middle">1 段目: 1bit で絞る(Stage 3)</text>
 <text x="430" y="152" font-size="11.5" fill="#374151" text-anchor="middle">10 万件すべてとハミング距離を計算</text>
 <text x="430" y="170" font-size="11.5" fill="#374151" text-anchor="middle">4.8 MB はキャッシュに乗る。0.77 ms</text>
 <text x="430" y="196" font-size="11.5" fill="#374151" text-anchor="middle">距離が近い順に上位 100 件を残す</text>
@@ -30,7 +30,7 @@
 <rect x="640" y="100" width="280" height="160" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
 <text x="780" y="128" font-size="14" font-weight="600" text-anchor="middle">2 段目: fp32 で採点し直す</text>
 <text x="780" y="152" font-size="11.5" fill="#374151" text-anchor="middle">100 件だけ fp32 版を読み、正確な内積を計算</text>
-<text x="780" y="170" font-size="11.5" fill="#374151" text-anchor="middle">Stage 1 の SIMD カーネル vec.Dot をそのまま使う</text>
+<text x="780" y="170" font-size="11.5" fill="#374151" text-anchor="middle">Stage 1 の SIMD 内積 vec.Dot をそのまま使う</text>
 <text x="780" y="196" font-size="11.5" fill="#374151" text-anchor="middle">100 件 × 1536 byte = 154 KB。キャッシュに乗る</text>
 <text x="780" y="222" font-size="11.5" fill="#16a34a" text-anchor="middle">追加の時間は 0.05 ms</text>
 <text x="780" y="240" font-size="11.5" fill="#16a34a" text-anchor="middle">内積の大きい順に並べ直して上位 10 件を返す</text>
