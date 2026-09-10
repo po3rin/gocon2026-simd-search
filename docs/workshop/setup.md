@@ -9,9 +9,15 @@
 
 [GitHub Codespaces](https://docs.github.com/en/codespaces) は、リポジトリの開発環境をブラウザ上の VS Code で開くサービスです。
 
-1. このリポジトリのページを開く
-2. 緑の `Code` ボタンを押し、`Codespaces` タブの `Create codespace on main` を選ぶ
+1. このリポジトリのページを開く: [https://github.com/po3rin/gocon2026-simd-search](https://github.com/po3rin/gocon2026-simd-search)
+2. 緑の `Code` ボタンを押し、`Codespaces` タブの「…」から `New with options...` を選ぶ(マシンタイプを選ぶため)
+
+   ![Code ボタン → Codespaces タブ → 「…」→ New with options...](../images/codespaces-new-with-options.png)
+
 3. マシンは `4-core`(16 GB RAM)を選ぶ。
+
+   ![Machine type で 4-core を選んで Create codespace](../images/codespaces-machine-type.png)
+
 4. しばらく待つ(初回はコンテナのビルドで 1〜3 分)。VS Code がブラウザで開けば準備完了
 
 [`.devcontainer/`](../../.devcontainer/)([Dev Container](https://containers.dev/) の設定)に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま使えます。
