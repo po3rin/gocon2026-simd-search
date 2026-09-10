@@ -51,7 +51,7 @@ bench: bench3
 bench-bonus:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchBinarySIMD$$' -benchtime 2s
 
-## コラム: goroutine 並列はどの上限に効くか(workshop.md §06 のコラム)。
+## goroutine 並列はどの上限に効くか(付録 appendix.md 8 節)。
 ## メモリ律速の全探索(B=1)はコアが DRAM 帯域を取り合うのでサブリニア、
 ## 演算律速のバッチ(B=32)はほぼリニアに伸びる。
 bench-parallel:
@@ -84,7 +84,7 @@ roofline:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
 ## バッチ化の効き: B=1(全探索) vs B=32(バッチ)で scalar/SIMD を比較
-## 演算律速にすると SIMD が exact 検索でも効くことを見る(docs/workshop/workshop.md Stage 2)
+## 演算律速にすると SIMD が exact 検索でも効くことを見る(付録 appendix.md 7 節)
 roofline-batch:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s
 
@@ -94,7 +94,7 @@ roofline-batch:
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|FLOP_NEON|ReadBW|TriadBW)$$' -benchtime 2s
 
-## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(docs/workshop §06 Stage 2)
+## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(付録 appendix.md 7 節)
 ## 自分のマシンの天井で: make roofline-decompose PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
 ## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
 PEAK ?= 25.59

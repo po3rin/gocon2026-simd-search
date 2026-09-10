@@ -45,7 +45,7 @@ make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 
 ## どの CPU が当たっても本編は動きます
 
-Codespaces は割り当てられる CPU(Intel/AMD、世代)を選べませんが、本編が使う SIMD は AVX2 + FMA だけです(Stage 1/2/5 の内積。Stage 3 の int8 内積は AVX2 のみ)。過去 10 年の x86(Intel は Haswell 2013 年以降、AMD は 2015 年以降)がほぼ全て持つので、どの CPU でも全ステージ再現します。ただし出る数字は CPU で変わります。教材は各自の数字で進める作りになっているので、それで問題ありません。
+Codespaces は割り当てられる CPU(Intel/AMD、世代)を選べませんが、本編が使う SIMD は AVX2 + FMA だけです(Stage 1/5 と付録のバッチ化の内積。Stage 3 の int8 内積は AVX2 のみ)。過去 10 年の x86(Intel は Haswell 2013 年以降、AMD は 2015 年以降)がほぼ全て持つので、どの CPU でも全ステージ再現します。ただし出る数字は CPU で変わります。教材は各自の数字で進める作りになっているので、それで問題ありません。
 
 AVX-512 は本編では使いません。Stage 4 で見るとおり、量子化後は popcount を SIMD 化しても速くならないためです。AVX-512 を実機で確かめたい人向けの実測は[付録](../appendix/appendix.md#3-avx-512-の-simd-popcount)にあります。
 
