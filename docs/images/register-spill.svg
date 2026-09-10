@@ -56,9 +56,9 @@
 <text x="672" y="288" font-size="10.5" fill="#374151">書き戻す</text>
 <text x="520" y="366" font-size="10.5" fill="#6b7280">1 周の機械語(a0 の 1 本ぶん。これが 12 本続く)</text>
 <g font-size="11" class="mono">
-<text x="520" y="390">VMOVDQU 0x398(SP), X2</text><text x="742" y="390" font-size="10.5" fill="#6b7280">スタックから読む</text>
+<text x="520" y="390">VMOVDQU 0x1b8(SP), Y2</text><text x="742" y="390" font-size="10.5" fill="#6b7280">スタックから読む</text>
 <text x="520" y="412">VFMADD213PS …</text><text x="742" y="412" font-size="10.5" fill="#6b7280">FMA</text>
-<text x="520" y="434">VMOVDQU X2, 0x398(SP)</text><text x="742" y="434" font-size="10.5" fill="#6b7280">スタックへ書き戻す</text>
+<text x="520" y="434">VMOVDQU Y2, 0x1b8(SP)</text><text x="742" y="434" font-size="10.5" fill="#6b7280">スタックへ書き戻す</text>
 </g>
 <text x="520" y="456" font-size="12" font-weight="600" fill="#9a3412">FMA 1 命令に読み書き 2 命令が付き、25.6 GFLOP/s で頭打ち</text>
 
