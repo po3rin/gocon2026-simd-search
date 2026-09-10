@@ -20,6 +20,8 @@
 
 4. しばらく待つ(初回はコンテナのビルドで 1〜3 分)。VS Code がブラウザで開けば準備完了
 
+   ![ブラウザで VS Code が開き、下部にターミナルが出れば準備完了](../images/codespaces-ready.png)
+
 [`.devcontainer/`](../../.devcontainer/)([Dev Container](https://containers.dev/) の設定)に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま使えます。
 
 ## 2. 動作確認(これが通れば準備OK)
