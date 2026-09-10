@@ -89,7 +89,7 @@ roofline-batch:
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|FLOP_NEON|ReadBW|TriadBW)$$' -benchtime 2s
 
-## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(付録 appendix.md 3 節)
+## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(docs 未掲載の補助図)
 ## 自分のマシンの天井で: make roofline-decompose PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
 ## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
 PEAK ?= 25.59
