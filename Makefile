@@ -4,7 +4,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-figures roofline-plot concept-images spill recall cpuinfo isa-report isa-report-amd64
+.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 recall-int8 roofline roofline-batch roofline-ceiling roofline-figures roofline-plot concept-images spill recall cpuinfo isa-report isa-report-amd64
 
 test:
 	$(GO) test ./...
@@ -89,16 +89,8 @@ roofline-batch:
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|FLOP_NEON|ReadBW|TriadBW)$$' -benchtime 2s
 
-## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(docs 未掲載の補助図)
-## 自分のマシンの天井で: make roofline-decompose PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
-## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
 PEAK ?= 25.59
 BW   ?= 20.80
-roofline-decompose:
-	$(GO) run ./cmd/roofline-decompose -peak $(PEAK) -bw $(BW) -o docs/images/memory-vs-compute-roofline.svg
-	@command -v rsvg-convert >/dev/null 2>&1 \
-	  && rsvg-convert -w 1920 docs/images/memory-vs-compute-roofline.svg -o docs/images/memory-vs-compute-roofline.png \
-	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
 ## 静止画のルーフライン図(docs/images/roofline-concept, rl-batch、rl-stage0〜4, roofline-plot)を同じ見た目で再生成。
 ## 数値は cmd/roofline-figures/main.go に直書き(workshop.md の Codespaces 実測値)。再計測したらそこを直して叩く。

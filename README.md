@@ -27,7 +27,7 @@ Go 1.27 の実験的 SIMD パッケージ(`simd/archsimd`)で Pure Go のベク�
 ```
 internal/vec/    距離カーネル(Stage ごとの内積・ハミング距離の実装)
 internal/index/  ミニ検索エンジン(Index / Search API)+ ベンチ + roofline 計測
-cmd/             計測補助ツール(isa-report、roofline の分解・作図)
+cmd/             計測補助ツール(isa-report、roofline の作図)
 docs/            教材・付録・図
 Makefile         各 Stage の計測コマンド(コメント付き)
 ```

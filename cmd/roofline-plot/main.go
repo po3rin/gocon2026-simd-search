@@ -16,7 +16,7 @@
 //
 // Ceilings default to the EPYC 7763 example; pass your own from
 // `make roofline-ceiling`. Zero dependencies — same hand-built-SVG style as
-// cmd/roofline-decompose. Benchmarks without AI/GFLOP/s (e.g. SearchBinary,
+// cmd/roofline-figures. Benchmarks without AI/GFLOP/s (e.g. SearchBinary,
 // which uses Hamming distance, not flop) are skipped: they live on a different
 // axis and are covered by the static Stage 3 image (docs/images/rl-stage3.png) instead.
 package main
