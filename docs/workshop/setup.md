@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Codespace を起動する(30秒)
+## 1. Codespace を起動する
 
 [GitHub Codespaces](https://docs.github.com/en/codespaces) は、リポジトリの開発環境をブラウザ上の VS Code で開くサービスです。
 
@@ -28,7 +28,7 @@ make test     # 正しさ確認。PASS が出ればOK(初回はビルド込み�
 make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 ```
 
-数字が出たら [workshop.md](workshop.md) の「04. まず動かしてみる」へ進んでください。
+数字が出たら [workshop.md](workshop.md) に戻り、続きを読み進めてください。
 ベンチの数字は共有 VM の揺れで実行ごとに ±5% ほど変わりますが、それで正常です。
 
 ---

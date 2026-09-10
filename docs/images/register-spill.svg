@@ -1,61 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620">
 <defs>
-<marker id="ag" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker>
-<marker id="ar" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker>
+<marker id="ag" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker>
 </defs>
 <style>text{font-family:'Helvetica Neue',Helvetica,Arial,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;fill:#111827} .mono{font-family:Menlo,Consolas,monospace}</style>
-<rect width="960" height="600" fill="#ffffff"/>
+<rect width="960" height="620" fill="#ffffff"/>
 <text x="480" y="34" font-size="18" font-weight="600" text-anchor="middle">register spill: アキュムレータがレジスタに居続けられない</text>
-<text x="480" y="56" font-size="11.5" fill="#6b7280" text-anchor="middle">12 本のアキュムレータ a0〜a11 を FMA で更新し続けるループ(演算ピークの計測)。1 周ぶんの流れ</text>
+<text x="480" y="58" font-size="12" fill="#6b7280" text-anchor="middle">演算ピークを測るループ(アキュムレータ 12 本、make roofline-ceiling)の 1 周で起きていること</text>
 
-<!-- 左: 理想 -->
-<rect x="40" y="80" width="420" height="380" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
-<text x="250" y="108" font-size="14" font-weight="600" fill="#16a34a" text-anchor="middle">理想: 12 本ぜんぶレジスタに置いたまま回す</text>
-<text x="70" y="136" font-size="11" fill="#6b7280">レジスタ(CPU の中。最も速い)</text>
-<g font-size="12">
-<rect x="70" y="150" width="120" height="34" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="130" y="172" text-anchor="middle" class="mono">Y0 = a0</text>
-<line x1="196" y1="167" x2="256" y2="167" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/><text x="266" y="171" class="mono">FMA</text>
-<rect x="70" y="194" width="120" height="34" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="130" y="216" text-anchor="middle" class="mono">Y1 = a1</text>
-<line x1="196" y1="211" x2="256" y2="211" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/><text x="266" y="215" class="mono">FMA</text>
-<rect x="70" y="238" width="120" height="34" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="130" y="260" text-anchor="middle" class="mono">Y2 = a2</text>
-<line x1="196" y1="255" x2="256" y2="255" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/><text x="266" y="259" class="mono">FMA</text>
-<text x="130" y="296" text-anchor="middle" fill="#6b7280">…</text>
-<rect x="70" y="310" width="120" height="34" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="130" y="332" text-anchor="middle" class="mono">Y13 = a11</text>
-<line x1="196" y1="327" x2="256" y2="327" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/><text x="266" y="331" class="mono">FMA</text>
+<!-- 左: 期待 -->
+<rect x="40" y="80" width="430" height="386" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="255" y="108" font-size="13.5" font-weight="600" text-anchor="middle">期待: 12 本ともレジスタに置いたまま回る</text>
+<text x="70" y="134" font-size="10.5" fill="#6b7280">レジスタ(CPU の中、最速の置き場)</text>
+<rect x="70" y="142" width="170" height="196" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<g font-size="11.5" class="mono">
+<rect x="85" y="154" width="140" height="24" rx="5" fill="#ffffff" stroke="#bbf7d0"/><text x="155" y="171" text-anchor="middle">a0</text>
+<rect x="85" y="186" width="140" height="24" rx="5" fill="#ffffff" stroke="#bbf7d0"/><text x="155" y="203" text-anchor="middle">a1</text>
+<rect x="85" y="218" width="140" height="24" rx="5" fill="#ffffff" stroke="#bbf7d0"/><text x="155" y="235" text-anchor="middle">a2</text>
+<text x="155" y="266" text-anchor="middle" fill="#6b7280">…</text>
+<rect x="85" y="282" width="140" height="24" rx="5" fill="#ffffff" stroke="#bbf7d0"/><text x="155" y="299" text-anchor="middle">a11</text>
 </g>
-<text x="70" y="380" font-size="12">1 周 = FMA が 12 回。メモリには触らない</text>
-<text x="70" y="400" font-size="12">12 本 + 定数 2 本 = 14 本。使える 15 本に収まる</text>
-<rect x="70" y="418" width="360" height="30" rx="6" fill="#16a34a"/>
-<text x="250" y="438" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">理論ピーク 約 110 GFLOP/s(FMA だけが回るとき)</text>
+<text x="280" y="134" font-size="10.5" fill="#6b7280">1 周の機械語</text>
+<g font-size="11.5" class="mono">
+<text x="280" y="164">FMA a0</text>
+<text x="280" y="188">FMA a1</text>
+<text x="280" y="212">FMA a2</text>
+<text x="280" y="236" fill="#6b7280">…</text>
+<text x="280" y="260">FMA a11</text>
+</g>
+<text x="280" y="300" font-size="11.5">FMA 12 命令だけ。</text>
+<text x="280" y="318" font-size="11.5">メモリには触らない</text>
+<text x="70" y="376" font-size="11.5">a0〜a11 と定数 2 本で 14 本。使える 15 本の</text>
+<text x="70" y="394" font-size="11.5">Y レジスタに収まる本数</text>
+<text x="70" y="432" font-size="12" font-weight="600" fill="#15803d">この形なら理論ピーク約 110 GFLOP/s が狙える</text>
 
 <!-- 右: 実際 -->
-<rect x="500" y="80" width="420" height="380" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
-<text x="710" y="108" font-size="14" font-weight="600" fill="#dc2626" text-anchor="middle">実際(Go 1.26 / 1.27): 毎周スタックと往復する</text>
-<text x="530" y="136" font-size="11" fill="#6b7280">スタック(メモリ上。レジスタよりずっと遅い)</text>
-<rect x="530" y="146" width="130" height="220" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
-<g font-size="12" class="mono">
-<rect x="545" y="158" width="100" height="28" rx="5" fill="#ffffff" stroke="#fecaca"/><text x="595" y="177" text-anchor="middle">a0</text>
-<rect x="545" y="194" width="100" height="28" rx="5" fill="#ffffff" stroke="#fecaca"/><text x="595" y="213" text-anchor="middle">a1</text>
-<rect x="545" y="230" width="100" height="28" rx="5" fill="#ffffff" stroke="#fecaca"/><text x="595" y="249" text-anchor="middle">a2</text>
-<text x="595" y="290" text-anchor="middle" fill="#6b7280">…</text>
-<rect x="545" y="316" width="100" height="28" rx="5" fill="#ffffff" stroke="#fecaca"/><text x="595" y="335" text-anchor="middle">a11</text>
+<rect x="490" y="80" width="430" height="386" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="705" y="108" font-size="13.5" font-weight="600" text-anchor="middle">実際(Go 1.26 / 1.27): 毎周スタックと往復する</text>
+<text x="520" y="134" font-size="10.5" fill="#6b7280">スタック(メモリ上、ずっと遅い)</text>
+<rect x="520" y="142" width="140" height="196" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+<g font-size="11.5" class="mono">
+<rect x="535" y="154" width="110" height="24" rx="5" fill="#ffffff" stroke="#fed7aa"/><text x="590" y="171" text-anchor="middle">a0</text>
+<rect x="535" y="186" width="110" height="24" rx="5" fill="#ffffff" stroke="#fed7aa"/><text x="590" y="203" text-anchor="middle">a1</text>
+<rect x="535" y="218" width="110" height="24" rx="5" fill="#ffffff" stroke="#fed7aa"/><text x="590" y="235" text-anchor="middle">a2</text>
+<text x="590" y="266" text-anchor="middle" fill="#6b7280">…</text>
+<rect x="535" y="282" width="110" height="24" rx="5" fill="#ffffff" stroke="#fed7aa"/><text x="590" y="299" text-anchor="middle">a11</text>
 </g>
-<text x="825" y="188" font-size="11" fill="#6b7280" text-anchor="middle">レジスタ(1 本だけ使い回す)</text>
-<rect x="760" y="196" width="130" height="80" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
-<text x="825" y="226" font-size="13" font-weight="600" text-anchor="middle" class="mono">Y2</text>
-<text x="825" y="252" font-size="12" text-anchor="middle" class="mono">② FMA</text>
-<line x1="648" y1="200" x2="754" y2="222" stroke="#dc2626" stroke-width="1.8" marker-end="url(#ar)"/>
-<text x="690" y="192" font-size="11" fill="#dc2626">① 読み戻す</text>
-<line x1="754" y1="256" x2="650" y2="300" stroke="#dc2626" stroke-width="1.8" marker-end="url(#ar)"/>
-<text x="686" y="308" font-size="11" fill="#dc2626">③ 書き戻す</text>
-<text x="530" y="390" font-size="12">1 周 = (読み + FMA + 書き) × 12 回</text>
-<text x="530" y="408" font-size="12">計算 1 命令ごとに読み書き 2 命令が付き、そちらで時間を使う</text>
-<rect x="530" y="418" width="360" height="30" rx="6" fill="#dc2626"/>
-<text x="710" y="438" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">実測 25.6 GFLOP/s(Codespaces / EPYC 7763)</text>
+<text x="762" y="164" font-size="10.5" fill="#6b7280">レジスタ(1 本だけ使い回す)</text>
+<rect x="762" y="172" width="136" height="86" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<rect x="777" y="186" width="106" height="24" rx="5" fill="#ffffff" stroke="#bbf7d0"/>
+<text x="830" y="203" font-size="11.5" text-anchor="middle" class="mono">Y2</text>
+<text x="830" y="240" font-size="10.5" fill="#6b7280" text-anchor="middle">FMA はここで実行</text>
+<line x1="666" y1="186" x2="756" y2="200" stroke="#6b7280" stroke-width="1.5" marker-end="url(#ag)"/>
+<text x="678" y="180" font-size="10.5" fill="#374151">読む</text>
+<line x1="756" y1="240" x2="666" y2="276" stroke="#6b7280" stroke-width="1.5" marker-end="url(#ag)"/>
+<text x="672" y="288" font-size="10.5" fill="#374151">書き戻す</text>
+<text x="520" y="366" font-size="10.5" fill="#6b7280">1 周の機械語(a0 の 1 本ぶん。これが 12 本続く)</text>
+<g font-size="11" class="mono">
+<text x="520" y="390">VMOVDQU 0x398(SP), X2</text><text x="742" y="390" font-size="10.5" fill="#6b7280">スタックから読む</text>
+<text x="520" y="412">VFMADD213PS …</text><text x="742" y="412" font-size="10.5" fill="#6b7280">FMA</text>
+<text x="520" y="434">VMOVDQU X2, 0x398(SP)</text><text x="742" y="434" font-size="10.5" fill="#6b7280">スタックへ書き戻す</text>
+</g>
+<text x="520" y="456" font-size="12" font-weight="600" fill="#9a3412">FMA 1 命令に読み書き 2 命令が付き、25.6 GFLOP/s で頭打ち</text>
 
-<!-- 下: まとめ -->
-<rect x="40" y="484" width="880" height="86" rx="8" fill="#fffbeb" stroke="#fde68a" stroke-width="1.5"/>
-<text x="60" y="510" font-size="12.5"><tspan font-weight="600">原因はコンパイラのレジスタ割り当て。</tspan>レジスタが足りないのではなく、載せてくれない(golang/go#76969。1.27 でも変わらず)</text>
-<text x="60" y="532" font-size="12.5">機械語で見ると、各 FMA の前後に <tspan class="mono">VMOVDQU …(SP)</tspan> の読み書きが付く(<tspan class="mono">make spill</tspan> で確認できる)</text>
-<text x="60" y="554" font-size="12.5">検索の結論は変わらない。検索は算術強度 0.5 のメモリ律速で、当たっている上限はメモリ帯域のまま</text>
+<text x="60" y="510" font-size="11.5" fill="#374151">レジスタが足りないのではない。14 本は使える 15 本に収まるのに、Go のコンパイラが値をレジスタに載せたままにできない</text>
+<text x="60" y="530" font-size="11.5" fill="#374151">(golang/go#76969。Go 1.27 でも残っている)。機械語は make spill で確認でき、各 FMA の前後に (SP) との読み書きが並ぶ。</text>
+<text x="60" y="560" font-size="11.5" fill="#6b7280">GFLOP/s の実測値は Codespaces(AMD EPYC 7763)のもの。理論ピークの内訳は本編 §04 を参照。</text>
 </svg>

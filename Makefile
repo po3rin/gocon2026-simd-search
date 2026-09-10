@@ -4,7 +4,7 @@
 GO ?= go
 export GOEXPERIMENT = simd
 
-.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 recall-int8 roofline roofline-batch roofline-ceiling roofline-decompose roofline-figures roofline-plot concept-images spill recall cpuinfo isa-report isa-report-amd64
+.PHONY: test lint fmt bench bench0 bench1 bench2 bench3 bench-portable bench-bonus bench-parallel bench-nsweep bench-int8 recall-int8 roofline roofline-batch roofline-ceiling roofline-figures roofline-plot concept-images spill recall cpuinfo isa-report isa-report-amd64
 
 test:
 	$(GO) test ./...
@@ -84,21 +84,13 @@ roofline-batch:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s
 
 ## ルーフラインの天井そのものを実測: 演算ピーク(FMA飽和) + メモリ帯域(read/triad)
-## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §05)
+## これで推定だった天井を実測値へ置き換える(docs/workshop/workshop.md §04)
 ## amd64 は FLOP_AVX2、arm64(Apple Silicon)は FLOP_NEON が走る(ReadBW/TriadBW も arm64 は Neon 版)。
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|FLOP_NEON|ReadBW|TriadBW)$$' -benchtime 2s
 
-## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(付録 appendix.md 3 節)
-## 自分のマシンの天井で: make roofline-decompose PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
-## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
 PEAK ?= 25.59
 BW   ?= 20.80
-roofline-decompose:
-	$(GO) run ./cmd/roofline-decompose -peak $(PEAK) -bw $(BW) -o docs/images/memory-vs-compute-roofline.svg
-	@command -v rsvg-convert >/dev/null 2>&1 \
-	  && rsvg-convert -w 1920 docs/images/memory-vs-compute-roofline.svg -o docs/images/memory-vs-compute-roofline.png \
-	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
 ## 静止画のルーフライン図(docs/images/roofline-concept, rl-batch、rl-stage0〜4, roofline-plot)を同じ見た目で再生成。
 ## 数値は cmd/roofline-figures/main.go に直書き(workshop.md の Codespaces 実測値)。再計測したらそこを直して叩く。
@@ -117,7 +109,7 @@ concept-images:
 	       rsvg-convert -w 1920 docs/images/$$f.svg -o docs/images/$$f.png; done \
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
-## 実測値から対話的ルーフライン HTML を生成(docs/workshop §06)。叩くたびに点が打たれ、
+## 実測値から対話的ルーフライン HTML を生成(docs/workshop §05)。叩くたびに点が打たれ、
 ## Stage 1(AI=0.5)はメモリ帯域の上限に張り付き、バッチ(AI=16)はリッジを越えて演算側へ動く。
 ## 自分のマシンの天井で: make roofline-plot PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
 ## 理論ピークの線も出すなら TPEAK=110(AVX2 理論値・CPU 依存なので既定は off)。
@@ -128,7 +120,7 @@ roofline-plot:
 	$(GO) run ./cmd/roofline-plot -peak $(PEAK) -bw $(BW) -tpeak $(TPEAK) < /tmp/roofline-bench.txt > /tmp/roofline.html
 	@echo "open /tmp/roofline.html"
 
-## register spill を見る(docs/workshop §05)。演算ピーク(12本アキュムレータ)ループ
+## register spill を見る(docs/workshop §04)。演算ピーク(12本アキュムレータ)ループ
 ## BenchmarkPeakFLOP_AVX2 の機械語をコンパイラ -S で出し、各アキュムレータ aN が毎回
 ## 「ロード(SP)、VFMADD、ストア(SP)」とスタックへ退避(spill)している様子を表示する。
 ## 12本+m+c=14 は使える 15本の Y レジスタ(Y15 は Go ABI の予約ゼロレジスタ:

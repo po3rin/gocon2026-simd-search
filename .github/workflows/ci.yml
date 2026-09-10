@@ -83,9 +83,8 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
-  # 生成図(docs/images の SVG)が cmd/roofline-figures /
-  # cmd/roofline-decompose の現在のコードと一致していることの確認。
-  # 引数は Makefile の roofline-figures / roofline-decompose と揃えること
+  # 生成図(docs/images の SVG)が cmd/roofline-figures の現在のコードと一致していることの確認。
+  # 引数は Makefile の roofline-figures と揃えること
   figures:
     name: 生成図の鮮度チェック
     runs-on: ubuntu-latest
@@ -98,7 +97,6 @@ jobs:
       - run: |
           mkdir -p /tmp/figs
           go run ./cmd/roofline-figures -peak 25.59 -bw 20.80 -tpeak 110 -out /tmp/figs
-          go run ./cmd/roofline-decompose -peak 25.59 -bw 20.80 -o /tmp/figs/memory-vs-compute-roofline.svg
           for f in /tmp/figs/*.svg; do
-            diff -u "docs/images/$(basename "$f")" "$f" || { echo "図が古い: make roofline-figures / roofline-decompose を実行してコミットしてください"; exit 1; }
+            diff -u "docs/images/$(basename "$f")" "$f" || { echo "図が古い: make roofline-figures を実行してコミットしてください"; exit 1; }
           done
