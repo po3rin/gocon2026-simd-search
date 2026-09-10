@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440">
+<defs><marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker></defs>
+<style>text{font-family:'Helvetica Neue', Helvetica, Arial, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;}</style>
+<rect width="960" height="440" fill="#ffffff"/>
+<text x="480" y="36" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">int8 の対称スカラ量子化 — 1 要素 4 byte を 1 byte にする</text>
+<text x="480" y="60" font-size="12" fill="#6b7280" text-anchor="middle">scale = maxAbs ÷ 127、q = round(v ÷ scale)。復元は q × scale ≈ v</text>
+
+<!-- fp32 row: 5 cells w=120 gap=8, x0=(960-632)/2=164 -->
+<text x="164" y="100" font-size="13" font-weight="600" fill="#111827" text-anchor="start">fp32 のベクトル(1 要素 4 byte × 384 次元)</text>
+<rect x="164" y="110" width="120" height="44" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/><text x="224" y="137" font-size="13" fill="#111827" text-anchor="middle">0.82</text>
+<rect x="292" y="110" width="120" height="44" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/><text x="352" y="137" font-size="13" fill="#111827" text-anchor="middle">-0.33</text>
+<rect x="420" y="110" width="120" height="44" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/><text x="480" y="137" font-size="13" fill="#111827" text-anchor="middle">0.07</text>
+<rect x="548" y="110" width="120" height="44" rx="6" fill="#fff7ed" stroke="#fb923c" stroke-width="2"/><text x="608" y="137" font-size="13" font-weight="600" fill="#9a3412" text-anchor="middle">-0.99</text>
+<rect x="676" y="110" width="120" height="44" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/><text x="736" y="137" font-size="13" fill="#111827" text-anchor="middle">0.54 …</text>
+<text x="608" y="176" font-size="11.5" fill="#9a3412" text-anchor="middle">絶対値の最大(maxAbs = 0.99)が scale を決める: 0.99 ÷ 127 ≈ 0.0078</text>
+
+<!-- arrow -->
+<line x1="290" y1="170" x2="290" y2="220" stroke="#2563eb" stroke-width="1.5" marker-end="url(#ab)"/>
+<text x="304" y="200" font-size="12" fill="#2563eb" text-anchor="start">÷ scale して round(-127〜127 の整数へ)</text>
+
+<!-- int8 row -->
+<text x="164" y="240" font-size="13" font-weight="600" fill="#111827" text-anchor="start">int8 のベクトル(1 要素 1 byte × 384 次元)+ scale 1 個</text>
+<rect x="164" y="250" width="120" height="44" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="224" y="277" font-size="13" fill="#111827" text-anchor="middle">105</text>
+<rect x="292" y="250" width="120" height="44" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="352" y="277" font-size="13" fill="#111827" text-anchor="middle">-42</text>
+<rect x="420" y="250" width="120" height="44" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="480" y="277" font-size="13" fill="#111827" text-anchor="middle">9</text>
+<rect x="548" y="250" width="120" height="44" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="608" y="277" font-size="13" fill="#111827" text-anchor="middle">-127</text>
+<rect x="676" y="250" width="120" height="44" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="736" y="277" font-size="13" fill="#111827" text-anchor="middle">69 …</text>
+<rect x="820" y="250" width="86" height="44" rx="6" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/><text x="863" y="270" font-size="11" fill="#111827" text-anchor="middle">scale</text><text x="863" y="285" font-size="11" fill="#111827" text-anchor="middle">0.0078</text>
+<text x="480" y="316" font-size="11.5" fill="#6b7280" text-anchor="middle">-127〜127 の 255 段階。復元は 105 × 0.0078 ≈ 0.82 のように大きさの情報が戻る(1bit との違い)</text>
+
+<!-- bottom note -->
+<rect x="120" y="344" width="720" height="64" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<text x="480" y="370" font-size="13" fill="#111827" text-anchor="middle">内積は int8 のまま計算し、最後に scaleA × scaleB を 1 回掛けるだけ</text>
+<text x="480" y="392" font-size="13" fill="#111827" text-anchor="middle">運ぶ量が 4 byte から 1 byte になり、算術強度は 0.5 から 2 に上がる</text>
+</svg>

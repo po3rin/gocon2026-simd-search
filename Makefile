@@ -118,7 +118,7 @@ roofline-figures:
 ## 手描きの概念図(生成コマンドを持たない docs/images/*.svg)を PNG 化。SVG を編集したら叩く。
 concept-images:
 	@command -v rsvg-convert >/dev/null 2>&1 \
-	  && for f in scalar-vs-simd vector-search embedding-similarity memory-wall register-spill vzeroupper maxsim rerank masked-load recall; do \
+	  && for f in scalar-vs-simd vector-search embedding-similarity memory-wall register-spill vzeroupper maxsim rerank masked-load recall int8-quantization; do \
 	       rsvg-convert -w 1920 docs/images/$$f.svg -o docs/images/$$f.png; done \
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
