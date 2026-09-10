@@ -51,7 +51,7 @@ AVX-512 は本編では使いません。Stage 3 で見るとおり、量子化�
 
 ## ローカル(amd64 Linux / Windows)で動かす場合
 
-Codespaces を使わず手元で動かす場合に必要なのは Go 1.27 と make だけです。
+Codespaces を使わず手元で動かす場合に必要なのは Go 1.27 と make だけです。Go の SIMD 自体は Windows ネイティブでも動きます(CI の windows-latest で確認)が、Makefile がシェル前提なので、Windows では WSL2 か Git Bash など make の使える環境で実行してください。
 
 ```bash
 git clone https://github.com/po3rin/gocon2026-simd-search
