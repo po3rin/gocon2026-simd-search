@@ -5,17 +5,19 @@
 | 節 | 内容 | こんなときに |
 |---|---|---|
 | [1. Go の SIMD の 2 つの隠れた性能上限](#1-go-の-simd-の-2-つの隠れた性能上限) | VZEROUPPER の遷移ペナルティと register spill | 「演算ピークが理論値の 1/3〜1/4 で止まるのはなぜか」を知りたい |
-| [2. MaxSim](#2-maxsim) | 最初から演算律速な検索方式(late interaction)での SIMD の効き | Stage 2 の考え方を別の検索方式で見たい |
-| [3. AVX-512 の SIMD popcount](#3-avx-512-の-simd-popcount) | AVX-512 の SIMD popcount を試して速くならなかった実測 | Stage 4 の「SIMD 版 popcount は効かない」の根拠を見たい |
+| [2. MaxSim](#2-maxsim) | 最初から演算律速な検索方式(late interaction)での SIMD の効き | バッチ化の考え方を別の検索方式で見たい |
+| [3. AVX-512 の SIMD popcount](#3-avx-512-の-simd-popcount) | AVX-512 の SIMD popcount を試して速くならなかった実測 | Stage 3 の「SIMD 版 popcount は効かない」の根拠を見たい |
 | [4. 実行環境の調査](#4-実行環境の調査) | Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くか | 手元の Mac や Docker で数字が出ない理由を知りたい |
 | [5. 上限ベンチの中身](#5-上限ベンチの中身演算ピークとメモリ帯域の測り方) | 演算ピークとメモリ帯域を測るベンチのコード | 本編 §05 の `make roofline-ceiling` の数字がどう出ているかを知りたい |
 | [6. SIMD が効く境界はデータサイズの軸にもある](#6-simd-が効く境界はデータサイズの軸にもあるmake-bench-nsweep) | DB 件数を 1k〜1M に振って SIMD の倍率が落ちる境界を実測 | Stage 1 の内積単体 6.3x と全探索 4.5x の差を深掘りしたい |
+| [7. クエリのバッチ化](#7-クエリのバッチ化再利用で算術強度を上げる) | B=32 で算術強度を 16 に上げ、exact のまま SIMD をスカラの 5.9x 効かせる | 算術強度を上げるもう 1 つの方法(再利用)の実測を見たい |
+| [8. goroutine で並列化すればいいのでは](#8-goroutine-で並列化すればいいのではmake-bench-parallel) | メモリ律速はマシン全体の帯域、演算律速は物理コア数で頭打ちになる実測 | 並列化がどの上限に効くかを知りたい |
 
 ---
 
 ## 1. Go の SIMD の 2 つの隠れた性能上限
 
-VZEROUPPER の遷移ペナルティと register spill の話です。本編の Stage 0〜5 とは独立した読み物で、Go 1.26 / 1.27 の archsimd が出す機械語の現状に踏み込みたい人向けです。どちらもハードの限界ではなく、Go のコード生成がまだ発展途上であることが原因です。
+VZEROUPPER の遷移ペナルティと register spill の話です。本編の Stage 0〜4 とは独立した読み物で、Go 1.26 / 1.27 の archsimd が出す機械語の現状に踏み込みたい人向けです。どちらもハードの限界ではなく、Go のコード生成がまだ発展途上であることが原因です。
 
 この調査は AWS c7i(Intel Xeon 8488C / Sapphire Rapids)で行いました。本編の Codespaces(AMD EPYC 7763)とは CPU のメーカーが違うので、2 つの現象の出方も違います。
 
@@ -93,13 +95,13 @@ Go の archsimd はこの VZEROUPPER を自動挿入しません(1.26、1.27 と
 
 ## 2. MaxSim
 
-MaxSim(late interaction)は、最初から演算律速な検索方式です。本編の Stage 2 の考え方を、この方式に当てはめた実測です。`make bench-maxsim` で再現できます(Codespaces、AMD EPYC 7763)。
+MaxSim(late interaction)は、最初から演算律速な検索方式です。[7 節のクエリのバッチ化](#7-クエリのバッチ化再利用で算術強度を上げる)の考え方を、この方式に当てはめた実測です。`make bench-maxsim` で再現できます(Codespaces、AMD EPYC 7763)。
 
-本編の Stage 2 は「クエリが 32 本まとめて来る」状況を利用して、DB ベクトルを 1 回運ぶたびに 32 本と内積を取り、算術強度を上げました。MaxSim([ColBERT](https://arxiv.org/abs/2004.12832) 系)は、クエリと文書をそれぞれ複数のトークンベクトルで表し、クエリトークンごとに文書トークンとの最大内積を取って足し合わせる検索方式です。次の図は 1 文書を採点する流れです。
+バッチ化は「クエリが 32 本まとめて来る」状況を利用して、DB ベクトルを 1 回運ぶたびに 32 本と内積を取り、算術強度を上げました。MaxSim([ColBERT](https://arxiv.org/abs/2004.12832) 系)は、クエリと文書をそれぞれ複数のトークンベクトルで表し、クエリトークンごとに文書トークンとの最大内積を取って足し合わせる検索方式です。次の図は 1 文書を採点する流れです。
 
 ![MaxSim の採点の流れ](../images/maxsim.png)
 
-文書側のトークンを 1 回運ぶたびにクエリトークン全部と内積を取るので、Stage 2 と同じ構造が検索方式そのものに含まれています。クエリのトークン数を Tq とすると算術強度は Tq/2 で、Tq = 16 なら 8 flop/byte です。何もしなくても最初からリッジ(約 1.2)の右にあります。
+文書側のトークンを 1 回運ぶたびにクエリトークン全部と内積を取るので、バッチ化と同じ構造が検索方式そのものに含まれています。クエリのトークン数を Tq とすると算術強度は Tq/2 で、Tq = 16 なら 8 flop/byte です。何もしなくても最初からリッジ(約 1.2)の右にあります。
 
 1 万文書 × 4 トークン、クエリ 16 トークンで測った結果です。
 
@@ -108,13 +110,13 @@ MaxSim(late interaction)は、最初から演算律速な検索方式です。�
 | スカラ(`SearchMaxSimNaive`) | 239 ms | 2.06 | 8.0 flop/byte |
 | SIMD(`SearchMaxSimSIMD`) | 42 ms | 11.7 | 8.0 flop/byte |
 
-SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメモリ帯域の上限に当たって 4.5x で止まりましたが、MaxSim は演算律速なので SIMD がそのまま効きます。Stage 2 で行った「算術強度を上げる工夫」が、この検索方式では最初から組み込まれています。実装は [`internal/index/maxsim.go`](../../internal/index/maxsim.go) にあります。
+SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメモリ帯域の上限に当たって 4.5x で止まりましたが、MaxSim は演算律速なので SIMD がそのまま効きます。バッチ化で行った「算術強度を上げる工夫」が、この検索方式では最初から組み込まれています。実装は [`internal/index/maxsim.go`](../../internal/index/maxsim.go) にあります。
 
 ---
 
 ## 3. AVX-512 の SIMD popcount
 
-本編の Stage 4 で、1bit 量子化後のハミング距離は通常の POPCNT 命令で足り、SIMD 版の popcount(AVX-512 の VPOPCNT)を使っても速くならないと書きました。その実測です。
+本編の Stage 3 で、1bit 量子化後のハミング距離は通常の POPCNT 命令で足り、SIMD 版の popcount(AVX-512 の VPOPCNT)を使っても速くならないと書きました。その実測です。
 
 [`vec.HammingSIMD`](../../internal/vec/hamming_simd.go) は、`Uint64x4.OnesCount`(VPOPCNTQ 命令)で 4 つの uint64 をまとめて popcount します。この命令は AVX-512 の拡張(AVX512VPOPCNTDQ)で、Codespaces に割り当てられる AMD EPYC 7763 にはありません。AVX-512 のある機械(AWS の c7i など)を自分で用意すれば `make bench-bonus` で測れます。
 
@@ -138,7 +140,7 @@ Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くかを調
 
 ### 結論
 
-| 環境 | 正しさのテスト | スカラ実装(Stage 0/4) | Stage 1 SIMD 内積 | 付録 AVX-512 | 本編ベンチ再現 |
+| 環境 | 正しさのテスト | スカラ実装(Stage 0/3) | Stage 1 SIMD 内積 | 付録 AVX-512 | 本編ベンチ再現 |
 |---|---|---|---|---|---|
 | arm64 ネイティブ(Apple M3 Pro) | ✅ `make test` | ✅ | ✅ Neon 128bit(Go 1.27 から。1.26 はスカラに落ちる) | ❌ | △ 動くが本編(AVX2)とは別の点 |
 | Rosetta(`GOARCH=amd64`) | ✅ | ✅ | ❌ FMA=false でスカラに落ちる | ❌ AVX-512 非対応 | △ 量子化は再現、SIMD 内積は不可 |
@@ -154,7 +156,7 @@ Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くかを調
 | 正しさだけ確認したい | Apple Silicon(arm64) | `make test` |
 | Neon 版の SIMD を手元で見たい | Apple Silicon(arm64) | `make GO=$(go env GOPATH)/bin/go1.27.1 bench1`(本編の数字とは別物) |
 | amd64 側の SIMD パスのコンパイル確認をしたい | Apple Silicon(Rosetta) | `GOARCH=amd64 GOEXPERIMENT=simd go1.27.1 test ./...`(FMA 非対応なので実行はスカラ) |
-| 本編の最終形(Stage 0/1/4/5)を再現したい | Codespaces / devcontainer(amd64 ホスト) | `make bench`(Stage 2/3 は `roofline-batch` / `bench-int8`) |
+| 本編の最終形(Stage 0/1/3/4)を再現したい | Codespaces / devcontainer(amd64 ホスト) | `make bench`(Stage 2 は `bench-int8`、バッチは `roofline-batch`) |
 | AVX-512 VPOPCNT を実機で確かめたい | AVX-512 のある機械を自分で用意(AWS c7i など) | `make bench-bonus` |
 | CPU 機能の有無を確認したい | どこでも | `make isa-report`(Rosetta 側は `make isa-report-amd64`) |
 
@@ -179,7 +181,7 @@ hasVPOPCNT = archsimd.X86.AVX512() && archsimd.X86.AVX512VPOPCNTDQ()
 
 ### arm64 ネイティブ(Apple M3 Pro)
 
-Go 1.26 では `simd/archsimd` が amd64 専用で、ビルドタグでスカラのフォールバックに切り替わり、テストだけ通る状態でした。Go 1.27 から arm64(Neon、128bit)に対応したので、Stage 1 の SIMD 内積(`dot_arm64.go`)と Stage 3 の int8(`int8_arm64.go`)は Neon 版が走ります。レジスタ幅は 256bit から 128bit に半分になる一方、単コアのメモリ帯域は Codespaces より大きいので、ルーフライン上の点も倍率も本編とは別の位置になります。
+Go 1.26 では `simd/archsimd` が amd64 専用で、ビルドタグでスカラのフォールバックに切り替わり、テストだけ通る状態でした。Go 1.27 から arm64(Neon、128bit)に対応したので、Stage 1 の SIMD 内積(`dot_arm64.go`)と Stage 2 の int8(`int8_arm64.go`)は Neon 版が走ります。レジスタ幅は 256bit から 128bit に半分になる一方、単コアのメモリ帯域は Codespaces より大きいので、ルーフライン上の点も倍率も本編とは別の位置になります。
 
 ### Rosetta(`GOARCH=amd64` on Apple Silicon)
 
@@ -308,3 +310,97 @@ b.ReportMetric(gb, "triad-GB/s")   // ← 17.36
 | 1,000,000 | 1.5 GB(DRAM)   | 347 ms  | 89.5 ms | 3.9x |
 
 L3 に収まる間は内積単体に近い 5.7〜5.8x、DRAM に溢れた瞬間に 3.9x へ落ちて以後一定です。本編の 10 万件(154MB)は、意図的に DRAM から読む側に置いた設定です。本編は算術強度の軸で SIMD が効く境界を探しましたが、同じ境界はデータサイズの軸にも現れます。
+
+---
+
+## 7. クエリのバッチ化(再利用で算術強度を上げる)
+
+本編の Stage 1 はメモリ帯域の上限に達し、算術強度を上げる 2 つの方法(再利用とバイト削減)のうち、本編はバイト削減(Stage 2〜)で進みました。この節はもう 1 つの再利用を実測します。計測は 4 コア Codespace(AMD EPYC 7763)です。
+
+本編の検索は、1 本のクエリのために DB ベクトル 10 万本を DRAM から順に運び、それぞれと内積を 1 回取って、捨てます。クエリが 32 本あれば、同じ 10 万本を 32 回運び直すことになります。
+
+運ぶ回数を減らす方法があります。クエリを 32 本まとめて持っておき、DB ベクトルを 1 本運ぶたびに、32 本のクエリ全部と内積を取ってから捨てます。運ぶ量は 1 クエリのときと同じで、計算だけが 32 倍になります。
+
+```text
+1 本ずつ:   DB ベクトル 1 本を運ぶ → 内積 1 回        算術強度 0.5
+32 本まとめ: DB ベクトル 1 本を運ぶ → 内積 32 回       算術強度 0.5 × 32 = 16
+```
+
+算術強度 16 はリッジ(1.2)より右なので、点は演算律速側に移ります。そこなら SIMD が効く見込みです。1 つ 1 つの内積は Stage 1 と同じ計算なので、結果は正確なままです。
+
+なお、この形は行列と行列の掛け算そのものです(DB ベクトルを並べた行列 × クエリを並べた行列)。数値計算ライブラリや Faiss のバッチ検索が速いのも、同じ考え方で運ぶ回数を減らしているからです。
+
+```go
+// internal/index/index.go: B 本のクエリを 1 パスで処理(d のロードを再利用)
+func (ix *Index) SearchBatchSIMD(qs [][]float32, k int) [][]Result {
+    tops := make([]*topK, len(qs))
+    for b := range tops { tops[b] = newTopK(k) }
+    for id := 0; id < ix.N; id++ {
+        d := ix.Vec(id)                          // ① d を1回ロード
+        for b := range qs {                      // ② B本のクエリで使い回す(d はキャッシュ常駐)
+            tops[b].push(id, vec.Dot(qs[b], d))   // SIMD内積
+        }
+    }
+    /* 各 tops[b].results() を返す */
+}
+```
+
+```bash
+$ make roofline-batch    # B=1(全探索) vs B=32(バッチ)、scalar vs SIMD (EPYC 7763 実測)
+B=1   SearchSIMD         7.95 ms/query   9.66 GF   ← AI 0.5・メモリ帯域の上限(Stage 1)
+B=32  SearchBatchNaive  34.24 ms/query   2.24 GF   ← AI 16・scalar
+B=32  SearchBatchSIMD    5.79 ms/query  13.26 GF   ← AI 16・SIMD で 5.9x。演算律速・exact
+```
+
+![ルーフライン上のバッチ化の位置](../images/rl-batch.png)
+
+図: バッチ化で 算術強度が 0.5 から 16 と右へ動き、演算律速側に乗った(exact・精度そのまま)。
+
+B=32 でクエリを束ねると算術強度は 0.5 から 16 になり、リッジを越えて演算律速側に移りました。そこでは SIMD がスカラより 5.9x 速くなります。scalar batch が 34.2 ms/query、SIMD batch が 5.79 ms/query で、GFLOP/s は 2.24 から 13.3 です。Stage 1 では 4.5x で頭打ちだった SIMD が、算術強度を上げると効きます。1 クエリあたりの時間も 7.9 ms から 5.8 ms に縮みます。
+
+ちなみに「クエリが 32 本まとめて来る」という前提は実戦でも発生します。[ColBERT](https://arxiv.org/abs/2004.12832) のようにクエリを複数のベクトルで表す検索方式では、DB ベクトル 1 本に対して複数の内積を取ることが方式そのものに含まれていて、最初から演算律速です。[2. MaxSim](#2-maxsim) で実測しています(5.7x)。
+
+なぜ律速が入れ替わるのかは、時間の内訳で分かります。1 要素を処理する時間は、運ぶ時間と計算する時間のうち長い方でおおよそ決まります。計算する時間は要素あたり 2 flop で同じですが、バッチ化は運ぶ時間だけを 1/32 にします。そのため時間のかかっているポイントが、運ぶ時間から計算する時間に入れ替わります。下の図は本編 §05 で測った演算ピーク 25.6 GFLOP/s と read 帯域 20.8 GB/s から計算したものです。
+
+![メモリ時間と演算時間の反転(ルーフライン分解)](../images/memory-vs-compute-roofline.png)
+
+図: Go 実測の上限から計算した時間内訳。Stage 1(算術強度 0.5)はメモリ時間が演算の約 2.5 倍でメモリ律速、バッチ(算術強度 16)はメモリ時間が演算の約 1/13 に縮んで演算律速へ反転。`make roofline-decompose` で自分の上限から再生成できる。この「メモリ vs 演算」の内訳は CPU プロファイラ(pprof / trace)では出せず、ルーフラインが与えるもの。
+
+---
+
+## 8. goroutine で並列化すればいいのでは(make bench-parallel)
+
+本編は全部 1 コアで測っています。goroutine で複数コアに分ければ速くなるのか、実測で確かめます。DB を workers 個に分けて goroutine で分担し、最後に各 goroutine の上位 k 件を 1 つにまとめます([`internal/index/parallel.go`](../../internal/index/parallel.go))。
+
+```go
+for w := 0; w < workers; w++ {
+    go func(t *topK, lo, hi int) {   // 各 worker は自分のチャンクだけ走査
+        defer wg.Done()
+        for id := lo; id < hi; id++ {
+            t.push(id, vec.Dot(q, ix.Vec(id)))
+        }
+    }(tops[w], lo, hi)
+}
+wg.Wait()
+// worker ごとの top-k をマージ(チャンクは互いに素なので重複なし)
+```
+
+メモリ律速の全探索(B=1・本編 Stage 1 の形)と、演算律速のバッチ(B=32・上の 7 節の形)の両方を、workers = 1/2/4 で測ります。
+
+```bash
+$ make bench-parallel    # 4 vCPU Codespace(表示は整形。別の回の実測で、Stage 1 やバッチの絶対値とは 2 割ほど違う。見るのは各行の倍率)
+SearchParallel/workers=1        9.4 ms      16.4 GB/s   ← メモリ律速(B=1)
+SearchParallel/workers=2        5.7 ms      26.8 GB/s   ← 1.6x
+SearchParallel/workers=4        5.2 ms      29.5 GB/s   ← 1.8x で頭打ち = マシン全体の帯域の上限
+SearchBatchParallel/workers=1   6.7 ms/query            ← 演算律速(B=32)
+SearchBatchParallel/workers=2   4.5 ms/query            ← 1.5x
+SearchBatchParallel/workers=4   3.5 ms/query            ← 1.9x = 物理コア数の上限
+```
+
+どちらも workers を 4 にしても 4 倍にはなりません。
+
+全探索(B=1)は 1.8x で止まりました。workers を 1、2、4 と増やすと、全部の goroutine が使う帯域の合計は 16、27、30 GB/s と増えますが、2 から 4 では 10% しか伸びていません。マシン全体で DRAM から運べる量に上限があり、goroutine はそれを分け合っているだけです。メモリ律速の処理は、コアを足しても速くなりません。
+
+バッチ(B=32)は 1.9x で止まりました。この Codespace の 4 vCPU は、物理コア 2 個に SMT で 2 スレッドずつ載せたものです(`lscpu` で確認できます)。SMT(Simultaneous Multithreading。同時マルチスレッディング)は 1 つの物理コアを 2 つの CPU として見せる仕組みで、Intel の Hyper-Threading と同じものです。同じ物理コアの 2 スレッドは FMA の実行ユニットを共有するので、計算で詰まっている処理は物理コアの数(2)までしか速くなりません。物理コアが 4 個以上の機械なら、コア数に応じて伸びます。
+
+並列化にも上限があります。メモリ律速ならマシン全体のメモリ帯域、演算律速なら物理コア数です。どちらも 1 コアのルーフラインには出てこない上限ですが、何律速かが分かっていれば、goroutine を足して効くかどうかは足す前に予測できます。

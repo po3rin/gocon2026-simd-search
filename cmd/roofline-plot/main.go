@@ -6,7 +6,7 @@
 // The point of the *interactive* version (vs the static docs/images/rl-*.png)
 // is that every run re-measures and re-plots: you watch the point appear and
 // stick to a ceiling. Stage 1 (AI=0.5) pins to the memory roof; the batched
-// Stage 2 (AI=16) crosses the ridge onto the compute roof.
+// The batch point (AI=16) crosses the ridge onto the compute roof.
 //
 // Usage (see `make roofline-plot`):
 //
@@ -18,7 +18,7 @@
 // `make roofline-ceiling`. Zero dependencies — same hand-built-SVG style as
 // cmd/roofline-decompose. Benchmarks without AI/GFLOP/s (e.g. SearchBinary,
 // which uses Hamming distance, not flop) are skipped: they live on a different
-// axis and are covered by the static Stage 3 image instead.
+// axis and are covered by the static Stage 2 image instead.
 package main
 
 import (
@@ -46,9 +46,9 @@ func label(raw string) string {
 	case "SearchSIMD":
 		return "Stage 1  SIMD (B=1)"
 	case "SearchBatchNaive":
-		return "Stage 2  scalar batch (B=32)"
+		return "scalar batch (B=32)"
 	case "SearchBatchSIMD":
-		return "Stage 2  SIMD batch (B=32)"
+		return "SIMD batch (B=32)"
 	}
 	return strings.TrimPrefix(raw, "Search")
 }

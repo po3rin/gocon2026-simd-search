@@ -26,13 +26,13 @@ var apis = []api{
 	{"Stage 1", "LoadFloat32x4", "LDR Q / VLD1"},
 	{"Stage 1", "Float32x4.MulAdd", "FMLA"},
 	{"Stage 1", "Float32x4.Store", "STR Q / VST1"},
-	{"Stage 3", "LoadInt8x16", "LDR Q / VLD1"},
-	{"Stage 3", "Int8x16.MulWidenLo", "SMULL"},
-	{"Stage 3", "Int8x16.HiToLo", "EXT"},
-	{"Stage 3", "Int16x8.ExtendLo4ToInt32", "SXTL"},
-	{"Stage 3", "Int32x4.ReduceSum", "ADDV"},
-	{"Stage 4", "vec.Hamming → bits.OnesCount64", "CNT + ADDV (Go intrinsic)"},
-	{"Stage 5", "vec.Dot in SearchBinaryRerank", "(Stage 1 APIs)"},
+	{"Stage 2", "LoadInt8x16", "LDR Q / VLD1"},
+	{"Stage 2", "Int8x16.MulWidenLo", "SMULL"},
+	{"Stage 2", "Int8x16.HiToLo", "EXT"},
+	{"Stage 2", "Int16x8.ExtendLo4ToInt32", "SXTL"},
+	{"Stage 2", "Int32x4.ReduceSum", "ADDV"},
+	{"Stage 3", "vec.Hamming → bits.OnesCount64", "CNT + ADDV (Go intrinsic)"},
+	{"Stage 4", "vec.Dot in SearchBinaryRerank", "(Stage 1 APIs)"},
 }
 
 func run() {

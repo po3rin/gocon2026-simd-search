@@ -20,7 +20,7 @@ func Quantize(v []float32, out []uint64) {
 
 // Hamming returns the number of differing bits between a and b.
 //
-// Stage 4 の距離計算。XOR + popcount だけで距離が出る。
+// Stage 3 の距離計算。XOR + popcount だけで距離が出る。
 // math/bits.OnesCount64 はスカラーの POPCNT 命令にコンパイルされる。
 // SIMD 版 popcount(VPOPCNTQ)は AVX512VPOPCNTDQ が必要なので付録 3 節(make bench-bonus)で扱う。
 func Hamming(a, b []uint64) int {

@@ -74,11 +74,11 @@ func main() {
 func figures(peak, bw, ridge float64) []fig {
 	s0 := pt{name: "Stage 0 スカラ全探索", ai: 0.5, gf: 2.15}
 	s1 := pt{name: "Stage 1 SIMD 全探索", ai: 0.5, gf: 9.7}
-	s2 := pt{name: "Stage 2 SIMD バッチ(B=32)", ai: 16, gf: 13.3}
-	s2s := pt{name: "Stage 2 スカラ バッチ(B=32)", ai: 16, gf: 2.24, side: "below"}
-	s3 := pt{name: "Stage 3 int8", ai: 2, gf: 18.3, note: "18.3 Gop/s・上限の 72%"}
-	s4 := pt{name: "Stage 4 1bit 量子化", ai: 16, gf: 80, note: "46x・flop が無いので位置は目安", vague: true}
-	s5 := pt{name: "Stage 5 1bit + rerank", ai: 16, gf: 80, note: "43x・Recall 0.87・位置は Stage 4 と同じ", vague: true}
+	s2 := pt{name: "バッチ SIMD(B=32)", ai: 16, gf: 13.3}
+	s2s := pt{name: "バッチ スカラ(B=32)", ai: 16, gf: 2.24, side: "below"}
+	s3 := pt{name: "Stage 2 int8", ai: 2, gf: 18.3, note: "18.3 Gop/s・上限の 72%"}
+	s4 := pt{name: "Stage 3 1bit 量子化", ai: 16, gf: 80, note: "46x・flop が無いので位置は目安", vague: true}
+	s5 := pt{name: "Stage 4 1bit + rerank", ai: 16, gf: 80, note: "43x・Recall 0.87・位置は Stage 3 と同じ", vague: true}
 	ghost := func(p pt) pt { p.ghost = true; p.note = " "; return p }
 
 	return []fig{
@@ -93,21 +93,21 @@ func figures(peak, bw, ridge float64) []fig {
 			title:    "Stage 1: SIMD 化",
 			subtitle: "全探索はメモリ帯域の上限に達する(9.7 GF、上限の 93%)",
 			points:   []pt{ghost(s0), s1}},
-		{file: "rl-stage2",
-			title:    "Stage 2: クエリのバッチ化(B=32)",
+		{file: "rl-batch",
+			title:    "クエリのバッチ化(B=32・付録)",
 			subtitle: "算術強度 が 0.5 から 16 に動き、リッジを越えて演算律速側へ。exact のまま SIMD がスカラより 5.9x 速い",
 			points:   []pt{ghost(s1), s2, s2s}},
-		{file: "rl-stage3",
-			title:    "Stage 3: int8 量子化",
+		{file: "rl-stage2",
+			title:    "Stage 2: int8 量子化",
 			subtitle: "算術強度 が 0.5 から 2 に動きリッジを越える。ただし演算ピークの下(int8 内積の速さで頭打ち)。Recall 0.948",
 			points:   []pt{ghost(s1), s3}},
-		{file: "rl-stage4",
-			title:    "Stage 4: 1bit 量子化",
+		{file: "rl-stage3",
+			title:    "Stage 3: 1bit 量子化",
 			subtitle: "データが 1/32 になりキャッシュに乗る。DRAM 帯域の制約から外れるが Recall 0.18(近似)",
 			points:   []pt{ghost(s3), s4}},
-		{file: "rl-stage5",
-			title:    "Stage 5: 1bit で絞って fp32 SIMD で rerank",
-			subtitle: "速度の位置は Stage 4 と同じ。差は精度(Recall 0.18 から 0.87)",
+		{file: "rl-stage4",
+			title:    "Stage 4: 1bit で絞って fp32 SIMD で rerank",
+			subtitle: "速度の位置は Stage 3 と同じ。差は精度(Recall 0.18 から 0.87)",
 			points:   []pt{s5}},
 		{file: "roofline-plot",
 			title:    "実測ルーフライン全体像(Codespaces / AMD EPYC 7763)",
@@ -115,8 +115,8 @@ func figures(peak, bw, ridge float64) []fig {
 			points:   []pt{s0, s1, s2, s3, s4},
 			notes: []string{
 				"Stage 0 から 1: 縦に上がりメモリ帯域の上限で止まる(算術強度 0.5 はリッジの左)",
-				"Stage 1 から 2 / 3: 算術強度 を右に動かすとリッジを越え、SIMD が効く側に入る",
-				"Stage 4: データを 1/32 にしてキャッシュに乗せる。flop が無いので点の位置は目安",
+				"Stage 1 からバッチ / Stage 2: 算術強度 を右に動かすとリッジを越え、SIMD が効く側に入る",
+				"Stage 3: データを 1/32 にしてキャッシュに乗せる。flop が無いので点の位置は目安",
 			}},
 	}
 }

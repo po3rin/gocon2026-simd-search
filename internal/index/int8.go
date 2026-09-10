@@ -2,7 +2,7 @@ package index
 
 import "github.com/po3rin/gocon2026-simd-search/internal/vec"
 
-// BuildInt8 は全ベクトルの int8 表現(1/4 サイズ)を構築する(Stage 3)。
+// BuildInt8 は全ベクトルの int8 表現(1/4 サイズ)を構築する(Stage 2)。
 // binary(1/32)と違い大きさの情報が残るので、rerank なしでも Recall が実用域。
 func (ix *Index) BuildInt8() {
 	ix.Codes8 = make([]int8, ix.N*ix.Dim)
@@ -17,7 +17,7 @@ func (ix *Index) Code8(id int) []int8 {
 	return ix.Codes8[id*ix.Dim : (id+1)*ix.Dim]
 }
 
-// SearchInt8 は int8 量子化した表現で全探索する(Stage 3)。
+// SearchInt8 は int8 量子化した表現で全探索する(Stage 2)。
 // スコアは qScale*dScale*dot_int8 ≈ fp32 の内積(近似)。
 // 転送は 1ベクトル 384 byte(fp32 の 1/4)→ AI が4倍に上がる。
 func (ix *Index) SearchInt8(q []float32, k int) []Result {
