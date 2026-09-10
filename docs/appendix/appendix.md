@@ -2,16 +2,19 @@
 
 本編([../workshop/workshop.md](../workshop/workshop.md))の 40 分には入らない、実装の裏側と調査の記録です。本編を読んだあとに、興味のある節から読めます。数値は計測した機械ごとに違うので、各節の冒頭に計測環境を書いてあります。
 
-| 節 | 内容 | こんなときに |
-|---|---|---|
-| [1. Go の SIMD の 2 つの隠れた性能上限](#1-go-の-simd-の-2-つの隠れた性能上限) | VZEROUPPER の遷移ペナルティと register spill | 「演算ピークが理論値の 1/3〜1/4 で止まるのはなぜか」を知りたい |
-| [2. MaxSim](#2-maxsim) | 最初から演算律速な検索方式(late interaction)での SIMD の効き | バッチ化の考え方を別の検索方式で見たい |
-| [3. AVX-512 の SIMD popcount](#3-avx-512-の-simd-popcount) | AVX-512 の SIMD popcount を試して速くならなかった実測 | Stage 3 の「SIMD 版 popcount は効かない」の根拠を見たい |
-| [4. 実行環境の調査](#4-実行環境の調査) | Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くか | 手元の Mac や Docker で数字が出ない理由を知りたい |
-| [5. 上限ベンチの中身](#5-上限ベンチの中身演算ピークとメモリ帯域の測り方) | 演算ピークとメモリ帯域を測るベンチのコード | 本編 §05 の `make roofline-ceiling` の数字がどう出ているかを知りたい |
-| [6. SIMD が効く境界はデータサイズの軸にもある](#6-simd-が効く境界はデータサイズの軸にもあるmake-bench-nsweep) | DB 件数を 1k〜1M に振って SIMD の倍率が落ちる境界を実測 | Stage 1 の内積単体 6.3x と全探索 4.5x の差を深掘りしたい |
-| [7. クエリのバッチ化](#7-クエリのバッチ化再利用で算術強度を上げる) | B=32 で算術強度を 16 に上げ、exact のまま SIMD をスカラの 5.9x 効かせる | 算術強度を上げるもう 1 つの方法(再利用)の実測を見たい |
-| [8. goroutine で並列化すればいいのでは](#8-goroutine-で並列化すればいいのではmake-bench-parallel) | メモリ律速はマシン全体の帯域、演算律速は物理コア数で頭打ちになる実測 | 並列化がどの上限に効くかを知りたい |
+
+| 節                                                                         | 内容                                                  | こんなときに                                            |
+| ------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------- |
+| [1. Go の SIMD の 2 つの隠れた性能上限](#1-go-の-simd-の-2-つの隠れた性能上限)                  | VZEROUPPER の遷移ペナルティと register spill                 | 「演算ピークが理論値の 1/3〜1/4 で止まるのはなぜか」を知りたい               |
+| [2. MaxSim](#2-maxsim)                                                    | 最初から演算律速な検索方式(late interaction)での SIMD の効き          | バッチ化の考え方を別の検索方式で見たい                               |
+| [3. AVX-512 の SIMD popcount](#3-avx-512-の-simd-popcount)                  | AVX-512 の SIMD popcount を試して速くならなかった実測              | Stage 3 の「SIMD 版 popcount は効かない」の根拠を見たい           |
+| [4. 実行環境の調査](#4-実行環境の調査)                                                  | Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くか  | 手元の Mac や Docker で数字が出ない理由を知りたい                   |
+| [5. 上限ベンチの中身](#5-上限ベンチの中身演算ピークとメモリ帯域の測り方)                                 | 演算ピークとメモリ帯域を測るベンチのコード                               | 本編 §05 の `make roofline-ceiling` の数字がどう出ているかを知りたい |
+| [6. SIMD が効く境界はデータサイズの軸にもある](#6-simd-が効く境界はデータサイズの軸にもあるmake-bench-nsweep) | DB 件数を 1k〜1M に振って SIMD の倍率が落ちる境界を実測                 | Stage 1 の内積単体 6.3x と全探索 4.5x の差を深掘りしたい            |
+| [7. クエリのバッチ化](#7-クエリのバッチ化再利用で算術強度を上げる)                                    | B=32 で算術強度を 16 に上げ、exact のまま SIMD をスカラの 5.9x 効かせる   | 算術強度を上げるもう 1 つの方法(再利用)の実測を見たい                     |
+| [8. goroutine で並列化すればいいのでは](#8-goroutine-で並列化すればいいのではmake-bench-parallel) | メモリ律速はマシン全体の帯域、演算律速は物理コア数で頭打ちになる実測                  | 並列化がどの上限に効くかを知りたい                                 |
+| [9. ベクトル量子化の系譜](#9-ベクトル量子化の系譜基本から最新まで)                                    | SQ / BQ / PQ / ScaNN / RaBitQ / TurboQuant を本編の軸で整理 | Stage 2〜4 の量子化の先にある手法を知りたい                        |
+
 
 ---
 
@@ -21,10 +24,12 @@
 
 この調査は AWS c7i(Intel Xeon 8488C / Sapphire Rapids)で行いました。本編の Codespaces(AMD EPYC 7763)とは CPU のメーカーが違うので、2 つの現象の出方も違います。
 
-| 現象 | Intel(c7i) | AMD(Codespaces の EPYC) |
-|---|---|---|
-| ① VZEROUPPER の遷移ペナルティ | 出ます。1 命令の有無で 167.4ns と 23.4ns | 基本的に出ません。呼んでも無害です |
-| ② register spill | 出ます。アキュムレータ 4 本で 23、12 本で 39 GFLOP/s | 出ます。4 本で 13.4、12 本で 25.6 GFLOP/s |
+
+| 現象                    | Intel(c7i)                           | AMD(Codespaces の EPYC)           |
+| --------------------- | ------------------------------------ | -------------------------------- |
+| ① VZEROUPPER の遷移ペナルティ | 出ます。1 命令の有無で 167.4ns と 23.4ns        | 基本的に出ません。呼んでも無害です                |
+| ② register spill      | 出ます。アキュムレータ 4 本で 23、12 本で 39 GFLOP/s | 出ます。4 本で 13.4、12 本で 25.6 GFLOP/s |
+
 
 本実装が境界で `archsimd.ClearAVXUpperBits()`(中身は VZEROUPPER 1 命令)を呼ぶのは Intel 機での保険で、AMD では何も起きないだけです。
 
@@ -40,11 +45,13 @@
 
 ペナルティの仕組みは CPU の世代で違います(出典: Agner Fog, [The microarchitecture of Intel, AMD and VIA CPUs](https://www.agner.org/optimize/microarchitecture.pdf))。
 
-| CPU | ペナルティの仕組み | VZEROUPPER の効果 |
-|---|---|---|
-| Intel Sandy Bridge〜Haswell | 一度きりの大きなモード切替(上位状態を保存して復元する) | 切替そのものを防ぎます |
+
+| CPU                                         | ペナルティの仕組み                                                                           | VZEROUPPER の効果            |
+| ------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- |
+| Intel Sandy Bridge〜Haswell                  | 一度きりの大きなモード切替(上位状態を保存して復元する)                                                        | 切替そのものを防ぎます               |
 | Intel Skylake 以降(c7i の Sapphire Rapids を含む) | 上位状態は保存せず、dirty 状態で実行するレガシー SSE 命令 1 個ごとに false dependency(偽の依存)とマージ μop が挿入されて蓄積する | 蓄積をまとめて消します。c7i の実測で 7.1x |
-| AMD Zen | Intel 型の遷移ペナルティは基本的に無い | 効果はありません(呼んでも害はありません) |
+| AMD Zen                                     | Intel 型の遷移ペナルティは基本的に無い                                                              | 効果はありません(呼んでも害はありません)     |
+
 
 教科書でよく語られるのは上の行の「一度きりの大きな遷移ペナルティ」ですが、c7i は真ん中の行です。実測した「呼び出しごとの固定費 約 145ns(550 サイクル)」は、命令ごとのペナルティの蓄積を VZEROUPPER がまとめて消していると読むのが正確です。
 
@@ -56,11 +63,13 @@ Go の archsimd はこの VZEROUPPER を自動挿入しません(1.26、1.27 と
 
 演算ピークを測るベンチ(`make roofline-ceiling`)では、独立なアキュムレータを 12 本持って FMA を回し続けます。理論上はメモリに触らず FMA だけが並ぶはずですが、実測は理論値の 1/3〜1/4 で止まります。
 
-| | c7i(Sapphire Rapids) | Codespaces(EPYC 7763) | M3 Pro(Neon) |
-|---|---|---|---|
-| 理論ピーク | 約 120 GFLOP/s | 約 110 GFLOP/s | 未算出 |
-| アキュムレータ 4 本 | 23 GFLOP/s | 13.4 GFLOP/s | 未計測 |
-| アキュムレータ 12 本 | 39 GFLOP/s | 25.6 GFLOP/s | 32 GFLOP/s |
+
+|              | c7i(Sapphire Rapids) | Codespaces(EPYC 7763) | M3 Pro(Neon) |
+| ------------ | -------------------- | --------------------- | ------------ |
+| 理論ピーク        | 約 120 GFLOP/s        | 約 110 GFLOP/s         | 未算出          |
+| アキュムレータ 4 本  | 23 GFLOP/s           | 13.4 GFLOP/s          | 未計測          |
+| アキュムレータ 12 本 | 39 GFLOP/s           | 25.6 GFLOP/s          | 32 GFLOP/s   |
+
 
 ※ 理論ピークは 2 FMA/cycle × 8 レーン × 2 flop × クロック(c7i は 3.75GHz、EPYC 7763 は単コアブーストの約 3.5GHz)。検索の内積は算術強度 0.5 の深いメモリ律速なので、この低さは検索の結論を変えません。ただし原因は見ておく価値があります。
 
@@ -105,10 +114,12 @@ MaxSim(late interaction)は、最初から演算律速な検索方式です。[7
 
 1 万文書 × 4 トークン、クエリ 16 トークンで測った結果です。
 
-| | 1 クエリ | GFLOP/s | 算術強度 |
-|---|---|---|---|
-| スカラ(`SearchMaxSimNaive`) | 239 ms | 2.06 | 8.0 flop/byte |
-| SIMD(`SearchMaxSimSIMD`) | 42 ms | 11.7 | 8.0 flop/byte |
+
+|                          | 1 クエリ  | GFLOP/s | 算術強度          |
+| ------------------------ | ------ | ------- | ------------- |
+| スカラ(`SearchMaxSimNaive`) | 239 ms | 2.06    | 8.0 flop/byte |
+| SIMD(`SearchMaxSimSIMD`) | 42 ms  | 11.7    | 8.0 flop/byte |
+
 
 SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメモリ帯域の上限に当たって 4.5x で止まりましたが、MaxSim は演算律速なので SIMD がそのまま効きます。バッチ化で行った「算術強度を上げる工夫」が、この検索方式では最初から組み込まれています。実装は [`internal/index/maxsim.go`](../../internal/index/maxsim.go) にあります。
 
@@ -120,10 +131,12 @@ SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメ�
 
 [`vec.HammingSIMD`](../../internal/vec/hamming_simd.go) は、`Uint64x4.OnesCount`(VPOPCNTQ 命令)で 4 つの uint64 をまとめて popcount します。この命令は AVX-512 の拡張(AVX512VPOPCNTDQ)で、Codespaces に割り当てられる AMD EPYC 7763 にはありません。AVX-512 のある機械(AWS の c7i など)を自分で用意すれば `make bench-bonus` で測れます(通常版と並べるなら `make bench2` も)。
 
-| 機械 | 通常版 `SearchBinary`(POPCNT) | SIMD 版 `SearchBinarySIMD`(VPOPCNT) |
-|---|---|---|
-| c7i(AVX-512 あり) | 0.68 ms | 0.75 ms |
-| Codespaces(AVX-512 なし) | 0.77 ms | 1.0 ms(機能チェックの分岐と、インライン化されない関数呼び出し越しに通常版へ回るぶん遅い) |
+
+| 機械                     | 通常版 `SearchBinary`(POPCNT) | SIMD 版 `SearchBinarySIMD`(VPOPCNT)               |
+| ---------------------- | -------------------------- | ------------------------------------------------ |
+| c7i(AVX-512 あり)        | 0.68 ms                    | 0.75 ms                                          |
+| Codespaces(AVX-512 なし) | 0.77 ms                    | 1.0 ms(機能チェックの分岐と、インライン化されない関数呼び出し越しに通常版へ回るぶん遅い) |
+
 
 AVX-512 のある c7i でも SIMD 版の方がわずかに遅い結果です。理由は 2 つあります。
 
@@ -140,25 +153,29 @@ Apple Silicon、Rosetta、Docker、amd64 実機で SIMD がどう動くかを調
 
 ### 結論
 
-| 環境 | 正しさのテスト | スカラ実装(Stage 0/3) | Stage 1 SIMD 内積 | 付録 AVX-512 | 本編ベンチ再現 |
-|---|---|---|---|---|---|
-| arm64 ネイティブ(Apple M3 Pro) | ✅ `make test` | ✅ | ✅ Neon 128bit(Go 1.27 から。1.26 はスカラに落ちる) | ❌ | △ 動くが本編(AVX2)とは別の点 |
-| Rosetta(`GOARCH=amd64`) | ✅ | ✅ | ❌ FMA=false でスカラに落ちる | ❌ AVX-512 非対応 | △ 量子化と int8 SIMD は動く、fp32 の SIMD 内積は不可 |
-| Docker `linux/amd64`(Apple Silicon 上) | ❌ ビルドクラッシュ / CPUID 全 false | △ バイナリ実行のみ | ❌ | ❌ | ❌ 使わない |
-| amd64 実機(Codespaces / AWS c7i) | ✅ | ✅ | ✅ | c7i のみ ✅ | ✅ `make bench` |
+
+| 環境                                    | 正しさのテスト                    | スカラ実装(Stage 0/3) | Stage 1 SIMD 内積                         | 付録 AVX-512    | 本編ベンチ再現                                |
+| ------------------------------------- | -------------------------- | ---------------- | --------------------------------------- | ------------- | -------------------------------------- |
+| arm64 ネイティブ(Apple M3 Pro)             | ✅ `make test`              | ✅                | ✅ Neon 128bit(Go 1.27 から。1.26 はスカラに落ちる) | ❌             | △ 動くが本編(AVX2)とは別の点                     |
+| Rosetta(`GOARCH=amd64`)               | ✅                          | ✅                | ❌ FMA=false でスカラに落ちる                    | ❌ AVX-512 非対応 | △ 量子化と int8 SIMD は動く、fp32 の SIMD 内積は不可 |
+| Docker `linux/amd64`(Apple Silicon 上) | ❌ ビルドクラッシュ / CPUID 全 false | △ バイナリ実行のみ       | ❌                                       | ❌             | ❌ 使わない                                 |
+| amd64 実機(Codespaces / AWS c7i)        | ✅                          | ✅                | ✅                                       | c7i のみ ✅      | ✅ `make bench`                         |
+
 
 本編で使う SIMD は AVX2 + FMA だけなので、参加者の数字は GitHub Codespaces 一本で全ステージ取れます(当たる CPU のメーカーと世代を問わず再現)。AVX-512 VPOPCNT は本編フロー外の付録(上の 3 節)で、AVX-512 のある機械を用意した場合だけ実機確認します。Apple Silicon の手元では、Go 1.27 なら Neon 版の SIMD が走るので `make test` と `make bench1` は動きます。ただし本編の数字とは別物です(M3 Pro の実測は [../workshop/setup.md](../workshop/setup.md) の「Apple Silicon で動かす場合」)。
 
 ### やりたいことごとの環境の選び方
 
-| やりたいこと | 環境 | コマンド |
-|---|---|---|
-| 正しさだけ確認したい | Apple Silicon(arm64) | `make test` |
-| Neon 版の SIMD を手元で見たい | Apple Silicon(arm64) | `make GO=$(go env GOPATH)/bin/go1.27.1 bench1`(本編の数字とは別物) |
-| amd64 側の SIMD パスのコンパイル確認をしたい | Apple Silicon(Rosetta) | `GOARCH=amd64 GOEXPERIMENT=simd go1.27.1 test ./...`(FMA 非対応なので実行はスカラ) |
-| 本編の最終形(Stage 0/1/3/4)を再現したい | Codespaces / devcontainer(amd64 ホスト) | `make bench`(Stage 2 は `bench-int8`、バッチは `roofline-batch`) |
-| AVX-512 VPOPCNT を実機で確かめたい | AVX-512 のある機械を自分で用意(AWS c7i など) | `make bench-bonus` |
-| CPU 機能の有無を確認したい | どこでも | `make isa-report`(Rosetta 側は `make isa-report-amd64`) |
+
+| やりたいこと                       | 環境                                   | コマンド                                                                   |
+| ---------------------------- | ------------------------------------ | ---------------------------------------------------------------------- |
+| 正しさだけ確認したい                   | Apple Silicon(arm64)                 | `make test`                                                            |
+| Neon 版の SIMD を手元で見たい         | Apple Silicon(arm64)                 | `make GO=$(go env GOPATH)/bin/go1.27.1 bench1`(本編の数字とは別物)              |
+| amd64 側の SIMD パスのコンパイル確認をしたい | Apple Silicon(Rosetta)               | `GOARCH=amd64 GOEXPERIMENT=simd go1.27.1 test ./...`(FMA 非対応なので実行はスカラ) |
+| 本編の最終形(Stage 0/1/3/4)を再現したい  | Codespaces / devcontainer(amd64 ホスト) | `make bench`(Stage 2 は `bench-int8`、バッチは `roofline-batch`)             |
+| AVX-512 VPOPCNT を実機で確かめたい    | AVX-512 のある機械を自分で用意(AWS c7i など)      | `make bench-bonus`                                                     |
+| CPU 機能の有無を確認したい              | どこでも                                 | `make isa-report`(Rosetta 側は `make isa-report-amd64`)                  |
+
 
 ### 調査方法
 
@@ -187,48 +204,56 @@ Go 1.26 では `simd/archsimd` が amd64 専用で、ビルドタグでスカラ
 
 Rosetta 上で `make isa-report-amd64` を実行し、`archsimd.X86` の各機能フラグを確認しました(Go 1.27.1 + macOS 26 でも同じ)。
 
-| Feature | 値 | 対応する API |
-|---|---|---|
-| AVX | true | `ClearAVXUpperBits`(VZEROUPPER) |
-| AVX2 | true | `LoadFloat32x8`、`Uint64x4.Xor` など |
-| FMA | **false** | `Float32x8.MulAdd`。Stage 1 がここで落ちる |
-| AVX512 | false | Apple のドキュメントどおり非対応 |
-| AVX512VPOPCNTDQ | false | `Uint64x4.OnesCount` |
-| hasSIMD | false | `Dot` は `DotNaive` にフォールバック |
-| hasVPOPCNT | false | `HammingSIMD` は `Hamming` にフォールバック |
+
+| Feature         | 値         | 対応する API                           |
+| --------------- | --------- | ---------------------------------- |
+| AVX             | true      | `ClearAVXUpperBits`(VZEROUPPER)    |
+| AVX2            | true      | `LoadFloat32x8`、`Uint64x4.Xor` など  |
+| FMA             | **false** | `Float32x8.MulAdd`。Stage 1 がここで落ちる |
+| AVX512          | false     | Apple のドキュメントどおり非対応                |
+| AVX512VPOPCNTDQ | false     | `Uint64x4.OnesCount`               |
+| hasSIMD         | false     | `Dot` は `DotNaive` にフォールバック        |
+| hasVPOPCNT      | false     | `HammingSIMD` は `Hamming` にフォールバック |
+
 
 Stage ごとに見ると次のとおりです。
 
-| Stage | API | 要求 feature | Rosetta |
-|---|---|---|---|
-| 0 | `DotNaive` | なし(スカラ) | ✅ |
-| 1 | `LoadFloat32x8` | AVX2 | ✅ |
-| 1 | `Float32x8.MulAdd` | FMA | ❌ |
-| 1 | `archsimd.ClearAVXUpperBits` | AVX | ✅(到達前にガードで落ちる) |
-| 2 | `DotInt8`(VPMOVSXBW+VPMADDWD) | AVX2 | ✅(FMA 不要なので SIMD が走る) |
-| 3 | `Hamming`(`bits.OnesCount64`) | スカラ POPCNT | ✅ |
-| 4 | `SearchBinaryRerank` | binary は動く。rerank の Dot は Naive | △ |
-| 付録 | `Uint64x4.OnesCount` | AVX512VPOPCNTDQ | ❌ |
+
+| Stage | API                           | 要求 feature                      | Rosetta               |
+| ----- | ----------------------------- | ------------------------------- | --------------------- |
+| 0     | `DotNaive`                    | なし(スカラ)                         | ✅                     |
+| 1     | `LoadFloat32x8`               | AVX2                            | ✅                     |
+| 1     | `Float32x8.MulAdd`            | FMA                             | ❌                     |
+| 1     | `archsimd.ClearAVXUpperBits`  | AVX                             | ✅(到達前にガードで落ちる)        |
+| 2     | `DotInt8`(VPMOVSXBW+VPMADDWD) | AVX2                            | ✅(FMA 不要なので SIMD が走る) |
+| 3     | `Hamming`(`bits.OnesCount64`) | スカラ POPCNT                      | ✅                     |
+| 4     | `SearchBinaryRerank`          | binary は動く。rerank の Dot は Naive | △                     |
+| 付録    | `Uint64x4.OnesCount`          | AVX512VPOPCNTDQ                 | ❌                     |
+
 
 ベンチ参考(Rosetta、1 クエリ、Go 1.27.1、M3 Pro、2026-09-06 に 3 回計測した中央値):
 
-| | 1 クエリ |
-|---|---|
-| `SearchNaive` | 24.1 ms |
-| `SearchSIMD` | 24.7 ms(`hasSIMD` が false なので `DotNaive` と同じ経路。速くならない) |
-| `SearchBinary` | 0.77 ms(スカラ量子化なので SIMD 不要) |
-| `SearchBinaryRerank` | 0.83 ms(rerank も `DotNaive`) |
+
+|                      | 1 クエリ                                                  |
+| -------------------- | ------------------------------------------------------ |
+| `SearchNaive`        | 24.1 ms                                                |
+| `SearchSIMD`         | 24.7 ms(`hasSIMD` が false なので `DotNaive` と同じ経路。速くならない) |
+| `SearchBinary`       | 0.77 ms(スカラ量子化なので SIMD 不要)                             |
+| `SearchBinaryRerank` | 0.83 ms(rerank も `DotNaive`)                           |
+
 
 量子化 Stage は Rosetta でも約 30 倍のオーダー感は出ます。SIMD 内積と AVX-512 は再現できません。Apple のドキュメントにあるとおり Rosetta は AVX と AVX2 を翻訳し AVX-512 は非対応ですが、FMA も CPUID で false になるのが Rosetta の制約です(以前「AVX 全体が動かない」と書いていたのは誤りで、修正済み)。
 
 ### Docker `linux/amd64`(Apple Silicon ホスト)
 
-| 確認したこと | 結果 |
-|---|---|
-| `uname -m` | `x86_64` と出る |
-| `/proc/cpuinfo` | ARM の機能(asimd など)が見える。ホスト CPU がそのまま露出している |
+
+| 確認したこと               | 結果                                             |
+| -------------------- | ---------------------------------------------- |
+| `uname -m`           | `x86_64` と出る                                   |
+| `/proc/cpuinfo`      | ARM の機能(asimd など)が見える。ホスト CPU がそのまま露出している      |
 | `go test` / `go run` | ビルド中に panic や SIGSEGV で落ちる(QEMU エミュレーションの不安定さ) |
-| `make isa-report` | 実行はできるが `archsimd.X86` はすべて false |
+| `make isa-report`    | 実行はできるが `archsimd.X86` はすべて false              |
+
 
 `docker run --platform linux/amd64` は Apple Silicon 上では QEMU 系のエミュレーションです([Docker のマルチプラットフォームビルド](https://docs.docker.com/build/building/multi-platform/))。x86 の CPUID を正しくエミュレートしないため `archsimd.X86` は信頼できず、ベンチと SIMD 検証には使えません。amd64 Linux の実機か Codespaces を使ってください。
 
@@ -304,12 +329,14 @@ b.ReportMetric(gb, "triad-GB/s")   // ← 17.36
 
 `make bench-nsweep` で DB 件数を 1,000 から 1,000,000 まで振ると、SIMD の倍率がキャッシュに収まらなくなる所で落ちるのが見えます(4 コア Codespace。本編とは別インスタンスの実測なので、Stage 1 本文と絶対値が少し違います)。
 
+
 | DB 件数     | データ量           | naive   | SIMD    | 倍率   |
 | --------- | -------------- | ------- | ------- | ---- |
 | 1,000     | 1.5 MB(キャッシュ内) | 351 µs  | 61 µs   | 5.8x |
 | 10,000    | 15 MB(L3)      | 3.5 ms  | 0.61 ms | 5.7x |
 | 100,000   | 154 MB(DRAM)   | 34.8 ms | 8.8 ms  | 4.0x |
 | 1,000,000 | 1.5 GB(DRAM)   | 347 ms  | 89.5 ms | 3.9x |
+
 
 L3 に収まる間は内積単体に近い 5.7〜5.8x、DRAM に溢れた瞬間に 4.0x に落ち、1,000,000 件でも 3.9x とほぼ一定です。本編の 10 万件(154MB)は、意図的に DRAM から読む側に置いた設定です。本編は算術強度の軸で SIMD が効く境界を探しましたが、同じ境界はデータサイズの軸にも現れます。
 
@@ -370,7 +397,7 @@ B=32  SearchBatchSIMD    5.79 ms/query  13.26 GF   ← AI 16・SIMD で 5.9x。�
 
 ---
 
-## 8. goroutine で並列化すればいいのでは(make bench-parallel)
+## 8. goroutine で並列化すればいいのでは？への回答
 
 本編は全部 1 コアで測っています。goroutine で複数コアに分ければ速くなるのか、実測で確かめます。DB を workers 個に分けて goroutine で分担し、最後に各 goroutine の上位 k 件を 1 つにまとめます([`internal/index/parallel.go`](../../internal/index/parallel.go))。
 
@@ -408,3 +435,34 @@ SearchBatchParallel/workers=4   3.5 ms/query            ← 1.9x = 物理コア�
 バッチ(B=32)は 1.9x で止まりました。この Codespace の 4 vCPU は、物理コア 2 個に SMT で 2 スレッドずつ載せたものです(`lscpu` で確認できます)。SMT(Simultaneous Multithreading。同時マルチスレッディング)は 1 つの物理コアを 2 つの CPU として見せる仕組みで、Intel の Hyper-Threading と同じものです。同じ物理コアの 2 スレッドは FMA の実行ユニットを共有するので、計算で詰まっている処理は物理コアの数(2)までしか速くなりません。物理コアが 4 個以上の機械なら、コア数に応じて伸びます。
 
 並列化にも上限があります。メモリ律速ならマシン全体のメモリ帯域、演算律速なら物理コア数です。どちらも 1 コアのルーフラインには出てこない上限ですが、何律速かが分かっていれば、goroutine を足して効くかどうかは足す前に予測できます。
+
+---
+
+## 9. いろんなベクトル量子化
+
+本編で使った量子化は 2 つでした。int8 のスカラ量子化(Stage 2)と、1bit のバイナリ量子化 + rerank(Stage 3/4)です。この節では、ベクトル検索で使われる量子化を系譜として整理します。どの手法も狙いは同じで、運ぶバイトを減らして算術強度を上げ、距離計算を軽い演算に置き換えることです。違いは、ビットの割り当て方と、誤差をどう抑えるかにあります。
+
+### スカラ量子化(SQ)
+
+次元ごとに独立に低ビットへ丸めます。本編 Stage 2 の対称 int8 量子化がこれで、float16 / int8 / int4 などビット幅に選択肢があります。単純で誤差も小さく、[Faiss](https://arxiv.org/abs/2401.08281) の SQ、[Qdrant](https://qdrant.tech/documentation/guides/quantization/)、Lucene/Elasticsearch の int8 インデックスなど実装も広い一方、圧縮率は 1/2〜1/8 程度までです。
+
+### バイナリ量子化(BQ)
+
+符号だけを残す 1bit 量子化です(本編 Stage 3)。起源は [SimHash(Charikar, STOC 2002)](https://dl.acm.org/doi/10.1145/509907.509965)で、ランダムな超平面に対する符号がコサイン類似度を近似的に保存するという結果に遡ります。1/32 まで縮み、距離は XOR + popcount のハミング距離になりますが、単体では精度が落ちるので rerank と組みます(Stage 4)。
+
+### 直積量子化(PQ)
+
+ベクトルを M 個の部分ベクトルに分け、それぞれを k-means で作ったコードブック(典型は 256 セントロイド = 8bit)のセントロイド番号に置き換えます([Jégou, Douze, Schmid, TPAMI 2011](https://dl.acm.org/doi/10.1109/TPAMI.2010.57))。距離は部分ごとに事前計算した距離表を引いて足すだけです(ADC)。回転を学習して部分空間への割り当てを最適化する OPQ(Ge ら、CVPR 2013)などの改良があります。SIMD との相性も深く掘られていて、4bit コードにすると距離表が SIMD レジスタに載り、シャッフル命令(VPSHUFB)1 発で 16〜32 個の表引きが同時にできます([fast scan。André ら、VLDB 2015](https://dl.acm.org/doi/10.14778/2856318.2856324)。[Faiss の FastScan](https://github.com/facebookresearch/faiss/wiki/Fast-accumulation-of-PQ-and-AQ-codes-%28FastScan%29))。本編の語彙で言えば、バイトを 1/16〜1/64 に減らしつつ、距離計算を表引きという軽い演算に置き換える手法です。
+
+### 内積検索向けの目的関数: 異方性量子化
+
+[ScaNN(Guo ら、ICML 2020)](https://arxiv.org/abs/1908.10396)は、内積検索の順位に効くのは元ベクトルと平行な方向の誤差だという観察から、方向によって重みを変えた損失で量子化します。「復元誤差を最小にすること」と「検索の順位を保存すること」は別の目的だという指摘で、以後の手法の前提になっています。
+
+### 回転 + 理論保証: RaBitQ 系
+
+[RaBitQ(Gao &amp; Long, SIGMOD 2024)](https://dl.acm.org/doi/10.1145/3654970)は、ランダム回転してから 1bit 量子化すると、距離推定の誤差に鋭い理論保証が付くことを示しました。D 次元を D bit にし、推定はビット演算と SIMD で速く走ります。多ビット拡張の Extended RaBitQ(SIGMOD 2025。[実装](https://github.com/VectorDB-NTU/RaBitQ-Library))は 2〜6bit の帯域で特に強く、rerank なしでも高い Recall に届きます。Elasticsearch/Lucene の [BBQ](https://www.elastic.co/search-labs/blog/better-binary-quantization-lucene-elasticsearch) はこの系譜の実装です。本編 Stage 3 の素朴な符号 1bit と比べると、「量子化の前にランダム回転を入れる」だけで同じ 1bit でも精度が大きく変わる、というのがこの系譜の核心です。
+
+### オンライン・データ非依存: TurboQuant
+
+[TurboQuant(Zandieh ら、2025)](https://arxiv.org/abs/2504.19874)は、データ分布を事前に学習しない(データ非依存でオンライン適用できる)量子化で、MSE と内積の両方の歪みについて近最適のレートを達成すると主張します。ランダム回転で座標の分布を集中させて座標ごとに最適なスカラー量子化を当て、残差に 1bit の変換を重ねて内積推定を不偏にします。ベクトル検索のほか、LLM の KV キャッシュ量子化(2.5〜3.5bit)への応用を示しています。なお、RaBitQ の著者らによる追試([Revisiting RaBitQ and TurboQuant, 2026](https://arxiv.org/abs/2604.19528))は、テストした大半の設定で RaBitQ が優位であり、TurboQuant 論文の一部の結果は公開実装から再現できなかったと報告しています。比較の当事者(RaBitQ 側)による報告なので、その前提で読んでください。
+
