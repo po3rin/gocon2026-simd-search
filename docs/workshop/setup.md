@@ -35,7 +35,7 @@ make bench0    # ベースライン(スカラ全探索)を1回測る(数秒)
 全員 `4-core`(16 GB RAM)を指定してください([マシンタイプの変え方](https://docs.github.com/en/codespaces/customizing-your-codespace/changing-the-machine-type-for-your-codespace))。起動時のマシン選択で `4-core` を選ぶだけです。
 バラバラのサイズだと比較しづらくなるので、条件を揃えるために統一します。8-core 以上は無料枠を早く消費するだけで不要、2-core はベンチが不安定になりがちなので避けます。
 
-> ただし Codespaces は当たる CPU(Intel/AMD・世代)を選べません。同じ 4-core でも CPU が違えば出る数字は変わります。
+> ただし Codespaces は当たる CPU(Intel/AMD・世代)を選べません。同じ 4-core でも CPU が違えば出る数字は変わります。さらに同じ CPU でも、個体や時間帯でメモリ帯域が 2〜3 割変わることがあります(read 天井の実測で 16〜21 GB/s)。メモリ律速の Stage の数字はそれに比例して動きますが、演算律速の数字(Stage 0 のベースラインやバッチ)はほぼ再現します。教材の数字と自分の数字が違っても、上限との「関係」が同じなら正しく動いています。
 
 ## 費用：かかりません
 
