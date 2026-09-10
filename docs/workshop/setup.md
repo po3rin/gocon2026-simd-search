@@ -11,15 +11,11 @@
 
 1. このリポジトリのページを開く: [https://github.com/po3rin/gocon2026-simd-search](https://github.com/po3rin/gocon2026-simd-search)
 2. 緑の `Code` ボタンを押し、`Codespaces` タブの「…」から `New with options...` を選ぶ(マシンタイプを選ぶため)
-  ![Code ボタン → Codespaces タブ → 「…」→ New with options...](../images/codespaces-new-with-options.png)
-
-  
+![Code ボタン → Codespaces タブ → 「…」→ New with options...](../images/codespaces-new-with-options.png)
 3. マシンは `4-core`(16 GB RAM)を選ぶ。
-  ![Machine type で 4-core を選んで Create codespace](../images/codespaces-machine-type.png)
-
-  
+![Machine type で 4-core を選んで Create codespace](../images/codespaces-machine-type.png)
 4. しばらく待つ(初回はコンテナのビルドで 1〜3 分)。VS Code がブラウザで開けば準備完了
-  ![ブラウザで VS Code が開き、下部にターミナルが出れば準備完了](../images/codespaces-ready.png)
+![ブラウザで VS Code が開き、下部にターミナルが出れば準備完了](../images/codespaces-ready.png)
 
 [`.devcontainer/`](../../.devcontainer/)([Dev Container](https://containers.dev/) の設定)に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま使えます。
 
@@ -67,7 +63,7 @@ make GO=$(go env GOPATH)/bin/go1.27.1 test                      # GOEXPERIMENT=s
 
 ## Apple Silicon で動かす場合
 
-コマンドは上の amd64 ローカルと同じです。Go 1.27 から `archsimd` が arm64 の Neon(128bit)に対応したので、手元の Mac でも SIMD が動きます。ただし本編の数字とは別物です。レジスタ幅は 256bit から 128bit に半分になる一方、単コアのメモリ帯域は Codespaces より大きいので、ルーフライン上の点も倍率も本編とは違う位置になります。M3 Pro の実測は次のとおりです。
+コマンドは上の amd64 ローカルと同じです。Go 1.27 から `archsimd` が arm64 の Neon(128bit)に対応したので、手元の Mac でも SIMD が動きます。ただし本編の数字とは別物です。レジスタ幅は 256bit から 128bit に半分になる一方、単コアのメモリ帯域は Codespaces より大きいので、ルーフライン上の点も倍率も本編とは違う位置になります。ワークショップ主催者の M3 Pro の実測は次のとおりです。
 
 
 | 項目                | M3 Pro(Neon)            | Codespaces(AVX2)        |
@@ -77,27 +73,19 @@ make GO=$(go env GOPATH)/bin/go1.27.1 test                      # GOEXPERIMENT=s
 | binary            | 0.43 ms                 | 0.77 ms                 |
 
 
-当日は Codespaces を使えば、手元のアーキの違いによらず全員が同じ条件で測れます。Mac の数字は自分の環境の値として持ち帰ってください。`make isa-report` でどの Neon 命令が使われているか一覧できます。
-
 ## Docker で amd64 を指定しても動かない理由
 
-Apple Silicon でも `docker run --platform linux/amd64` を使えば x86 として測れそうに見えますが、動きません。中身は QEMU のエミュレーション(または [Rosetta](https://developer.apple.com/documentation/apple-silicon/about-the-rosetta-translation-environment))で、実際の x86 CPU ではないからです([Docker のマルチプラットフォームビルド](https://docs.docker.com/build/building/multi-platform/))。
-
-- CPU の機能問い合わせ(CPUID)を正しく再現しないので `archsimd.X86.*()` が全て false になり、SIMD の分岐がスカラ実装に落ちます
-- QEMU が不安定で、ビルド中に SIGSEGV で落ちることがあります
-- Rosetta 経由でも翻訳されるのは AVX/AVX2 までで、FMA が使えません(`X86.FMA()` が false。macOS 26 + Go 1.27.1 で確認)。本編の内積は AVX2 + FMA が要るので、スカラ実装に落ちます
-
-SIMD の数字は Codespaces(amd64 のホスト)で測ってください。詳しい調査は[付録の実行環境の調査](../appendix/appendix.md#4-実行環境の調査)にあります。
+Apple Silicon でも `docker run --platform linux/amd64` を使えば x86 として測れそうに見えます。しかし、これの中身は QEMU のエミュレーション(または [Rosetta](https://developer.apple.com/documentation/apple-silicon/about-the-rosetta-translation-environment))で、実際の x86 CPU ではないからです([Docker のマルチプラットフォームビルド](https://docs.docker.com/build/building/multi-platform/))。
 
 ---
 
 ## 困ったとき(フォールバック)
 
 
-| 状況                                 | 対処                                                                                                              |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| 会社/組織アカウントで Codespaces が無効(組織ポリシー) | 個人の GitHub アカウントで参加するか、手元の Apple Silicon (Mac) で動かす(次の行)                                                        |
-| 手元が Apple Silicon (Mac)            | Go 1.27 なら `make test` も `make bench1` も Neon(128bit)版の SIMD で動きます。ただし本編の数字とは違う値になります(上の「Apple Silicon で動かす場合」) |
+| 状況                                | 対処                                                                                     |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| 会社/組織アカウントで Codespaces が組織ポリシーで無効 | 個人の GitHub アカウントで参加するか、手元の Apple Silicon (Mac) で動かす↓                                   |
+| 手元が Apple Silicon (Mac)           | Go 1.27 なら `make test` も `make bench1` も Neon(128bit)版の SIMD で動きます。ただし本編の数字とは違う値になります。 |
 
 
 困ったら早めに講師に声をかけてください。当日は会場ネットワーク障害時に講師画面でのライブ進行に切り替えます。
