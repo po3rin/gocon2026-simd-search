@@ -22,13 +22,13 @@
 
 この節では、VZEROUPPER の遷移ペナルティと register spill という 2 つの隠れた上限を扱います。本編の Stage 0〜4 とは独立した読み物で、Go 1.26 / 1.27 の archsimd が出す機械語の現状に踏み込みたい人向けです。どちらもハードの限界ではなく、Go のコード生成がまだ発展途上であることが原因です。
 
-この調査は AWS c7i(Intel Xeon 8488C / Sapphire Rapids)で行いました。本編の Codespaces(AMD EPYC 7763)とは CPU が違うので、2 つの現象の出方も違います。
+この調査は AWS c7i(Intel Xeon 8488C / Sapphire Rapids)で行いました。本編の Codespaces(AMD EPYC 7763)とは CPU が違うので注意してください。
 
 
-| 現象                    | Intel(c7i)                           | AMD(Codespaces の EPYC)           |
-| --------------------- | ------------------------------------ | -------------------------------- |
-| ① VZEROUPPER の遷移ペナルティ | 出ます。1 命令の有無で 167.4ns と 23.4ns        | 基本的に出ません。呼んでも無害です                |
-| ② register spill      | 出ます。アキュムレータ 4 本で 23、12 本で 39 GFLOP/s | 出ます。4 本で 13.4、12 本で 25.6 GFLOP/s |
+| 現象                    | Intel(c7i)                            | AMD(Codespaces の EPYC)            |
+| --------------------- | ------------------------------------- | --------------------------------- |
+| ① VZEROUPPER の遷移ペナルティ | 出現する。1 命令の有無で 167.4ns と 23.4ns        | 出現しない                             |
+| ② register spill      | 出現する。アキュムレータ 4 本で 23、12 本で 39 GFLOP/s | 出現する。4 本で 13.4、12 本で 25.6 GFLOP/s |
 
 
 本実装が境界で `archsimd.ClearAVXUpperBits()`(中身は VZEROUPPER 1 命令)を呼ぶのは Intel 機での保険で、AMD では何も起きないだけです。
@@ -141,7 +141,7 @@ SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメ�
 AVX-512 のある c7i でも SIMD 版の方がわずかに遅い結果です。理由は 2 つあります。
 
 - 量子化後の DB(4.8 MB)はキャッシュに乗っていて、popcount の計算で時間を使っていない
-- 1 ベクトルが 6 語(uint64 × 6)しかなく、まとめて数える利点が出る前に終わる。6 語では 4 語まとめの VPOPCNTQ が 1 回使えるだけで、残り 2 語はどのみちスカラで数えることになる
+- 1bit 量子化後の 1 ベクトルは uint64 6 個ぶん(384bit)しかなく、まとめて数える利点が出る前に終わる。VPOPCNTQ は uint64 を 4 個まとめて数える命令なので、6 個では 1 回使えるだけで、残り 2 個はどのみちスカラで数えることになる
 
 計算で詰まっていない所に SIMD を足しても速くならない、という本編の主張の実測例として残してあります。
 
@@ -460,7 +460,7 @@ SearchBatchParallel/workers=4   3.5 ms/query            ← 1.9x = 物理コア�
 
 ### 回転 + 理論保証: RaBitQ 系
 
-[RaBitQ(Gao &amp; Long, SIGMOD 2024)](https://dl.acm.org/doi/10.1145/3654970)は、ランダム回転してから 1bit 量子化すると、距離推定の誤差に鋭い理論保証が付くことを示しました。D 次元を D bit にし、推定はビット演算と SIMD で速く走ります。多ビット拡張の Extended RaBitQ(SIGMOD 2025。[実装](https://github.com/VectorDB-NTU/RaBitQ-Library))は 2〜6bit の帯域で特に強く、rerank なしでも高い Recall に届きます。Elasticsearch/Lucene の [BBQ](https://www.elastic.co/search-labs/blog/better-binary-quantization-lucene-elasticsearch) はこの系譜の実装です。本編 Stage 3 の素朴な符号 1bit と比べると、「量子化の前にランダム回転を入れる」だけで同じ 1bit でも精度が大きく変わる、というのがこの系譜の核心です。
+[RaBitQ(Gao &amp; Long, SIGMOD 2024)](https://dl.acm.org/doi/10.1145/3654970)は、ランダム回転してから 1bit 量子化すると、距離推定の誤差に理論保証が付くことを示しました。D 次元を D bit にし、推定はビット演算と SIMD で速く走ります。多ビット拡張の Extended RaBitQ(SIGMOD 2025。[実装](https://github.com/VectorDB-NTU/RaBitQ-Library))は 2〜6bit の帯域で特に強く、rerank なしでも高い Recall に届きます。Elasticsearch/Lucene の [BBQ](https://www.elastic.co/search-labs/blog/better-binary-quantization-lucene-elasticsearch) はこの系譜の実装です。本編 Stage 3 の素朴な符号 1bit と比べると、「量子化の前にランダム回転を入れる」だけで同じ 1bit でも精度が大きく変わる、というのがこの系譜の核心です。
 
 ### オンライン・データ非依存: TurboQuant
 

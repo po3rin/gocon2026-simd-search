@@ -587,7 +587,7 @@ Recall@10: binary=0.180 binary+rerank=0.868             ← binary 単体は 0.1
 
 DB が 153.6MB から 4.8MB になってキャッシュに乗り、DRAM 帯域の制約から外れました。0.77 ms、**46x** です。速くなった理由は SIMD ではなく、データを 1/32 にしたことです。
 
-距離の計算には、通常の(SIMD でない)POPCNT 命令で十分です。SIMD 版の popcount(AVX-512 の VPOPCNT)に変えても速くなりません。データがキャッシュに乗っていて 1 ベクトルが 6 語と短く、popcount の計算で時間を使っていないからです。AVX-512 のあるマシンで測ると、SIMD 版が 0.75 ms、通常版が 0.68 ms でした。実測は[付録](../appendix/appendix.md#3-avx-512-の-simd-popcount)にあります(今回の Codespace の AMD CPU には VPOPCNT が無いので、手元では再現できません)。
+距離の計算には、通常の(SIMD でない)POPCNT 命令で十分です。SIMD 版の popcount(AVX-512 の VPOPCNT)に変えても速くなりません。データがキャッシュに乗っていて、1 ベクトルも uint64 6 個ぶん(384bit)と短く、popcount の計算で時間を使っていないからです。AVX-512 のあるマシンで測ると、SIMD 版が 0.75 ms、通常版が 0.68 ms でした。実測は[付録](../appendix/appendix.md#3-avx-512-の-simd-popcount)にあります(今回の Codespace の AMD CPU には VPOPCNT が無いので、手元では再現できません)。
 
 ただし、良いことばかりではありません。1bit に減らしたぶん精度が大きく落ち、**Recall@10 = 0.18** です。正解 10 件のうち 2 件弱しか当たりません。46x は正確な検索が速くなったのではなく、別の近似の問題に置き換えた結果で、このままでは使えません。
 
