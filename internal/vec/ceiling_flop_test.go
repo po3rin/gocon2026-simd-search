@@ -18,25 +18,17 @@ import (
 // 漸化式 a = a*m + c (m=0.9999, c=1) は固定点 10000 に収束し、オーバーフロー/
 // 非正規化数を踏まない。詳細は docs/workshop/workshop.md。
 
-func fill8(v float32) archsimd.Float32x8 {
-	var b [8]float32
-	for i := range b {
-		b[i] = v
-	}
-	return archsimd.LoadFloat32x8(b[:])
-}
-
 // BenchmarkPeakFLOP_AVX2 は 256bit FMA(Float32x8)のピーク GFLOP/s を測る。
 // ワークショップ Stage 1 が使う幅なので、これが「縦に上る天井」の実測値。
 func BenchmarkPeakFLOP_AVX2(b *testing.B) {
 	if !hasSIMD {
 		b.Skip("requires AVX2+FMA")
 	}
-	m := fill8(0.9999)
-	c := fill8(1.0)
-	a0, a1, a2, a3 := fill8(0.5), fill8(1.5), fill8(2.5), fill8(3.5)
-	a4, a5, a6, a7 := fill8(4.5), fill8(5.5), fill8(6.5), fill8(7.5)
-	a8, a9, a10, a11 := fill8(8.5), fill8(9.5), fill8(10.5), fill8(11.5)
+	m := archsimd.BroadcastFloat32x8(0.9999)
+	c := archsimd.BroadcastFloat32x8(1.0)
+	a0, a1, a2, a3 := archsimd.BroadcastFloat32x8(0.5), archsimd.BroadcastFloat32x8(1.5), archsimd.BroadcastFloat32x8(2.5), archsimd.BroadcastFloat32x8(3.5)
+	a4, a5, a6, a7 := archsimd.BroadcastFloat32x8(4.5), archsimd.BroadcastFloat32x8(5.5), archsimd.BroadcastFloat32x8(6.5), archsimd.BroadcastFloat32x8(7.5)
+	a8, a9, a10, a11 := archsimd.BroadcastFloat32x8(8.5), archsimd.BroadcastFloat32x8(9.5), archsimd.BroadcastFloat32x8(10.5), archsimd.BroadcastFloat32x8(11.5)
 	const inner = 1 << 12
 	iters := 0
 	for b.Loop() {
@@ -75,9 +67,9 @@ func BenchmarkPeakFLOP_AVX2_4acc(b *testing.B) {
 	if !hasSIMD {
 		b.Skip("requires AVX2+FMA")
 	}
-	m := fill8(0.9999)
-	c := fill8(1.0)
-	a0, a1, a2, a3 := fill8(0.5), fill8(1.5), fill8(2.5), fill8(3.5)
+	m := archsimd.BroadcastFloat32x8(0.9999)
+	c := archsimd.BroadcastFloat32x8(1.0)
+	a0, a1, a2, a3 := archsimd.BroadcastFloat32x8(0.5), archsimd.BroadcastFloat32x8(1.5), archsimd.BroadcastFloat32x8(2.5), archsimd.BroadcastFloat32x8(3.5)
 	const inner = 1 << 12
 	iters := 0
 	for b.Loop() {

@@ -16,21 +16,13 @@ import (
 // パイプが 4 本 × レイテンシ ~4cyc なので 12 本あれば飽和する。
 // レーン数が 4 なので flop の数え方は 12 本 × 4 レーン × 2。
 
-func fill4(v float32) archsimd.Float32x4 {
-	var b [4]float32
-	for i := range b {
-		b[i] = v
-	}
-	return archsimd.LoadFloat32x4(b[:])
-}
-
 // BenchmarkPeakFLOP_NEON は 128bit FMLA(Float32x4)のピーク GFLOP/s を測る。
 func BenchmarkPeakFLOP_NEON(b *testing.B) {
-	m := fill4(0.9999)
-	c := fill4(1.0)
-	a0, a1, a2, a3 := fill4(0.5), fill4(1.5), fill4(2.5), fill4(3.5)
-	a4, a5, a6, a7 := fill4(4.5), fill4(5.5), fill4(6.5), fill4(7.5)
-	a8, a9, a10, a11 := fill4(8.5), fill4(9.5), fill4(10.5), fill4(11.5)
+	m := archsimd.BroadcastFloat32x4(0.9999)
+	c := archsimd.BroadcastFloat32x4(1.0)
+	a0, a1, a2, a3 := archsimd.BroadcastFloat32x4(0.5), archsimd.BroadcastFloat32x4(1.5), archsimd.BroadcastFloat32x4(2.5), archsimd.BroadcastFloat32x4(3.5)
+	a4, a5, a6, a7 := archsimd.BroadcastFloat32x4(4.5), archsimd.BroadcastFloat32x4(5.5), archsimd.BroadcastFloat32x4(6.5), archsimd.BroadcastFloat32x4(7.5)
+	a8, a9, a10, a11 := archsimd.BroadcastFloat32x4(8.5), archsimd.BroadcastFloat32x4(9.5), archsimd.BroadcastFloat32x4(10.5), archsimd.BroadcastFloat32x4(11.5)
 	const inner = 1 << 12
 	iters := 0
 	for b.Loop() {

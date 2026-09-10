@@ -251,8 +251,9 @@ Stage ごとに見ると次のとおりです。
 
 ```go
 // 12本の独立アキュムレータ。漸化式 a = a*m + c はメモリにも触れない
-m, c := fill8(0.9999), fill8(1.0)
-a0, a1, /* … */ a11 := fill8(0.5), fill8(1.5), /* … */ fill8(11.5)
+broadcast := archsimd.BroadcastFloat32x8   // 全 8 レーンに同じ値を配る
+m, c := broadcast(0.9999), broadcast(1.0)
+a0, a1, /* … */ a11 := broadcast(0.5), broadcast(1.5), /* … */ broadcast(11.5)
 for b.Loop() {
     for j := 0; j < inner; j++ {
         a0 = a0.MulAdd(m, c)   // ← FMA。互いに独立なので 12本が並んで走る

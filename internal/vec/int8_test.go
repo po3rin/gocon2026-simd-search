@@ -22,6 +22,31 @@ func TestDotInt8MatchesNaive(t *testing.T) {
 	}
 }
 
+// 端の値と累積の上界を確認する。
+//   - -128 同士: QuantizeInt8 は ±127 にクランプするので作らないが、
+//     DotInt8 自体は -128 を含む入力でも正しい((-128)² の積和も int32 に収まる)
+//   - 全要素 ±127 × dim=4096: アキュムレータの int32 ヘッドルームの確認
+func TestDotInt8Extremes(t *testing.T) {
+	a := make([]int8, 33) // 32 の倍数 + 端数
+	b := make([]int8, 33)
+	for i := range a {
+		a[i] = -128
+		b[i] = -128
+	}
+	if got, want := DotInt8(a, b), DotInt8Naive(a, b); got != want {
+		t.Errorf("all -128: DotInt8=%d DotInt8Naive=%d", got, want)
+	}
+
+	big := make([]int8, 4096)
+	for i := range big {
+		big[i] = 127
+	}
+	want := int32(127) * 127 * 4096
+	if got := DotInt8(big, big); got != want {
+		t.Errorf("dim=4096 all 127: DotInt8=%d want %d", got, want)
+	}
+}
+
 func TestQuantizeInt8RoundTrip(t *testing.T) {
 	r := rand.New(rand.NewPCG(23, 24))
 	v := make([]float32, 384)
@@ -32,8 +57,25 @@ func TestQuantizeInt8RoundTrip(t *testing.T) {
 	scale := QuantizeInt8(v, q)
 	for i := range v {
 		got := float32(q[i]) * scale
-		if d := got - v[i]; d > scale || d < -scale { // 量子化誤差は ±scale/2 以内
+		// 丸めによる誤差は ±scale/2。ただし scale と inv(=127/maxAbs)を別々に
+		// float32 で丸めているため厳密な scale/2 は保証されず、わずかな余裕を持たせる
+		lim := scale * 0.5001
+		if d := got - v[i]; d > lim || d < -lim {
 			t.Errorf("i=%d: v=%f restored=%f (scale=%f)", i, v[i], got, scale)
+		}
+	}
+}
+
+// ゼロベクトルは scale=1 で全要素 0 に量子化される(godoc の仕様の確認)。
+func TestQuantizeInt8Zero(t *testing.T) {
+	v := make([]float32, 8)
+	q := []int8{9, 9, 9, 9, 9, 9, 9, 9}
+	if scale := QuantizeInt8(v, q); scale != 1 {
+		t.Errorf("scale = %f, want 1", scale)
+	}
+	for i, x := range q {
+		if x != 0 {
+			t.Errorf("q[%d] = %d, want 0", i, x)
 		}
 	}
 }

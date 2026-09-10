@@ -1,5 +1,5 @@
 // Command roofline-figures regenerates the static roofline figures in
-// docs/images (roofline-concept, rl-stage0..5, roofline-plot) so that they all
+// docs/images (roofline-concept, rl-stage0..4, rl-batch, roofline-plot) so that they all
 // share one look: the same axes, the same gray roof, the same point style and
 // the same "上限の何 %" droplines as the interactive `make roofline-plot`.
 //
@@ -22,13 +22,14 @@ import (
 
 // pt is one point on the roofline.
 type pt struct {
-	name  string  // label above the point
-	ai    float64 // arithmetic intensity (flop/byte)
-	gf    float64 // achieved GFLOP/s
-	note  string  // small text under the point ("" = auto "x GF・上限の y%")
-	ghost bool    // previous stage: drawn gray, no dropline
-	vague bool    // position is only indicative (no flop defined): dashed, no dropline
-	side  string  // label side: "" (above), "below", "right", "left"
+	name   string  // label above the point
+	ai     float64 // arithmetic intensity (flop/byte)
+	gf     float64 // achieved GFLOP/s
+	note   string  // small text under the point ("" = auto "x GF・上限の y%")
+	noNote bool    // suppress the note entirely (ghost points)
+	ghost  bool    // previous stage: drawn gray, no dropline
+	vague  bool    // position is only indicative (no flop defined): dashed, no dropline
+	side   string  // label side: "" (above), "below"
 }
 
 // fig is one figure to emit.
@@ -53,7 +54,7 @@ const (
 func main() {
 	peak := flag.Float64("peak", 25.59, "compute ceiling in GFLOP/s (make roofline-ceiling)")
 	bw := flag.Float64("bw", 20.80, "memory read bandwidth in GB/s (make roofline-ceiling)")
-	tpeak := flag.Float64("tpeak", 110, "theoretical compute peak line (0 = hide)")
+	tpeak := flag.Float64("tpeak", 0, "theoretical compute peak line (0 = hide; docs の図は Makefile が 110 を渡す)")
 	out := flag.String("out", "docs/images", "output directory")
 	flag.Parse()
 
@@ -72,14 +73,14 @@ func main() {
 
 // figures lists the figures and the measured points that appear in each.
 func figures(peak, bw, ridge float64) []fig {
-	s0 := pt{name: "Stage 0 スカラ全探索", ai: 0.5, gf: 2.15}
-	s1 := pt{name: "Stage 1 SIMD 全探索", ai: 0.5, gf: 9.7}
-	s2 := pt{name: "バッチ SIMD(B=32)", ai: 16, gf: 13.3}
-	s2s := pt{name: "バッチ スカラ(B=32)", ai: 16, gf: 2.24, side: "below"}
-	s3 := pt{name: "Stage 2 int8", ai: 2, gf: 18.3, note: "18.3 Gop/s・上限の 72%"}
-	s4 := pt{name: "Stage 3 1bit 量子化", ai: 16, gf: 80, note: "46x・flop が無いので位置は目安", vague: true}
-	s5 := pt{name: "Stage 4 1bit + rerank", ai: 16, gf: 80, note: "43x・Recall 0.87・位置は Stage 3 と同じ", vague: true}
-	ghost := func(p pt) pt { p.ghost = true; p.note = " "; return p }
+	stage0 := pt{name: "Stage 0 スカラ全探索", ai: 0.5, gf: 2.15}
+	stage1 := pt{name: "Stage 1 SIMD 全探索", ai: 0.5, gf: 9.7}
+	batchSIMD := pt{name: "バッチ SIMD(B=32)", ai: 16, gf: 13.3}
+	batchScalar := pt{name: "バッチ スカラ(B=32)", ai: 16, gf: 2.24, side: "below"}
+	stage2Int8 := pt{name: "Stage 2 int8", ai: 2, gf: 18.3, note: "18.3 Gop/s・上限の 72%"}
+	stage3Bin := pt{name: "Stage 3 1bit 量子化", ai: 16, gf: 80, note: "46x・flop が無いので位置は目安", vague: true}
+	stage4Rerank := pt{name: "Stage 4 1bit + rerank", ai: 16, gf: 80, note: "43x・Recall 0.87・位置は Stage 3 と同じ", vague: true}
+	ghost := func(p pt) pt { p.ghost = true; p.noNote = true; return p }
 
 	return []fig{
 		{file: "roofline-concept", concept: true,
@@ -88,31 +89,31 @@ func figures(peak, bw, ridge float64) []fig {
 		{file: "rl-stage0",
 			title:    "Stage 0: スカラ全探索",
 			subtitle: "算術強度 0.5、2.15 GFLOP/s。メモリ帯域から決まる上限(約 10)にも届いていない",
-			points:   []pt{s0}},
+			points:   []pt{stage0}},
 		{file: "rl-stage1",
 			title:    "Stage 1: SIMD 化",
 			subtitle: "全探索はメモリ帯域の上限に達する(9.7 GF、上限の 93%)",
-			points:   []pt{ghost(s0), s1}},
+			points:   []pt{ghost(stage0), stage1}},
 		{file: "rl-batch",
 			title:    "クエリのバッチ化(B=32・付録)",
 			subtitle: "算術強度 が 0.5 から 16 に動き、リッジを越えて演算律速側へ。exact のまま SIMD がスカラより 5.9x 速い",
-			points:   []pt{ghost(s1), s2, s2s}},
+			points:   []pt{ghost(stage1), batchSIMD, batchScalar}},
 		{file: "rl-stage2",
 			title:    "Stage 2: int8 量子化",
 			subtitle: "算術強度 が 0.5 から 2 に動きリッジを越える。ただし演算ピークの下(int8 内積の速さで頭打ち)。Recall 0.948",
-			points:   []pt{ghost(s1), s3}},
+			points:   []pt{ghost(stage1), stage2Int8}},
 		{file: "rl-stage3",
 			title:    "Stage 3: 1bit 量子化",
 			subtitle: "データが 1/32 になりキャッシュに乗る。DRAM 帯域の制約から外れるが Recall 0.18(近似)",
-			points:   []pt{ghost(s3), s4}},
+			points:   []pt{ghost(stage2Int8), stage3Bin}},
 		{file: "rl-stage4",
 			title:    "Stage 4: 1bit で絞って fp32 SIMD で rerank",
 			subtitle: "速度の位置は Stage 3 と同じ。差は精度(Recall 0.18 から 0.87)",
-			points:   []pt{s5}},
+			points:   []pt{stage4Rerank}},
 		{file: "roofline-plot",
 			title:    "実測ルーフライン全体像(Codespaces / AMD EPYC 7763)",
 			subtitle: "演算ピーク " + ftoa(peak) + " GFLOP/s、メモリ帯域 " + ftoa(bw) + " GB/s、リッジ " + strconv.FormatFloat(ridge, 'f', 2, 64) + " flop/byte",
-			points:   []pt{s0, s1, s3, s4},
+			points:   []pt{stage0, stage1, stage2Int8, stage3Bin},
 			notes: []string{
 				"Stage 0 から 1: 縦に上がりメモリ帯域の上限で止まる(算術強度 0.5 はリッジの左)",
 				"Stage 1 から 2: 算術強度 を右に動かすとリッジを越え、SIMD が効く側に入る",
@@ -126,7 +127,7 @@ func ftoa(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }
 func render(f fig, peak, bw, tpeak float64) string {
 	ridge := peak / bw
 	aiLo, aiHi := 0.25, 64.0
-	gfLo, gfHi := 1.0, 150.0
+	gfLo, gfHi := 1.0, math.Max(150, math.Max(peak, tpeak)*1.3)
 	lx0, lx1 := math.Log10(aiLo), math.Log10(aiHi)
 	ly0, ly1 := math.Log10(gfLo), math.Log10(gfHi)
 	px := func(ai float64) float64 { return x0 + (math.Log10(ai)-lx0)/(lx1-lx0)*plotW }
@@ -226,21 +227,19 @@ func render(f fig, peak, bw, tpeak float64) string {
 			dash = " stroke-dasharray=\"3 2\""
 		}
 		p("<circle cx=\"%.1f\" cy=\"%.1f\" r=\"7\" fill=\"%s\" stroke=\"%s\" stroke-width=\"2\"%s/>\n", x, y, fill, stroke, dash)
-		note := q.note
-		if note == "" {
-			note = fmt.Sprintf("%.1f GF・上限の %.0f%%", q.gf, q.gf/r*100)
+		note := ""
+		if !q.noNote {
+			note = q.note
+			if note == "" {
+				note = fmt.Sprintf("%.1f GF・上限の %.0f%%", q.gf, q.gf/r*100)
+			}
 		}
 		anchor, tx, ty1, ty2 := "middle", x, y-12, y+20
-		switch q.side {
-		case "below":
+		if q.side == "below" {
 			ty1, ty2 = y+22, y+36
-		case "right":
-			anchor, tx, ty1, ty2 = "start", x+12, y+4, y+18
-		case "left":
-			anchor, tx, ty1, ty2 = "end", x-12, y+4, y+18
 		}
 		p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" font-weight=\"600\" fill=\"%s\" text-anchor=\"%s\">%s</text>\n", tx, ty1, labFill, anchor, esc(q.name))
-		if strings.TrimSpace(note) != "" {
+		if note != "" {
 			p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10\" fill=\"#6b7280\" text-anchor=\"%s\">%s</text>\n", tx, ty2, anchor, esc(note))
 		}
 	}

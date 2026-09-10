@@ -4,6 +4,10 @@ package vec
 
 import "simd/archsimd"
 
+// HasInt8SIMD reports whether the int8 SIMD path is compiled in and usable.
+// arm64 では Neon が必須機能なので常に true。
+func HasInt8SIMD() bool { return true }
+
 // DotInt8 は int8 ベクトルの内積を Neon で計算する(Stage 2 の arm64 版)。
 //
 // amd64 版(int8_simd.go)は VPMADDWD(DotProductPairs)1発で int16 ペアの積和を
@@ -16,11 +20,10 @@ import "simd/archsimd"
 // 足し込むと 3 個目で溢れるので、必ず int32 へ広げてから蓄積する。
 //
 // 1 イテレーションで 16 要素。命令数は 2 SMULL + 4 SXTL + 4 ADD(+ ロード 2)で、
-// スカラの 16 回 × (MUL+ADD) より少ない。
+// スカラの 16 回 × (MUL+ADD) より少ない。アキュムレータは 1 レーンに 16 要素ごと
+// ≦16129 を蓄積するので、dim ≦ 約 200 万まで int32 に収まる。
+// a と b は同じ長さであること。
 func DotInt8(a, b []int8) int32 {
-	if len(b) < len(a) {
-		a = a[:len(b)]
-	}
 	var acc0, acc1, acc2, acc3 archsimd.Int32x4
 	for len(a) >= 16 {
 		va := archsimd.LoadInt8x16(a)

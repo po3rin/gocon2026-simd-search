@@ -8,18 +8,21 @@ import "simd/archsimd"
 // すべて AVX2 で足りる(FMA 不要)。
 var hasInt8SIMD = archsimd.X86.AVX2()
 
+// HasInt8SIMD reports whether the int8 SIMD path is compiled in and usable.
+func HasInt8SIMD() bool { return hasInt8SIMD }
+
 // DotInt8 は int8 ベクトルの内積を AVX2 で計算する(Stage 2)。
+// a と b は同じ長さであること。
 //
 // 1イテレーションで int8 を16個: sign-extend で int16x16 に広げ(VPMOVSXBW)、
 // DotProductPairs(VPMADDWD)が「隣り合う2要素の積和」を int32x8 で返すので
 // アキュムレータに足し込む。int16 同士の積は最大 127*127=16129、ペア和でも
 // int32 に余裕で収まる(signed×signed なので飽和対策が要らない)。
+// アキュムレータ側は 1 レーンに 32 要素ごと ≦32258 を蓄積するので、
+// dim ≦ 約 200 万まで int32 に収まる。
 func DotInt8(a, b []int8) int32 {
 	if !hasInt8SIMD {
 		return DotInt8Naive(a, b)
-	}
-	if len(b) < len(a) {
-		a = a[:len(b)]
 	}
 	var acc0, acc1 archsimd.Int32x8
 	for len(a) >= 32 {

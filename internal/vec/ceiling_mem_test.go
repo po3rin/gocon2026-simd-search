@@ -34,7 +34,10 @@ func memSetup() {
 		memA = make([]float32, memN)
 		memB = make([]float32, memN)
 		memC = make([]float32, memN)
+		// memA も含めて 3 本とも書いてページを実体化しておく。
+		// これを怠ると Triad の初回反復がページフォルト込みで計測される
 		for i := range memB {
+			memA[i] = 0
 			memB[i] = float32(i&1023) * 0.5
 			memC[i] = float32(i&511) * 0.25
 		}

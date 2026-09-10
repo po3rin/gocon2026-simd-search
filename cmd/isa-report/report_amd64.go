@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"simd"
 	"simd/archsimd"
 )
 
@@ -39,7 +40,8 @@ var apis = []api{
 	{"Stage 0", "vec.DotNaive (scalar loop)", "ADDSS/MULSS", "(scalar SSE, not archsimd)", func() bool { return true }},
 
 	// Stage 1 — Float32x8 dot
-	{"Stage 1", "LoadFloat32x8", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
+	// ロード自体は AVX で足りるが、本リポのガード(AVX2+FMA)に合わせて AVX2 を確認する
+	{"Stage 1", "LoadFloat32x8", "VMOVUPS", "AVX2", archsimd.X86.AVX2},
 	{"Stage 1", "Float32x8.MulAdd", "VFMADD213PS", "FMA", archsimd.X86.FMA},
 	{"Stage 1", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
 
@@ -111,6 +113,10 @@ func run() {
 		fmt.Printf("  guard: %s\n", s.guard)
 		fmt.Printf("  active: %s\n", s.active)
 	}
+
+	fmt.Printf("\n=== portable simd package (Go 1.27) ===\n")
+	fmt.Printf("  %-20s   %d bit  (simd.Float32s = %d lanes)\n", "VectorBitSize", simd.VectorBitSize(), simd.Float32s{}.Len())
+	fmt.Printf("  %-20s   %v\n", "Emulated", simd.Emulated())
 
 	fmt.Printf("\n=== Notes ===\n")
 	fmt.Printf("  • Feature checks: archsimd.X86.* — same API pkg.go.dev recommends.\n")

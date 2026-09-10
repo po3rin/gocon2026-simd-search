@@ -6,7 +6,7 @@
 //
 // Inputs are the machine's measured ceilings (from `make roofline-ceiling`):
 //
-//	go run ./cmd/roofline-decompose -peak 25.59 -bw 20.80 > out.svg
+//	go run ./cmd/roofline-decompose -peak 25.59 -bw 20.80 -o out.svg
 //
 // Or: make roofline-decompose  (regenerates docs/images/memory-vs-compute-roofline.svg)
 //
@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -28,7 +29,6 @@ const (
 
 type stage struct {
 	title string
-	ai    string
 	bytes float64 // bytes moved per element (amortized by batching)
 	y     float64
 }
@@ -36,11 +36,12 @@ type stage struct {
 func main() {
 	peak := flag.Float64("peak", 25.59, "compute ceiling in GFLOP/s (from make roofline-ceiling)")
 	bw := flag.Float64("bw", 20.80, "memory read bandwidth in GB/s (from make roofline-ceiling)")
+	out := flag.String("o", "", "output file (default: stdout)")
 	flag.Parse()
 
 	stages := []stage{
-		{"全探索 (B=1)", "算術強度=0.5", bytePerElem, 130},      // no reuse
-		{"バッチ (B=32)", "算術強度=16", bytePerElem / 32, 280}, // d loaded once for 32 queries
+		{"全探索 (B=1)", bytePerElem, 130},       // no reuse
+		{"バッチ (B=32)", bytePerElem / 32, 280}, // d loaded once for 32 queries
 	}
 
 	tc := flopPerElem / *peak // compute time per element (same for every stage)
@@ -63,7 +64,7 @@ func main() {
 		tm := s.bytes / *bw
 		mw, cw := tm*k, tc*k
 		p(`<text x="120" y="%.0f" font-size="13.5" font-weight="600" fill="#111827" text-anchor="middle">%s</text>`+"\n", s.y+24, s.title)
-		p(`<text x="120" y="%.0f" font-size="11" fill="#6b7280" text-anchor="middle">%s</text>`+"\n", s.y+42, s.ai)
+		p(`<text x="120" y="%.0f" font-size="11" fill="#6b7280" text-anchor="middle">算術強度=%g</text>`+"\n", s.y+42, flopPerElem/s.bytes)
 
 		// memory-time bar
 		p(`<rect x="%.0f" y="%.0f" width="%.1f" height="%.0f" fill="%s" stroke="%s" stroke-width="1.6"/>`+"\n", x0, s.y, mw, hb, memFill, memStroke)
@@ -94,5 +95,14 @@ func main() {
 	p(`<text x="480" y="428" font-size="10.5" fill="#9ca3af" text-anchor="middle">※ ルーフラインの理想値。実測は spill 等でこれより遅い(本文)。この内訳は pprof/trace では出せず、ルーフラインが与える。</text>` + "\n")
 	p(`</svg>` + "\n")
 
+	// -o 指定時はファイルへ書く(シェルの > だと go run が失敗しただけで
+	// コミット済みの SVG が 0 バイトに潰れるため)
+	if *out != "" {
+		if err := os.WriteFile(*out, []byte(b.String()), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, "roofline-decompose:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	fmt.Print(b.String())
 }

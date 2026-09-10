@@ -55,7 +55,7 @@ func BenchmarkHammingSIMD(b *testing.B) {
 	}
 }
 
-// ポータブル simd パッケージ版(workshop.md §01)。archsimd 版(DotSIMD)との差を見る(make bench-portable)。
+// ポータブル simd パッケージ版(workshop.md §01)。archsimd 版(Dot)との差を見る(make bench-portable)。
 func BenchmarkDotPortable(b *testing.B) {
 	for b.Loop() {
 		sinkF = DotPortable(benchA, benchB)

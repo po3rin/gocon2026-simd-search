@@ -59,7 +59,7 @@ bench-parallel:
 
 ## N スイープ(付録 appendix.md 6 節): DB サイズを 1k から 1M まで振り、
 ## キャッシュに収まる間は SIMD が効き、DRAM に溢れると倍率が崩れるのを見る。
-## 1M の index 構築(数秒)が初回に走る。
+## 1M の index 構築(数秒)が初回に走る。4 サイズ分のデータを同時に持つため約 1.7GB のメモリが要る。
 bench-nsweep:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchSweep$$' -benchtime 1s -timeout 30m
 
@@ -78,10 +78,10 @@ recall-int8:
 bench-maxsim:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s
 
-## ルーフライン: 各 Stage の GFLOP/s・AI・MB/query を表示して図に「点を打つ」
-## (Stage 0 naive、Stage 1 SIMD、Stage 3 binary の 3 点。docs/workshop/workshop.md 参照)
-roofline:
-	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
+## ルーフライン: 図に「点を打つ」ための計測(bench2 と同じコマンドなのでエイリアス)。
+## Stage 0/1 は GFLOP/s・AI・MB/query、Stage 3(binary)は MB/query のみ
+## (popcount なので flop 軸に乗らない)。docs/workshop/workshop.md 参照
+roofline: bench2
 
 ## バッチ化の効き: B=1(全探索) vs B=32(バッチ)で scalar/SIMD を比較
 ## 演算律速にすると SIMD が exact 検索でも効くことを見る(付録 appendix.md 7 節)
@@ -100,7 +100,7 @@ roofline-ceiling:
 PEAK ?= 25.59
 BW   ?= 20.80
 roofline-decompose:
-	$(GO) run ./cmd/roofline-decompose -peak $(PEAK) -bw $(BW) > docs/images/memory-vs-compute-roofline.svg
+	$(GO) run ./cmd/roofline-decompose -peak $(PEAK) -bw $(BW) -o docs/images/memory-vs-compute-roofline.svg
 	@command -v rsvg-convert >/dev/null 2>&1 \
 	  && rsvg-convert -w 1920 docs/images/memory-vs-compute-roofline.svg -o docs/images/memory-vs-compute-roofline.png \
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
@@ -109,7 +109,7 @@ roofline-decompose:
 ## 数値は cmd/roofline-figures/main.go に直書き(workshop.md の Codespaces 実測値)。再計測したらそこを直して叩く。
 ## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
 roofline-figures:
-	$(GO) run ./cmd/roofline-figures -peak $(PEAK) -bw $(BW) -out docs/images
+	$(GO) run ./cmd/roofline-figures -peak $(PEAK) -bw $(BW) -tpeak 110 -out docs/images
 	@command -v rsvg-convert >/dev/null 2>&1 \
 	  && for f in roofline-concept rl-batch rl-stage0 rl-stage1 rl-stage2 rl-stage3 rl-stage4 roofline-plot; do \
 	       rsvg-convert -w 1920 docs/images/$$f.svg -o docs/images/$$f.png; done \
@@ -129,8 +129,8 @@ concept-images:
 ## ※ 本編の数字は amd64(Codespaces)のもの。arm64(Neon)でも動くが別の数字になる。
 TPEAK ?= 0
 roofline-plot:
-	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s \
-	  | $(GO) run ./cmd/roofline-plot -peak $(PEAK) -bw $(BW) -tpeak $(TPEAK) > /tmp/roofline.html
+	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Int8|BatchNaive|BatchSIMD)$$' -benchtime 2s > /tmp/roofline-bench.txt
+	$(GO) run ./cmd/roofline-plot -peak $(PEAK) -bw $(BW) -tpeak $(TPEAK) < /tmp/roofline-bench.txt > /tmp/roofline.html
 	@echo "open /tmp/roofline.html"
 
 ## register spill を見る(docs/workshop §05)。演算ピーク(12本アキュムレータ)ループ
@@ -157,7 +157,7 @@ cpuinfo:
 ## amd64 なら archsimd.X86.* のチェック結果、arm64(Apple Silicon)なら Neon 版の内積・距離関数の一覧が出る。
 ## Mac から amd64 側の一覧を見たいときは: make isa-report-amd64 (Rosetta 実行・FMA=false になる)
 isa-report:
-	GOEXPERIMENT=simd $(GO) run ./cmd/isa-report/
+	$(GO) run ./cmd/isa-report/
 
 isa-report-amd64:
-	GOARCH=amd64 GOEXPERIMENT=simd $(GO) run ./cmd/isa-report/
+	GOARCH=amd64 $(GO) run ./cmd/isa-report/

@@ -7,6 +7,10 @@
 
 数値の正本はこの教材と、`make roofline` / `make roofline-ceiling` の実測です。
 
+## 登壇スライド
+
+- [slides/part1.html](slides/part1.html): 前半(§01〜§05)の講義パート、15 分ぶん・22 枚。ブラウザで開いて ← → でめくる(`f` で全画面、Cmd+P で PDF 出力)。図は `docs/images/*.svg` を参照しているので、図を直したらスライドにも反映される
+
 ## 付録
 
 - [appendix/appendix.md](appendix/appendix.md): Go の SIMD の 2 つの隠れた性能上限(VZEROUPPER の遷移ペナルティ、register spill)、MaxSim、AVX-512 popcount、実行環境の調査(Apple Silicon、Rosetta、Docker、amd64 実機)

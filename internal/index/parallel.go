@@ -17,12 +17,12 @@ func (ix *Index) SearchParallel(q []float32, k, workers int) []Result {
 	if workers <= 1 {
 		return ix.SearchSIMD(q, k)
 	}
-	chunk := (ix.N + workers - 1) / workers
 	tops := make([]*topK, workers)
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
-		lo := w * chunk
-		hi := min(lo+chunk, ix.N)
+		// w*N/workers 方式なら端数が全 worker に均される(N が割り切れなくても偏らない)
+		lo := w * ix.N / workers
+		hi := (w + 1) * ix.N / workers
 		if lo >= hi {
 			continue
 		}
@@ -48,13 +48,12 @@ func (ix *Index) SearchBatchParallel(qs [][]float32, k, workers int) [][]Result 
 	if workers <= 1 {
 		return ix.SearchBatchSIMD(qs, k)
 	}
-	chunk := (ix.N + workers - 1) / workers
 	// tops[w][b]: worker w のクエリ b 用 topK
 	tops := make([][]*topK, workers)
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
-		lo := w * chunk
-		hi := min(lo+chunk, ix.N)
+		lo := w * ix.N / workers
+		hi := (w + 1) * ix.N / workers
 		if lo >= hi {
 			continue
 		}

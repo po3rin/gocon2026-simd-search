@@ -64,3 +64,40 @@ jobs:
           if [ -n "$out" ]; then
             echo "gofmt が必要なファイル:"; echo "$out"; exit 1
           fi
+
+  # GOEXPERIMENT なしでも壊れないことの確認(フォールバック実装
+  # dot_fallback.go / int8_fallback.go / dot_portable_fallback.go /
+  # hamming_simd_fallback.go / report_stub.go はここでしかコンパイルされない)
+  build-nosimd:
+    name: build (GOEXPERIMENT なし)
+    runs-on: ubuntu-latest
+    env:
+      GOEXPERIMENT: ""
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - run: go vet ./...
+      - run: go test ./...
+
+  # 生成図(docs/images の SVG)が cmd/roofline-figures /
+  # cmd/roofline-decompose の現在のコードと一致していることの確認。
+  # 引数は Makefile の roofline-figures / roofline-decompose と揃えること
+  figures:
+    name: 生成図の鮮度チェック
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - run: |
+          mkdir -p /tmp/figs
+          go run ./cmd/roofline-figures -peak 25.59 -bw 20.80 -tpeak 110 -out /tmp/figs
+          go run ./cmd/roofline-decompose -peak 25.59 -bw 20.80 -o /tmp/figs/memory-vs-compute-roofline.svg
+          for f in /tmp/figs/*.svg; do
+            diff -u "docs/images/$(basename "$f")" "$f" || { echo "図が古い: make roofline-figures / roofline-decompose を実行してコミットしてください"; exit 1; }
+          done

@@ -44,6 +44,8 @@ func (ix *Index) Add(v []float32) {
 	vec.Quantize(v, code)
 	ix.Codes = append(ix.Codes, code...)
 	ix.N++
+	// int8 表現はベースが変わると古くなるので捨てる(次の BuildInt8 で作り直す)
+	ix.Codes8, ix.Scales = nil, nil
 }
 
 // Vec returns the float32 vector for id.
@@ -114,6 +116,7 @@ func (ix *Index) SearchBinarySIMD(q []float32, k int) []Result {
 // SearchBinaryRerank retrieves k*factor candidates with the cheap binary
 // scan, then re-scores them with the exact float32 dot product.
 // 「速度と精度は二者択一ではない」を示す QBit 風の二段構え。
+// 戻り値の Score は SearchBinary と違い、-Hamming ではなく fp32 の内積。
 func (ix *Index) SearchBinaryRerank(q []float32, k, factor int) []Result {
 	cands := ix.SearchBinary(q, k*factor)
 	t := newTopK(k)
