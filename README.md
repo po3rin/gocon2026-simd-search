@@ -19,6 +19,10 @@ Go 1.27 の実験的 SIMD パッケージ(`simd/archsimd`)で Pure Go のベク�
 - [docs/appendix/appendix.md](docs/appendix/appendix.md): 付録
 - [docs/README.md](docs/README.md): ドキュメント索引
 
+## スライド
+
+- [https://speakerdeck.com/po3rin/gocon2026-workshop](https://speakerdeck.com/po3rin/gocon2026-workshop)
+
 ## 構成
 
 ```
