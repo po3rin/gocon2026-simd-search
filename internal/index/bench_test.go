@@ -95,7 +95,7 @@ func BenchmarkSearchSIMD(b *testing.B) {
 	reportFloatRoofline(b, iters)
 }
 
-// ポータブル simd 版(simd.Float32s。workshop.md §01)。SearchSIMD と同じ点に乗る(Codespaces 実測で確認済み)。
+// ポータブル simd 版(simd.Float32s。workshop.md §02)。SearchSIMD と同じ点に乗る(Codespaces 実測で確認済み)。
 func BenchmarkSearchPortable(b *testing.B) {
 	benchSetup()
 	b.SetBytes(benchN * benchDim * 4)
