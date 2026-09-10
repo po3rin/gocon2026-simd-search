@@ -108,7 +108,7 @@ func BenchmarkSearchPortable(b *testing.B) {
 	b.ReportMetric(float64(vec.PortableVectorBits()), "vec-bits")
 }
 
-// Stage 4: バイナリ量子化 + スカラー popcount。右上に動いて DRAM 律速を脱出。
+// Stage 3: バイナリ量子化 + スカラー popcount。右上に動いて DRAM 律速を脱出。
 func BenchmarkSearchBinary(b *testing.B) {
 	benchSetup()
 	b.SetBytes(benchN * benchDim / 8)
@@ -129,7 +129,7 @@ func BenchmarkSearchBinarySIMD(b *testing.B) {
 	reportBinaryRoofline(b)
 }
 
-// Stage 5(仕上げ): バイナリ検索 + float32 rerank(精度軸。Recall@10 0.18→0.87)。
+// Stage 4(仕上げ): バイナリ検索 + float32 rerank(精度軸。Recall@10 0.18→0.87)。
 func BenchmarkSearchBinaryRerank(b *testing.B) {
 	benchSetup()
 	for b.Loop() {

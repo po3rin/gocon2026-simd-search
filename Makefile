@@ -35,11 +35,11 @@ bench-portable:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD|Portable)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|Portable)$$' -benchtime 2s
 
-## Stage 4: バイナリ量子化(1bit・1/32)
+## Stage 3: バイナリ量子化(1bit・1/32)
 bench2:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
-## Stage 5(仕上げ): スカラ/SIMD/バイナリ + float32 rerank(本編の最終形。AVX2+FMA だけで完結)
+## Stage 4(仕上げ): スカラ/SIMD/バイナリ + float32 rerank(本編の最終形。AVX2+FMA だけで完結)
 bench3:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary|BinaryRerank)$$' -benchtime 2s
 
@@ -63,13 +63,13 @@ bench-parallel:
 bench-nsweep:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchSweep$$' -benchtime 1s -timeout 30m
 
-## Stage 3: int8 量子化(1/4 サイズ)。内積単体(VPMOVSXBW+VPMADDWD)と全探索。
+## Stage 2: int8 量子化(1/4 サイズ)。内積単体(VPMOVSXBW+VPMADDWD)と全探索。
 ## 精度は make recall(TestRecallInt8 も走る)で確認。
 bench-int8:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDotInt8(Naive|SIMD)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchInt8$$' -benchtime 2s
 
-## Stage 3 の精度: int8 単体の Recall@10(binary と rerank の行は Stage 4/5 で見る)
+## Stage 2 の精度: int8 単体の Recall@10(binary と rerank の行は Stage 2/4 で見る)
 recall-int8:
 	$(GO) test ./internal/index -run 'TestRecallInt8$$' -v
 
@@ -79,7 +79,7 @@ bench-maxsim:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s
 
 ## ルーフライン: 各 Stage の GFLOP/s・AI・MB/query を表示して図に「点を打つ」
-## (Stage 0 naive、Stage 1 SIMD、Stage 4 binary の 3 点。docs/workshop/workshop.md 参照)
+## (Stage 0 naive、Stage 1 SIMD、Stage 3 binary の 3 点。docs/workshop/workshop.md 参照)
 roofline:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD|Binary)$$' -benchtime 2s
 
@@ -105,13 +105,13 @@ roofline-decompose:
 	  && rsvg-convert -w 1920 docs/images/memory-vs-compute-roofline.svg -o docs/images/memory-vs-compute-roofline.png \
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
-## 静止画のルーフライン図(docs/images/roofline-concept, rl-stage0〜5, roofline-plot)を同じ見た目で再生成。
+## 静止画のルーフライン図(docs/images/roofline-concept, rl-batch、rl-stage0〜4, roofline-plot)を同じ見た目で再生成。
 ## 数値は cmd/roofline-figures/main.go に直書き(workshop.md の Codespaces 実測値)。再計測したらそこを直して叩く。
 ## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
 roofline-figures:
 	$(GO) run ./cmd/roofline-figures -peak $(PEAK) -bw $(BW) -out docs/images
 	@command -v rsvg-convert >/dev/null 2>&1 \
-	  && for f in roofline-concept rl-stage0 rl-stage1 rl-stage2 rl-stage3 rl-stage4 rl-stage5 roofline-plot; do \
+	  && for f in roofline-concept rl-batch rl-stage0 rl-stage1 rl-stage2 rl-stage3 rl-stage4 roofline-plot; do \
 	       rsvg-convert -w 1920 docs/images/$$f.svg -o docs/images/$$f.png; done \
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
@@ -123,7 +123,7 @@ concept-images:
 	  || echo "(PNG はスキップ: rsvg-convert が無い)"
 
 ## 実測値から対話的ルーフライン HTML を生成(docs/workshop §06)。叩くたびに点が打たれ、
-## Stage 1(AI=0.5)はメモリ帯域の上限に張り付き、Stage 2 バッチ(AI=16)はリッジを越えて演算側へ動く。
+## Stage 1(AI=0.5)はメモリ帯域の上限に張り付き、バッチ(AI=16)はリッジを越えて演算側へ動く。
 ## 自分のマシンの天井で: make roofline-plot PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
 ## 理論ピークの線も出すなら TPEAK=110(AVX2 理論値・CPU 依存なので既定は off)。
 ## ※ 本編の数字は amd64(Codespaces)のもの。arm64(Neon)でも動くが別の数字になる。

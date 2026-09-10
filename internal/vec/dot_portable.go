@@ -16,7 +16,7 @@ import "simd"
 // Codespaces(EPYC 7763)実測では 256bit で archsimd 版と同じ点(メモリ帯域の上限)に乗る
 // (make bench-portable)。
 //
-// 一方、Stage 3 の int8 積和(VPMADDWD / SMULL)や付録 B の popcount は
+// 一方、Stage 2 の int8 積和(VPMADDWD / SMULL)や付録 B の popcount は
 // ポータブル API には無い(アーキ間で共通に持てる演算だけが入っている)ので、
 // 量子化版の内積とハミング距離は archsimd のままにしてある。
 func DotPortable(a, b []float32) float32 {

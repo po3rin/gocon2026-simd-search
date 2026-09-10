@@ -43,13 +43,13 @@ var apis = []api{
 	{"Stage 1", "Float32x8.MulAdd", "VFMADD213PS", "FMA", archsimd.X86.FMA},
 	{"Stage 1", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
 
-	// Stage 3 — int8 dot (AVX2 only)
-	{"Stage 3", "LoadInt8x16", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
-	{"Stage 3", "Int8x16.ExtendToInt16", "VPMOVSXBW", "AVX2", archsimd.X86.AVX2},
-	{"Stage 3", "Int16x16.DotProductPairs", "VPMADDWD", "AVX2", archsimd.X86.AVX2},
+	// Stage 2 — int8 dot (AVX2 only)
+	{"Stage 2", "LoadInt8x16", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
+	{"Stage 2", "Int8x16.ExtendToInt16", "VPMOVSXBW", "AVX2", archsimd.X86.AVX2},
+	{"Stage 2", "Int16x16.DotProductPairs", "VPMADDWD", "AVX2", archsimd.X86.AVX2},
 
-	// Stage 4 — binary search (scalar path in production)
-	{"Stage 4", "vec.Hamming → bits.OnesCount64", "POPCNT", "(scalar POPCNT, not archsimd)", func() bool { return true }},
+	// Stage 3 — binary search (scalar path in production)
+	{"Stage 3", "vec.Hamming → bits.OnesCount64", "POPCNT", "(scalar POPCNT, not archsimd)", func() bool { return true }},
 
 	// 付録 3 節 — Uint64x4 Hamming SIMD
 	{"付録 3 節", "LoadUint64x4", "VMOVDQU", "AVX2", archsimd.X86.AVX2},
@@ -57,8 +57,8 @@ var apis = []api{
 	{"付録 3 節", "Uint64x4.OnesCount", "VPOPCNTQ", "AVX512VPOPCNTDQ", archsimd.X86.AVX512VPOPCNTDQ},
 	{"付録 3 節", "archsimd.ClearAVXUpperBits", "VZEROUPPER", "AVX", archsimd.X86.AVX},
 
-	// Stage 5 — rerank calls vec.Dot (Stage 1 guard)
-	{"Stage 5", "vec.Dot in SearchBinaryRerank", "(Stage 1 APIs)", "AVX2+FMA", func() bool {
+	// Stage 4 — rerank calls vec.Dot (Stage 1 guard)
+	{"Stage 4", "vec.Dot in SearchBinaryRerank", "(Stage 1 APIs)", "AVX2+FMA", func() bool {
 		return archsimd.X86.AVX2() && archsimd.X86.FMA()
 	}},
 }
@@ -141,10 +141,10 @@ func stageSummaries(hasSIMD, hasVPOPCNT bool) []stageSummary {
 	return []stageSummary{
 		{"Stage 0: scalar baseline", "(always)", "yes"},
 		{"Stage 1: SIMD dot", "archsimd.X86.AVX2() && FMA()", dot},
-		{"Stage 2: batch (same APIs as Stage 1)", "archsimd.X86.AVX2() && FMA()", dot},
-		{"Stage 3: int8 quantization", "archsimd.X86.AVX2()", dot8},
-		{"Stage 4: binary quantization", "scalar Hamming (POPCNT)", "yes"},
-		{"Stage 5: binary + rerank", "Hamming + Dot guard", rerank},
+		{"batch (B=32, same APIs as Stage 1)", "archsimd.X86.AVX2() && FMA()", dot},
+		{"Stage 2: int8 quantization", "archsimd.X86.AVX2()", dot8},
+		{"Stage 3: binary quantization", "scalar Hamming (POPCNT)", "yes"},
+		{"Stage 4: binary + rerank", "Hamming + Dot guard", rerank},
 		{"付録 3 節: AVX-512 Hamming", "AVX512() && AVX512VPOPCNTDQ()", bonus},
 	}
 }
@@ -154,7 +154,7 @@ func sortedKeys(m map[string][]api) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	order := map[string]int{"Stage 0": 0, "Stage 1": 1, "Stage 3": 2, "Stage 4": 3, "Stage 5": 4, "付録 3 節": 5}
+	order := map[string]int{"Stage 0": 0, "Stage 1": 1, "Stage 2": 2, "Stage 3": 3, "Stage 4": 4, "付録 3 節": 5}
 	sort.Slice(keys, func(i, j int) bool {
 		oi, oj := order[keys[i]], order[keys[j]]
 		if oi != oj {

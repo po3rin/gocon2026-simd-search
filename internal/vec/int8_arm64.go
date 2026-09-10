@@ -4,7 +4,7 @@ package vec
 
 import "simd/archsimd"
 
-// DotInt8 は int8 ベクトルの内積を Neon で計算する(Stage 3 の arm64 版)。
+// DotInt8 は int8 ベクトルの内積を Neon で計算する(Stage 2 の arm64 版)。
 //
 // amd64 版(int8_simd.go)は VPMADDWD(DotProductPairs)1発で int16 ペアの積和を
 // int32 に落とせたが、Neon の archsimd(Go 1.27)にはその命令が無い。代わりに
