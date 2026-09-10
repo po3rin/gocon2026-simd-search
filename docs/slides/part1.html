@@ -187,7 +187,7 @@ acc = va.MulAdd(vb, acc)          <span class="c">// acc += va*vb を 8 レー�
     <tr><td class="lbl">① 型がデータの形</td>
         <td><code>Float32x8</code> = float32 を 8 レーン = 256bit。<br>型を選ぶことが、使う命令幅とレーン数を選ぶことになる</td></tr>
     <tr><td class="lbl">② メソッド = 1 命令</td>
-        <td><code>MulAdd</code> → <code>VFMADD</code>、<code>Xor</code> → <code>VPXOR</code>。<br>メソッド名から出てくる機械語の見当がつく</td></tr>
+        <td><code>MulAdd</code> → <code>VFMADD</code>、<code>DotProductPairs</code> → <code>VPMADDWD</code>。<br>メソッド名から出てくる機械語の見当がつく</td></tr>
     <tr><td class="lbl">③ 実行時にガード</td>
         <td>未対応 CPU で呼ぶと panic する。<br><code>archsimd.X86.AVX2() &amp;&amp; archsimd.X86.FMA()</code> で確認してから使う</td></tr>
   </table>
