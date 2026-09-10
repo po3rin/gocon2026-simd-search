@@ -5,7 +5,7 @@ package vec
 import "simd/archsimd"
 
 // hasSIMD: この CPU で 256bit の FMA パスが使えるか。
-// MulAdd は VFMADD213PS になるので、AVX2 に加えて FMA も要る。
+// MulAdd は VFMADD213PS(FMA 拡張の命令)になる。FMA だけで足りるが、安全側に AVX2 も確認する。
 var hasSIMD = archsimd.X86.AVX2() && archsimd.X86.FMA()
 
 // HasSIMD は SIMD の高速パスがビルドに含まれ、実行環境で使えるかを返す。
