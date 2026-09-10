@@ -22,7 +22,7 @@ func Quantize(v []float32, out []uint64) {
 //
 // Stage 3 の距離計算。XOR + popcount だけで距離が出る。
 // math/bits.OnesCount64 はスカラーの POPCNT 命令にコンパイルされる。
-// SIMD 版 popcount(VPOPCNTQ)は AVX512VPOPCNTDQ が必要なので付録 3 節(make bench-bonus)で扱う。
+// SIMD 版 popcount(VPOPCNTQ)は AVX512VPOPCNTDQ が必要なので付録 6 節(make bench-bonus)で扱う。
 func Hamming(a, b []uint64) int {
 	var d int
 	for i := range a {

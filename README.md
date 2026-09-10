@@ -19,7 +19,7 @@ Go 1.27 の実験的 SIMD パッケージ(`simd/archsimd`)で Pure Go のベク�
 ## ドキュメント
 
 - [docs/workshop/workshop.md](docs/workshop/workshop.md): 教材本体。ルーフラインの進め方、各 Stage の図とコードと計測コマンド、原典
-- [docs/appendix/appendix.md](docs/appendix/appendix.md): 付録。Go の SIMD の隠れた性能上限、MaxSim、AVX-512 popcount、実行環境の調査
+- [docs/appendix/appendix.md](docs/appendix/appendix.md): 付録。Go の SIMD の隠れた性能上限、AVX-512 popcount、実行環境の調査
 - [docs/README.md](docs/README.md): ドキュメント索引
 
 ## 構成

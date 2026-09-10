@@ -2,7 +2,7 @@
 <defs><marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker></defs>
 <style>text{font-family:'Helvetica Neue', Helvetica, Arial, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;}</style>
 <rect width="960" height="440" fill="#ffffff"/>
-<text x="480" y="36" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">int8 の対称スカラ量子化 — 1 要素 4 byte を 1 byte にする</text>
+<text x="480" y="36" font-size="18" font-weight="600" fill="#111827" text-anchor="middle">int8 のスカラ量子化(対称型) — 1 要素 4 byte を 1 byte にする</text>
 <text x="480" y="60" font-size="12" fill="#6b7280" text-anchor="middle">scale = maxAbs ÷ 127、q = round(v ÷ scale)。復元は q × scale ≈ v</text>
 
 <!-- fp32 row: 5 cells w=120 gap=8, x0=(960-632)/2=164 -->
