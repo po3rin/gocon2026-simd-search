@@ -17,7 +17,7 @@
 
 ## 1. Go の SIMD の 2 つの隠れた性能上限
 
-VZEROUPPER の遷移ペナルティと register spill の話です。本編の Stage 0〜4 とは独立した読み物で、Go 1.26 / 1.27 の archsimd が出す機械語の現状に踏み込みたい人向けです。どちらもハードの限界ではなく、Go のコード生成がまだ発展途上であることが原因です。
+この節では、VZEROUPPER の遷移ペナルティと register spill という 2 つの隠れた上限を扱います。本編の Stage 0〜4 とは独立した読み物で、Go 1.26 / 1.27 の archsimd が出す機械語の現状に踏み込みたい人向けです。どちらもハードの限界ではなく、Go のコード生成がまだ発展途上であることが原因です。
 
 この調査は AWS c7i(Intel Xeon 8488C / Sapphire Rapids)で行いました。本編の Codespaces(AMD EPYC 7763)とは CPU のメーカーが違うので、2 つの現象の出方も違います。
 
@@ -95,7 +95,7 @@ Go の archsimd はこの VZEROUPPER を自動挿入しません(1.26、1.27 と
 
 ## 2. MaxSim
 
-MaxSim(late interaction)は、最初から演算律速な検索方式です。[7 節のクエリのバッチ化](#7-クエリのバッチ化再利用で算術強度を上げる)の考え方を、この方式に当てはめた実測です。`make bench-maxsim` で再現できます(Codespaces、AMD EPYC 7763)。
+MaxSim(late interaction)は、最初から演算律速な検索方式です。[7 節のクエリのバッチ化](#7-クエリのバッチ化再利用で算術強度を上げる)と同じ「1 回のロードに多数の計算を載せる」構造が、この方式には最初から入っています。この節ではそれを実測で確かめます。計測は Codespaces(AMD EPYC 7763)で、`make bench-maxsim` で再現できます。
 
 バッチ化は「クエリが 32 本まとめて来る」状況を利用して、DB ベクトルを 1 回運ぶたびに 32 本と内積を取り、算術強度を上げる方法です。MaxSim([ColBERT](https://arxiv.org/abs/2004.12832) 系)は、クエリと文書をそれぞれ複数のトークンベクトルで表し、クエリトークンごとに文書トークンとの最大内積を取って足し合わせる検索方式です。次の図は 1 文書を採点する流れです。
 
@@ -116,7 +116,7 @@ SIMD 化だけで 5.7x です。Stage 1 の全探索(算術強度 0.5)ではメ�
 
 ## 3. AVX-512 の SIMD popcount
 
-本編の Stage 3 で、1bit 量子化後のハミング距離は通常の POPCNT 命令で足り、SIMD 版の popcount(AVX-512 の VPOPCNT)を使っても速くならないと書きました。その実測です。
+本編の Stage 3 で、1bit 量子化後のハミング距離は通常の POPCNT 命令で足り、SIMD 版の popcount(AVX-512 の VPOPCNT)を使っても速くならないと書きました。この節では、その根拠になった実測を載せます。
 
 [`vec.HammingSIMD`](../../internal/vec/hamming_simd.go) は、`Uint64x4.OnesCount`(VPOPCNTQ 命令)で 4 つの uint64 をまとめて popcount します。この命令は AVX-512 の拡張(AVX512VPOPCNTDQ)で、Codespaces に割り当てられる AMD EPYC 7763 にはありません。AVX-512 のある機械(AWS の c7i など)を自分で用意すれば `make bench-bonus` で測れます(通常版と並べるなら `make bench2` も)。
 
@@ -185,7 +185,7 @@ Go 1.26 では `simd/archsimd` が amd64 専用で、ビルドタグでスカラ
 
 ### Rosetta(`GOARCH=amd64` on Apple Silicon)
 
-`archsimd.X86` の isa-report 実測です(Go 1.27.1 + macOS 26 でも同じ)。
+Rosetta 上で `make isa-report-amd64` を実行し、`archsimd.X86` の各機能フラグを確認しました(Go 1.27.1 + macOS 26 でも同じ)。
 
 | Feature | 値 | 対応する API |
 |---|---|---|
