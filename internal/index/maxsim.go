@@ -7,13 +7,13 @@ import (
 	"github.com/po3rin/gocon2026-simd-search/internal/vec"
 )
 
-// MultiIndex は文書を「トークンベクトルの集合」で持つ(付録 2 節: late interaction)。
+// MultiIndex は文書を「トークンベクトルの集合」で持つ(付録 8 節: late interaction)。
 // ColBERT 系の検索方式で、スコアは MaxSim:
 //
 //	score(q, d) = Σ_{qt∈q} max_{dt∈d} dot(qt, dt)
 //
 // 文書トークン dt を1回ロードするとクエリトークン全部(Tq 本)と内積するので、
-// バッチ化(付録 7 節)と同じ「1ロードに対し多数の計算」がタスクの仕様として内在する
+// バッチ化(付録 4 節)と同じ「1ロードに対し多数の計算」がタスクの仕様として内在する
 // = 最初から演算律速で、SIMD が最初から効く。
 type MultiIndex struct {
 	Dim  int

@@ -45,19 +45,19 @@ bench3:
 
 bench: bench3
 
-## (付録 appendix.md 3 節) AVX-512 VPOPCNT で popcount を SIMD 化。量子化後はキャッシュ律速で速くならない
+## (付録 appendix.md 7 節) AVX-512 VPOPCNT で popcount を SIMD 化。量子化後はキャッシュ律速で速くならない
 ## (SearchBinarySIMD ≧ SearchBinary)ことの確認用。本編フロー外。AVX-512 + VPOPCNTDQ のある機械(AWS c7i 等を
 ## 各自で用意)以外ではスカラにフォールバックする。
 bench-bonus:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchBinarySIMD$$' -benchtime 2s
 
-## goroutine 並列はどの上限に効くか(付録 appendix.md 8 節)。
+## goroutine 並列はどの上限に効くか(付録 appendix.md 5 節)。
 ## メモリ律速の全探索(B=1)はコアが DRAM 帯域を取り合うのでサブリニア、
 ## 演算律速のバッチ(B=32)はほぼリニアに伸びる。
 bench-parallel:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Parallel|BatchParallel)$$' -benchtime 2s
 
-## N スイープ(付録 appendix.md 6 節): DB サイズを 1k から 1M まで振り、
+## N スイープ(付録 appendix.md 3 節): DB サイズを 1k から 1M まで振り、
 ## キャッシュに収まる間は SIMD が効き、DRAM に溢れると倍率が崩れるのを見る。
 ## 1M の index 構築(数秒)が初回に走る。4 サイズ分のデータを同時に持つため約 1.7GB のメモリが要る。
 bench-nsweep:
@@ -73,7 +73,7 @@ bench-int8:
 recall-int8:
 	$(GO) test ./internal/index -run 'TestRecallInt8$$' -v
 
-## 付録 appendix.md 2 節: MaxSim(late interaction)。1 回のロードに多数の内積が最初から含まれるので、
+## 付録 appendix.md 8 節: MaxSim(late interaction)。1 回のロードに多数の内積が最初から含まれるので、
 ## 最初から演算律速で SIMD が効く検索方式。
 bench-maxsim:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearchMaxSim(Naive|SIMD)$$' -benchtime 2s
@@ -84,7 +84,7 @@ bench-maxsim:
 roofline: bench2
 
 ## バッチ化の効き: B=1(全探索) vs B=32(バッチ)で scalar/SIMD を比較
-## 演算律速にすると SIMD が exact 検索でも効くことを見る(付録 appendix.md 7 節)
+## 演算律速にすると SIMD が exact 検索でも効くことを見る(付録 appendix.md 4 節)
 roofline-batch:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|BatchNaive|BatchSIMD)$$' -benchtime 2s
 
@@ -94,7 +94,7 @@ roofline-batch:
 roofline-ceiling:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkPeak(FLOP_AVX2|FLOP_NEON|ReadBW|TriadBW)$$' -benchtime 2s
 
-## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(付録 appendix.md 7 節)
+## 「メモリ時間 vs 演算時間」の反転図を、実測天井から再生成(付録 appendix.md 4 節)
 ## 自分のマシンの天井で: make roofline-decompose PEAK=<GF> BW=<GB/s> (天井は make roofline-ceiling)
 ## PNG 化には rsvg-convert が要る(無ければ SVG だけ更新)。
 PEAK ?= 25.59
