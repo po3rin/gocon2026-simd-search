@@ -112,10 +112,10 @@ func figures(peak, bw, ridge float64) []fig {
 		{file: "roofline-plot",
 			title:    "実測ルーフライン全体像(Codespaces / AMD EPYC 7763)",
 			subtitle: "演算ピーク " + ftoa(peak) + " GFLOP/s、メモリ帯域 " + ftoa(bw) + " GB/s、リッジ " + strconv.FormatFloat(ridge, 'f', 2, 64) + " flop/byte",
-			points:   []pt{s0, s1, s2, s3, s4},
+			points:   []pt{s0, s1, s3, s4},
 			notes: []string{
 				"Stage 0 から 1: 縦に上がりメモリ帯域の上限で止まる(算術強度 0.5 はリッジの左)",
-				"Stage 1 からバッチ / Stage 2: 算術強度 を右に動かすとリッジを越え、SIMD が効く側に入る",
+				"Stage 1 から 2: 算術強度 を右に動かすとリッジを越え、SIMD が効く側に入る",
 				"Stage 3: データを 1/32 にしてキャッシュに乗せる。flop が無いので点の位置は目安",
 			}},
 	}
