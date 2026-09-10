@@ -1,58 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 720" font-family="Hiragino Sans,PingFang SC,Helvetica Neue,Arial,sans-serif">
-<defs>
-<marker id="ar-g" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#6b7280"/></marker>
-<marker id="ar-r" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#dc2626"/></marker>
-<marker id="ar-gr" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#16a34a"/></marker>
-</defs>
-<rect x="0" y="0" width="980" height="720" fill="#ffffff"/>
-<text x="490" y="34" text-anchor="middle" font-size="21" font-weight="700" fill="#111827">VZEROUPPER の遷移ペナルティ: SIMD からスカラへ戻る境界で起きる</text>
-<text x="490" y="58" text-anchor="middle" font-size="14" fill="#6b7280">同じコードでも、境界の1命令の有無で 167ns &#8594; 23ns（7.1x）</text>
-<rect x="40" y="72" width="430" height="40" rx="8" ry="8" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
-<text x="255" y="98" font-size="16" font-weight="700" fill="#b91c1c" text-anchor="middle">&#10007; VZEROUPPER なし = 167ns</text>
-<rect x="510" y="72" width="430" height="40" rx="8" ry="8" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-<text x="725" y="98" font-size="16" font-weight="700" fill="#15803d" text-anchor="middle">&#10003; VZEROUPPER あり = 23ns</text>
-<rect x="40" y="130" width="430" height="64" rx="8" ry="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
-<text x="58" y="156" font-size="14" font-weight="600" fill="#9a3412" text-anchor="start">&#9312; AVX2 FMA を実行（YMM 256bit を使う）</text>
-<text x="58" y="178" font-size="12.5" font-weight="400" fill="#b45309" text-anchor="start">&#8594; YMM レジスタの上位128bitが dirty（汚れた）状態</text>
-<rect x="510" y="130" width="430" height="64" rx="8" ry="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
-<text x="528" y="156" font-size="14" font-weight="600" fill="#9a3412" text-anchor="start">&#9312; AVX2 FMA を実行（YMM 256bit を使う）</text>
-<text x="528" y="178" font-size="12.5" font-weight="400" fill="#b45309" text-anchor="start">&#8594; YMM レジスタの上位128bitが dirty（汚れた）状態</text>
-<rect x="40" y="212" width="430" height="52" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="5,4"/>
-<text x="58" y="243" font-size="14" font-weight="400" fill="#374151" text-anchor="start">&#9313; 境界：何もしない（掃除しない）</text>
-<rect x="510" y="212" width="430" height="52" rx="8" ry="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
-<text x="528" y="234" font-size="14" font-weight="700" fill="#15803d" text-anchor="start">&#9313; 境界：VZEROUPPER を1命令だけ実行</text>
-<text x="528" y="254" font-size="12.5" font-weight="400" fill="#16a34a" text-anchor="start">&#8594; YMM 上位128bit をゼロに掃除</text>
-<rect x="40" y="290" width="430" height="58" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
-<text x="58" y="314" font-size="14" font-weight="400" fill="#374151" text-anchor="start">&#9314; スカラの水平和 sum = buf[0]+buf[1]+…</text>
-<text x="58" y="334" font-size="12.5" font-weight="400" fill="#6b7280" text-anchor="start">&#8594; Go はこれをレガシー SSE 命令で出力</text>
-<rect x="510" y="290" width="430" height="58" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
-<text x="528" y="314" font-size="14" font-weight="400" fill="#374151" text-anchor="start">&#9314; スカラの水平和（レガシー SSE）</text>
-<text x="528" y="334" font-size="12.5" font-weight="400" fill="#6b7280" text-anchor="start">&#8594; 上位は綺麗なので普通に実行されるだけ</text>
-<rect x="40" y="372" width="430" height="84" rx="8" ry="8" fill="#fef2f2" stroke="#f87171" stroke-width="2"/>
-<text x="58" y="396" font-size="14" font-weight="700" fill="#b91c1c" text-anchor="start">&#9888; 衝突：dirty な YMM上位 × レガシーSSE</text>
-<text x="58" y="418" font-size="12.5" font-weight="400" fill="#dc2626" text-anchor="start">&#8594; レガシーSSE 1命令ごとに、CPU が</text>
-<text x="58" y="438" font-size="12.5" font-weight="400" fill="#dc2626" text-anchor="start">   false dependency（偽の依存）+ merge(blend) μop を挿入</text>
-<rect x="510" y="372" width="430" height="84" rx="8" ry="8" fill="#f0fdf4" stroke="#4ade80" stroke-width="2"/>
-<text x="528" y="402" font-size="14" font-weight="700" fill="#15803d" text-anchor="start">&#10003; 衝突なし</text>
-<text x="528" y="426" font-size="12.5" font-weight="400" fill="#16a34a" text-anchor="start">&#8594; false dependency なし / merge μop なし</text>
-<rect x="40" y="478" width="430" height="60" rx="8" ry="8" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
-<text x="58" y="502" font-size="13.5" font-weight="700" fill="#b91c1c" text-anchor="start">遅い：呼び出しごとに固定費 ≒145ns(550cyc) が乗る</text>
-<text x="452" y="528" font-size="18" font-weight="700" fill="#b91c1c" text-anchor="end">= 167ns</text>
-<rect x="510" y="478" width="430" height="60" rx="8" ry="8" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-<text x="528" y="502" font-size="13.5" font-weight="700" fill="#15803d" text-anchor="start">速い：固定費が消える</text>
-<text x="922" y="528" font-size="18" font-weight="700" fill="#15803d" text-anchor="end">= 23ns</text>
-<line x1="255" y1="194" x2="255" y2="210" stroke="#6b7280" stroke-width="2" marker-end="url(#ar-g)"/>
-<line x1="255" y1="264" x2="255" y2="288" stroke="#6b7280" stroke-width="2" marker-end="url(#ar-g)"/>
-<line x1="725" y1="194" x2="725" y2="210" stroke="#6b7280" stroke-width="2" marker-end="url(#ar-g)"/>
-<line x1="725" y1="264" x2="725" y2="288" stroke="#6b7280" stroke-width="2" marker-end="url(#ar-g)"/>
-<line x1="255" y1="348" x2="255" y2="370" stroke="#dc2626" stroke-width="2" marker-end="url(#ar-r)"/>
-<line x1="255" y1="456" x2="255" y2="476" stroke="#dc2626" stroke-width="2" marker-end="url(#ar-r)"/>
-<line x1="725" y1="348" x2="725" y2="370" stroke="#16a34a" stroke-width="2" marker-end="url(#ar-gr)"/>
-<line x1="725" y1="456" x2="725" y2="476" stroke="#16a34a" stroke-width="2" marker-end="url(#ar-gr)"/>
-<rect x="40" y="560" width="900" height="132" rx="8" ry="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
-<text x="60" y="588" font-size="15" font-weight="700" fill="#111827" text-anchor="start">たった1命令 VZEROUPPER で 167 &#8594; 23ns = 7.1x（AWS c7i / Sapphire Rapids 実測）</text>
-<text x="60" y="614" font-size="13" font-weight="400" fill="#374151" text-anchor="start">・教科書でいう「一度きりの大きな遷移ペナルティ（モード切替）」は Haswell 世代までの話。</text>
-<text x="60" y="636" font-size="13" font-weight="400" fill="#374151" text-anchor="start">・Skylake 以降は仕組みが変わり、『レガシーSSE 1命令ごと』に小さなペナルティが蓄積する形になった。</text>
-<text x="60" y="658" font-size="13" font-weight="400" fill="#374151" text-anchor="start">・VZEROUPPER はその蓄積をまとめて消す。ただし効果はベンダー差あり（AMD Zen では小さい）。</text>
-<text x="60" y="680" font-size="13" font-weight="400" fill="#6b7280" text-anchor="start">・Go 1.26 / 1.27 の archsimd は VZEROUPPER を自動挿入しないため、境界で archsimd.ClearAVXUpperBits() を呼んでいる。</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
+<style>text{font-family:'Helvetica Neue',Helvetica,Arial,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;fill:#111827} .mono{font-family:Menlo,Consolas,monospace}</style>
+<rect width="960" height="640" fill="#ffffff"/>
+<text x="480" y="34" font-size="18" font-weight="600" text-anchor="middle">VZEROUPPER の遷移ペナルティ</text>
+<text x="480" y="58" font-size="12" fill="#6b7280" text-anchor="middle">同じ SIMD 内積が、境界の 1 命令の有無で 167.4ns と 23.4ns に分かれる(AWS c7i、Intel Sapphire Rapids)</text>
+
+<!-- 1. レジスタの構造 -->
+<text x="60" y="96" font-size="13.5" font-weight="600">前提: YMM レジスタ(256bit)の構造</text>
+<rect x="240" y="108" width="240" height="44" fill="#fff7ed" stroke="#fb923c" stroke-width="1.5"/>
+<text x="360" y="135" font-size="12.5" text-anchor="middle">上位 128bit</text>
+<rect x="480" y="108" width="240" height="44" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="600" y="135" font-size="12.5" text-anchor="middle">下位 128bit(XMM と同じ場所)</text>
+<text x="240" y="176" font-size="11.5" fill="#9a3412">AVX2 の FMA は 256bit 全体に書く。実行後は上位 128bit に値が残る(この状態を dirty と呼ぶ)</text>
+<text x="240" y="196" font-size="11.5" fill="#1d4ed8">水平和などのスカラ計算は、下位 128bit しか知らない古い命令(レガシー SSE)で出力される</text>
+
+<!-- 2. 実行の流れ -->
+<text x="60" y="240" font-size="13.5" font-weight="600">実行の流れ: 違いは境界の 1 命令だけ</text>
+
+<text x="60" y="282" font-size="12">VZEROUPPER なし</text>
+<rect x="200" y="258" width="200" height="38" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="300" y="282" font-size="12" text-anchor="middle">SIMD 内積(FMA の繰り返し)</text>
+<rect x="408" y="258" width="110" height="38" rx="4" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="5,4"/>
+<text x="463" y="282" font-size="11.5" fill="#6b7280" text-anchor="middle">境界: 何もない</text>
+<rect x="530" y="258" width="200" height="22" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="630" y="274" font-size="11.5" text-anchor="middle">水平和(レガシー SSE)</text>
+<rect x="530" y="280" width="200" height="16" rx="4" fill="#ffedd5" stroke="#fb923c" stroke-width="1.5"/>
+<text x="630" y="292" font-size="10" fill="#9a3412" text-anchor="middle">命令ごとにマージ処理が挟まる</text>
+<text x="530" y="316" font-size="11" fill="#9a3412">上位が dirty のままだと、CPU が上位の値を守るための処理を毎回追加する</text>
+
+<text x="60" y="374" font-size="12">VZEROUPPER あり</text>
+<rect x="200" y="350" width="200" height="38" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="300" y="374" font-size="12" text-anchor="middle">SIMD 内積(FMA の繰り返し)</text>
+<rect x="408" y="350" width="110" height="38" rx="4" fill="#f0fdf4" stroke="#4ade80" stroke-width="1.5"/>
+<text x="463" y="369" font-size="10.5" text-anchor="middle" class="mono">VZEROUPPER</text>
+<text x="463" y="382" font-size="9.5" fill="#15803d" text-anchor="middle">上位をゼロに掃除</text>
+<rect x="530" y="350" width="200" height="38" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="630" y="374" font-size="11.5" text-anchor="middle">水平和(レガシー SSE)</text>
+<text x="530" y="408" font-size="11" fill="#15803d">上位が綺麗なので、水平和はそのまま実行されるだけ</text>
+
+<!-- 3. 時間の内訳 -->
+<text x="60" y="452" font-size="13.5" font-weight="600">かかった時間(内積 1 回、384 次元)</text>
+
+<text x="60" y="486" font-size="12">なし</text>
+<rect x="200" y="466" width="92" height="28" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="246" y="484" font-size="11" text-anchor="middle">計算</text>
+<rect x="292" y="466" width="568" height="28" fill="#fed7aa" stroke="#fb923c" stroke-width="1.5"/>
+<text x="576" y="484" font-size="11.5" fill="#9a3412" text-anchor="middle">ペナルティ 約 145ns(マージ処理の積み重ね)</text>
+<text x="868" y="485" font-size="13" font-weight="600" text-anchor="start">167.4ns</text>
+
+<text x="60" y="532" font-size="12">あり</text>
+<rect x="200" y="512" width="92" height="28" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="246" y="530" font-size="11" text-anchor="middle">計算</text>
+<rect x="292" y="512" width="6" height="28" fill="#bbf7d0" stroke="#4ade80" stroke-width="1"/>
+<text x="308" y="531" font-size="13" font-weight="600" text-anchor="start">23.4ns(7.1x)</text>
+
+<text x="60" y="584" font-size="11.5" fill="#6b7280">このペナルティは Intel の CPU で起きる(AMD では起きない)。Go のコンパイラは VZEROUPPER を自動では入れないので、</text>
+<text x="60" y="604" font-size="11.5" fill="#6b7280">境界で標準 API の archsimd.ClearAVXUpperBits()(中身は VZEROUPPER 1 命令)を呼ぶと「あり」の側になる。</text>
 </svg>
