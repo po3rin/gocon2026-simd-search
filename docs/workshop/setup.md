@@ -11,14 +11,14 @@
 
 1. このリポジトリのページを開く
 2. 緑の `Code` ボタンを押し、`Codespaces` タブの `Create codespace on main` を選ぶ
-3. マシンは `4-core`(16 GB RAM)を選ぶ。全員ここで揃えます(理由は下記)
+3. マシンは `4-core`(16 GB RAM)を選ぶ。
 4. しばらく待つ(初回はコンテナのビルドで 1〜3 分)。VS Code がブラウザで開けば準備完了
 
 [`.devcontainer/`](../../.devcontainer/)([Dev Container](https://containers.dev/) の設定)に Go 1.27 + `GOEXPERIMENT=simd` が入っているので、開いたらそのまま使えます。
 
 ## 2. 動作確認(これが通れば準備OK)
 
-VS Code 下部のターミナルで:
+下部のターミナルで:
 
 ```sh
 make test     # 正しさ確認。PASS が出ればOK(初回はビルド込みで10秒ほど)
