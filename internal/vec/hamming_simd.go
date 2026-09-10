@@ -17,7 +17,7 @@ func HasVPOPCNT() bool { return hasVPOPCNT }
 // HammingSIMD computes the Hamming distance using AVX-512 VPOPCNTQ
 // (4 つの uint64 を 1 命令で popcount する)。
 //
-// 付録 7 節: 量子化後はキャッシュ律速のため、popcount を SIMD 化しても速くならない
+// 付録 6 節: 量子化後はキャッシュ律速のため、popcount を SIMD 化しても速くならない
 // ことの確認用(make bench-bonus)。AVX-512 が無い CPU ではスカラー版にフォールバックする。
 func HammingSIMD(a, b []uint64) int {
 	if !hasVPOPCNT {

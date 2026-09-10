@@ -43,7 +43,7 @@ func run() {
 	fmt.Printf("  %-20s ✓ true   (Neon 128bit は ARMv8-A 必須。機能チェック不要)\n", "NEON")
 	fmt.Printf("  %-20s   %v  (repo guard: dot_arm64.go)\n", "HasSIMD", vec.HasSIMD())
 	fmt.Printf("  %-20s   %v  (repo guard: int8_arm64.go)\n", "HasInt8SIMD", vec.HasInt8SIMD())
-	fmt.Printf("  %-20s   %v  (AVX-512 専用。付録 7 節。arm64 ではスカラ Hamming)\n", "HasVPOPCNT", false)
+	fmt.Printf("  %-20s   %v  (AVX-512 専用。付録 6 節。arm64 ではスカラ Hamming)\n", "HasVPOPCNT", false)
 
 	fmt.Printf("\n=== portable simd package (Go 1.27) ===\n")
 	fmt.Printf("  %-20s   %d bit  (simd.Float32s = %d lanes)\n", "VectorBitSize", simd.VectorBitSize(), simd.Float32s{}.Len())

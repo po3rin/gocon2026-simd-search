@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// N スイープ(付録 appendix.md 3 節): DB サイズを振って naive/SIMD を測る。
+// N スイープ(docs 未掲載の実験): DB サイズを振って naive/SIMD を測る。
 // DB がキャッシュ(L2/L3)に収まる間はメモリの壁が高い位置にあり SIMD が効くが、
 // DRAM に溢れた瞬間に倍率が崩れる = 「SIMD が効く境界」はデータサイズの軸にもある。
 var (
