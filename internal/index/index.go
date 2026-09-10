@@ -78,7 +78,7 @@ func (ix *Index) SearchSIMD(q []float32, k int) []Result {
 
 // SearchPortable is Stage 1 written with the portable simd package
 // (Go 1.27 の simd.Float32s)。SearchSIMD と同じ走査で、内積だけ vec.DotPortable
-// (make bench-portable。workshop.md §01「ポータブルな simd パッケージ」)。
+// (make bench-portable。workshop.md §02「ポータブルな simd パッケージ」)。
 func (ix *Index) SearchPortable(q []float32, k int) []Result {
 	t := newTopK(k)
 	for id := 0; id < ix.N; id++ {

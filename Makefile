@@ -30,7 +30,7 @@ bench1:
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(Naive|SIMD)$$' -benchtime 2s
 
 ## ポータブル simd パッケージ(Go 1.27 の simd.Float32s)で書いた同じ内積(vec.DotPortable)。
-## archsimd 版と同じ速さになることを確認する(workshop.md §01「ポータブルな simd パッケージ」)。
+## archsimd 版と同じ速さになることを確認する(workshop.md §02「ポータブルな simd パッケージ」)。
 bench-portable:
 	$(GO) test ./internal/vec -run - -bench 'BenchmarkDot(Naive|SIMD|Portable)$$' -benchtime 2s
 	$(GO) test ./internal/index -run - -bench 'BenchmarkSearch(SIMD|Portable)$$' -benchtime 2s
