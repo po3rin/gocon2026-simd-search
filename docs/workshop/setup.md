@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Codespace を起動する(30秒)
+## 1. Codespace を起動する
 
 [GitHub Codespaces](https://docs.github.com/en/codespaces) は、リポジトリの開発環境をブラウザ上の VS Code で開くサービスです。
 
