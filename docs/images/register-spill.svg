@@ -51,7 +51,7 @@
 <text x="530" y="390" font-size="12">1 周 = (読み + FMA + 書き) × 12 回</text>
 <text x="530" y="408" font-size="12">計算 1 命令ごとに読み書き 2 命令が付き、そちらで時間を使う</text>
 <rect x="530" y="418" width="360" height="30" rx="6" fill="#dc2626"/>
-<text x="710" y="438" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">実測 25.5 GFLOP/s(Codespaces / EPYC 7763)</text>
+<text x="710" y="438" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">実測 25.6 GFLOP/s(Codespaces / EPYC 7763)</text>
 
 <!-- 下: まとめ -->
 <rect x="40" y="484" width="880" height="86" rx="8" fill="#fffbeb" stroke="#fde68a" stroke-width="1.5"/>
