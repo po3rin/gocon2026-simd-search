@@ -1,3 +1,5 @@
+![Go × SIMDで高速化するベクトル検索 ~ ルーフラインモデルでSIMDが効く境界を探れ！ ~(Go Conference 2026 WorkshopB)](docs/images/workshop-hero.png)
+
 # gocon2026-simd-search
 
 Go Conference 2026 ショートワークショップ [「Go × SIMDで高速化するベクトル検索 ~ ルーフラインモデルでSIMDが効く境界を探れ！ ~」](https://gocon.jp/2026/timetable/1264338/) の教材リポジトリ。
