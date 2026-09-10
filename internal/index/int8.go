@@ -12,7 +12,7 @@ func (ix *Index) BuildInt8() {
 	}
 }
 
-// Code8 returns the int8 code for id.
+// Code8 は id 番目の int8 表現を返す。
 func (ix *Index) Code8(id int) []int8 {
 	return ix.Codes8[id*ix.Dim : (id+1)*ix.Dim]
 }

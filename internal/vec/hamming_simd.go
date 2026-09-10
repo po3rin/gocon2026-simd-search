@@ -8,14 +8,14 @@ import (
 	"simd/archsimd"
 )
 
-// hasVPOPCNT reports whether the CPU has AVX-512 VPOPCNTQ.
+// hasVPOPCNT: この CPU に AVX-512 の VPOPCNTQ があるか。
 var hasVPOPCNT = archsimd.X86.AVX512() && archsimd.X86.AVX512VPOPCNTDQ()
 
-// HasVPOPCNT reports whether the AVX-512 popcount bonus path is usable.
+// HasVPOPCNT は AVX-512 popcount の付録パスが使えるかを返す。
 func HasVPOPCNT() bool { return hasVPOPCNT }
 
-// HammingSIMD computes the Hamming distance using AVX-512 VPOPCNTQ
-// (4 つの uint64 を 1 命令で popcount する)。
+// HammingSIMD は AVX-512 VPOPCNTQ(uint64 4 個を 1 命令で popcount)で
+// ハミング距離を計算する。
 //
 // 付録 6 節: 量子化後はキャッシュ律速のため、popcount を SIMD 化しても速くならない
 // ことの確認用(make bench-bonus)。AVX-512 が無い CPU ではスカラー版にフォールバックする。

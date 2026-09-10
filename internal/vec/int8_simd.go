@@ -8,7 +8,7 @@ import "simd/archsimd"
 // すべて AVX2 で足りる(FMA 不要)。
 var hasInt8SIMD = archsimd.X86.AVX2()
 
-// HasInt8SIMD reports whether the int8 SIMD path is compiled in and usable.
+// HasInt8SIMD は int8 の SIMD パスがビルドに含まれ、実行環境で使えるかを返す。
 func HasInt8SIMD() bool { return hasInt8SIMD }
 
 // DotInt8 は int8 ベクトルの内積を AVX2 で計算する(Stage 2)。

@@ -2,8 +2,8 @@ package index
 
 import "testing"
 
-// TestRecallInt8 measures Recall@10 of the int8 stage on clustered data
-// (Stage 2)。binary(0.18)と違い、大きさの情報が残るので単体で実用域に入る(実測 0.948)。
+// TestRecallInt8 はクラスタ構造のある合成データで int8(Stage 2)の Recall@10 を測る。
+// binary(0.18)と違い、大きさの情報が残るので単体で実用域に入る(実測 0.948)。
 // 合成データは TestRecall と同じ clusteredIndex(helpers_test.go)を同じシードで使う。
 func TestRecallInt8(t *testing.T) {
 	const (

@@ -1,10 +1,10 @@
-// Command roofline-figures regenerates the static roofline figures in
-// docs/images (roofline-concept, rl-stage0..4, rl-batch, roofline-plot) so that they all
-// share one look: the same axes, the same gray roof, the same point style and
-// the same "上限の何 %" droplines as the interactive `make roofline-plot`.
+// Command roofline-figures は docs/images の静的なルーフライン図
+// (roofline-concept、rl-stage0..4、rl-batch、roofline-plot)を再生成する。
+// 軸・灰色の屋根・点のスタイル・「上限の何 %」の縦線を、対話版の
+// `make roofline-plot` と同じ見た目に揃えるのが目的。
 //
-// Numbers are the Codespaces (AMD EPYC 7763, 4-core) measurements quoted in
-// docs/workshop/workshop.md. Re-run after re-measuring:
+// 数値は docs/workshop/workshop.md に載せた Codespaces(AMD EPYC 7763、4 コア)の
+// 実測値。再計測したら次で再生成する:
 //
 //	make roofline-figures            # SVG + PNG(要 rsvg-convert)
 //	go run ./cmd/roofline-figures -peak 25.59 -bw 20.80 -out docs/images
@@ -20,26 +20,26 @@ import (
 	"strings"
 )
 
-// pt is one point on the roofline.
+// pt はルーフライン上の点 1 つ。
 type pt struct {
-	name   string  // label above the point
+	name   string  // 点の上に出すラベル
 	ai     float64 // arithmetic intensity (flop/byte)
 	gf     float64 // achieved GFLOP/s
 	note   string  // small text under the point ("" = auto "x GF・上限の y%")
-	noNote bool    // suppress the note entirely (ghost points)
+	noNote bool    // 注記を出さない(薄い参考点用)
 	ghost  bool    // previous stage: drawn gray, no dropline
-	vague  bool    // position is only indicative (no flop defined): dashed, no dropline
+	vague  bool    // 位置は目安(flop が定義できない): 破線で縦線なし
 	side   string  // label side: "" (above), "below"
 }
 
-// fig is one figure to emit.
+// fig は出力する図 1 枚。
 type fig struct {
 	file     string
 	title    string
 	subtitle string
 	points   []pt
-	notes    []string // lines rendered in a box under the plot (overview only)
-	concept  bool     // conceptual figure: no tick numbers, region labels instead of points
+	notes    []string // 図の下の枠に出す行(概念図のみ)
+	concept  bool     // 概念図: 目盛りの数字を消し、点の代わりに領域ラベルを出す
 }
 
 const (
@@ -71,7 +71,7 @@ func main() {
 	}
 }
 
-// figures lists the figures and the measured points that appear in each.
+// figures は出力する図と、それぞれに載せる実測点の一覧。
 func figures(peak, bw, ridge float64) []fig {
 	stage0 := pt{name: "Stage 0 スカラ全探索", ai: 0.5, gf: 2.15}
 	stage1 := pt{name: "Stage 1 SIMD 全探索", ai: 0.5, gf: 9.7}

@@ -1,24 +1,21 @@
-// Command roofline-plot turns `go test -bench` output into an interactive
-// roofline HTML: it reads the benchmark lines on stdin, picks the points that
-// report both AI(flop/byte) and GFLOP/s, and plots them on a log-log roofline
-// whose ceilings come from the machine's measured peak/bandwidth.
+// Command roofline-plot は `go test -bench` の出力を対話的なルーフライン HTML にする。
+// 標準入力からベンチ行を読み、AI(flop/byte)と GFLOP/s の両方を報告する行だけを
+// 点として拾い、実測した演算ピークとメモリ帯域を天井にした両対数の図に載せる。
 //
-// The point of the *interactive* version (vs the static docs/images/rl-*.png)
-// is that every run re-measures and re-plots: you watch the point appear and
-// stick to a ceiling. Stage 1 (AI=0.5) pins to the memory roof; the batch
-// point (AI=16) crosses the ridge onto the compute roof.
+// 静的な docs/images/rl-*.png と違い、叩くたびに測り直して描き直すのが対話版の狙い。
+// 自分の実行で点が現れて天井に張り付くのを見られる。Stage 1(AI=0.5)はメモリの
+// 屋根に張り付き、バッチの点(AI=16)はリッジを越えて演算の屋根側に移る。
 //
-// Usage (see `make roofline-plot`):
+// 使い方(make roofline-plot を参照):
 //
 //	go test ./internal/index -run - \
 //	  -bench 'BenchmarkSearch(Naive|SIMD|BatchNaive|BatchSIMD)$' -benchtime 2s \
 //	  | go run ./cmd/roofline-plot -peak 25.59 -bw 20.80 > roofline.html
 //
-// Ceilings default to the EPYC 7763 example; pass your own from
-// `make roofline-ceiling`. Zero dependencies — same hand-built-SVG style as
-// cmd/roofline-figures. Benchmarks without AI/GFLOP/s (e.g. SearchBinary,
-// which uses Hamming distance, not flop) are skipped: they live on a different
-// axis and are covered by the static Stage 3 image (docs/images/rl-stage3.png) instead.
+// 天井の既定値は EPYC 7763 の例。自分の値は `make roofline-ceiling` で測って渡す。
+// 依存ライブラリは無く、SVG の手組みは cmd/roofline-figures と同じ流儀。
+// AI と GFLOP/s を報告しないベンチ(ハミング距離で flop の無い SearchBinary など)は
+// 軸が別物なので拾わず、静的な Stage 3 の図(docs/images/rl-stage3.png)に任せる。
 package main
 
 import (
@@ -31,14 +28,14 @@ import (
 	"strings"
 )
 
-// point is one benchmark plotted on the roofline.
+// point はルーフラインに載せるベンチ 1 件。
 type point struct {
 	name string  // friendly label
 	ai   float64 // arithmetic intensity (flop/byte)
 	gf   float64 // achieved GFLOP/s
 }
 
-// label maps a raw benchmark name to a friendly stage label
+// label はベンチ名を図に出す Stage 名に変換する
 // (静止画 cmd/roofline-figures と同じ日本語ラベルに揃える)。
 func label(raw string) string {
 	switch raw {
@@ -56,7 +53,7 @@ func label(raw string) string {
 	return strings.TrimPrefix(raw, "Search")
 }
 
-// parseBench reads `go test -bench` output and returns the points that report
+// parseBench は `go test -bench` の出力を読み、点になるベンチを返す。
 // AI(flop/byte) と GFLOP/s(int8 は Gop/s)の両方を報告するベンチだけが点になる。
 func parseBench(r *bufio.Scanner) []point {
 	var pts []point
@@ -67,7 +64,7 @@ func parseBench(r *bufio.Scanner) []point {
 		}
 		raw := strings.TrimPrefix(f[0], "Benchmark")
 		if i := strings.LastIndexByte(raw, '-'); i >= 0 && allDigits(raw[i+1:]) {
-			raw = raw[:i] // strip the -GOMAXPROCS suffix
+			raw = raw[:i] // -GOMAXPROCS の接尾辞を落とす
 		}
 		var ai, gf float64
 		for i := 1; i < len(f); i++ {
@@ -153,7 +150,7 @@ func main() {
 	ly0, ly1 := math.Log10(gfLo), math.Log10(gfHiP)
 	px := func(ai float64) float64 { return x0 + (math.Log10(ai)-lx0)/(lx1-lx0)*plotW }
 	py := func(gf float64) float64 { return y0 + plotH - (math.Log10(gf)-ly0)/(ly1-ly0)*plotH }
-	// roof(ai) is the lower of the two ceilings at a given AI.
+	// roof(ai) はその AI における 2 つの天井の低い方。
 	roof := func(ai float64) float64 { return math.Min(ai**bw, *peak) }
 
 	memFill, memStroke := "#dbeafe", "#60a5fa"
@@ -200,14 +197,14 @@ func main() {
 	rx := math.Max(aiLo, math.Min(ridge, aiHi))
 	p("<polyline fill=\"none\" stroke=\"#9ca3af\" stroke-width=\"2.5\" points=\"%.1f,%.1f %.1f,%.1f %.1f,%.1f\"/>\n",
 		px(aiLo), py(roof(aiLo)), px(rx), py(*peak), px(aiHi), py(*peak))
-	// region tints (memory-bound left of ridge, compute-bound right)
+	// 領域の色分け(リッジの左がメモリ律速、右が演算律速)
 	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"start\">メモリ律速(メモリ帯域 %.1f GB/s で決まる斜線)</text>\n", px(aiLo)+6, py(roof(aiLo))-8, memStroke, *bw)
 	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" text-anchor=\"end\">演算律速(演算ピーク %.1f GFLOP/s で決まる水平線)</text>\n", px(aiHi)-6, py(*peak)-8, cStroke, *peak)
 	// ridge marker
 	p("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#9ca3af\" stroke-dasharray=\"3 3\"/>\n", px(ridge), py(*peak), px(ridge), y0+plotH)
 	p("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10\" fill=\"#6b7280\" text-anchor=\"middle\">リッジ %.2f</text>\n", px(ridge), py(*peak)-4, ridge)
 
-	// optional theoretical peak (shows the spill gap)
+	// 理論ピークの線(任意。spill による差が見える)
 	if *tpeak > 0 {
 		y := py(*tpeak)
 		p("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#cbd5e1\" stroke-width=\"1.5\" stroke-dasharray=\"6 4\"/>\n", x0, y, x0+plotW, y)
@@ -223,7 +220,7 @@ func main() {
 		if pt.ai < ridge {
 			fill, stroke = memFill, memStroke
 		}
-		// dropline from point up to the roof at this AI
+		// 点からその AI の屋根まで縦線を引く
 		p("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"1.2\" stroke-dasharray=\"2 3\"/>\n", x, yPt, x, py(r), stroke)
 		p("<circle class=\"pt\" cx=\"%.1f\" cy=\"%.1f\" r=\"7\" fill=\"%s\" stroke=\"%s\" stroke-width=\"2\" "+
 			"data-name=\"%s\" data-ai=\"%g\" data-gf=\"%.2f\" data-roof=\"%.2f\" data-frac=\"%.0f\"/>\n",
