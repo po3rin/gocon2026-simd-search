@@ -98,7 +98,7 @@ acc = va.MulAdd(vb, acc)               // acc += va*vb を 8 レーン同時に(
 
 #### ① 型が「データの形」を表す
 
-型名そのものが「何ビット幅のレジスタに、どの型の値を何個詰めるか」を意味します。詰めた 1 個ぶんの区画を**レーン**と呼びます。256bit のレジスタに float32(32bit)を詰めると1 つの命令はこの 8 レーン全部に同じ演算を同時にかけます。型を選ぶことが、使う命令幅とレーン数を選ぶことになります。
+型名そのものが「何ビット幅のレジスタに、どの型の値を何個詰めるか」を意味します。詰めた 1 個ぶんの区画を**レーン**と呼びます。256bit のレジスタに float32(32bit)を詰めると 8 レーンになり、1 つの命令はこの 8 レーン全部に同じ演算を同時にかけます。型を選ぶことが、使う命令幅とレーン数を選ぶことになります。
 
 ```go
 var a archsimd.Float32x8    // float32 を8レーン  = 256bit(AVX2)
@@ -120,14 +120,14 @@ va.Store(xs)                           // レジスタ → スライス(スト�
 
 #### ③ 使う前に、その CPU が対応しているか確かめる
 
-未対応の CPU でメソッドを呼ぶと panic するので、実行時に機能フラグでガードします。x86 系の機能フラグは `archsimd.X86` にまとまっています。
+未対応の CPU でメソッドを呼ぶと、不正な命令(SIGILL)でプロセスごと落ちます。recover できる panic にもならないので、実行時に機能フラグでガードします。x86 系の機能フラグは `archsimd.X86` にまとまっています。
 
 ```go
-var hasSIMD    = archsimd.X86.AVX2() && archsimd.X86.FMA()                 // MulAdd は AVX2 + FMA が要る
+var hasSIMD    = archsimd.X86.AVX2() && archsimd.X86.FMA()                 // MulAdd の FMA を確認(AVX2 は安全側)
 var hasVPOPCNT = archsimd.X86.AVX512() && archsimd.X86.AVX512VPOPCNTDQ()   // OnesCount は AVX-512 VPOPCNTDQ
 ```
 
-1 行目で AVX2 と FMA の 2 つを確認しているのは、x86 では `MulAdd` が使う FMA 命令が AVX2 に含まれておらず、別の拡張として提供されているためです。機能フラグも別々なので、両方そろっているかを見る必要があります。arm64 では FMA 相当の命令が Neon 自体に含まれるため、この区別はありません。
+1 行目で AVX2 と FMA の 2 つを確認しているのは、x86 では `MulAdd` が使う FMA 命令が AVX2 に含まれておらず、別の拡張として提供されているためです。MulAdd 自体に必要なのは FMA だけですが、FMA を持つ実在の CPU はほぼ AVX2 も持っているので、ここでは安全側に AVX2 も合わせて確認しています。arm64 では FMA 相当の命令が Neon 自体に含まれるため、この区別はありません。
 
 ### ポータブルな simd パッケージ
 
@@ -436,7 +436,7 @@ int8 同士の積は最大 127 × 127 で、int32 に余裕で収まります。
 ```go
 // internal/vec/int8_arm64.go — 3 段の中心部分
 lo := va.MulWidenLo(vb)                   // SMULL: int8 同士を掛けて int16 に広げる
-hi := va.HiToLo().MulWidenLo(vb.HiToLo()) // SMULL2: 上位 8 要素も同様に
+hi := va.HiToLo().MulWidenLo(vb.HiToLo()) // SMULL2 相当: 上位 8 要素も同様に
 acc0 = acc0.Add(lo.ExtendLo4ToInt32())    // SXTL: int16 → int32 に広げてから足す
 ```
 
@@ -543,7 +543,7 @@ Stage 3 は速いものの、Recall 0.18 では使えません。このStageで�
 1. 1bit のハミング距離で 10 万件すべてを比べ、近い順に上位 100 件(返したい 10 件の 10 倍)を残す。Stage 3 と同じ処理で、0.77 ms
 2. その 100 件だけ fp32 のベクトルを読み、Stage 1 の SIMD 内積で正確に採点し直して、上位 10 件を返す
 
-2 段目で読む fp32 のデータは 100 件 × 1536 byte = 154 KB で、キャッシュに乗ります。10 万件すべてに fp32 の内積を行うと 7.9 ms かかりますが、100 件なら 1/1000 なので 0.01 ms 程度で済みます。実測でも 1bit 単体の 0.77 ms に対して 0.82 ms と、0.05 ms しか増えていません。この採点し直しを rerank と呼びます。
+2 段目で読む fp32 のデータは 100 件 × 1536 byte = 154 KB で、キャッシュに乗ります。10 万件すべてに fp32 の内積を行うと 7.9 ms かかりますが、100 件なら 1/1000 なので 0.01 ms 程度で済みます。実測でも 1bit 単体の 0.77 ms に対して 0.82 ms と、0.05 ms しか増えていません。見積りとの差は、内積以外の仕事(上位 100 件の選び出しや、飛び飛びの場所からの読み出し)のぶんです。この採点し直しを rerank と呼びます。
 
 ![Stage 4 の手順: 1bit で 100 件に絞り、fp32 で採点し直して上位 10 件を返す](../images/rerank.png)
 
@@ -589,7 +589,7 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 | 1bit + rerank(Stage 4) | 0.82 ms  | 0.868        | 速さ最優先。精度は rerank で復元 |
 
 
-※ 速度は 10 万件のベンチ、Recall@10 は 2 万件の合成データ(Stage 2 の注)で測った値です。
+※ 速度は 10 万件のベンチ、Recall@10 は 2 万件の合成データ([`internal/index/index_test.go`](../../internal/index/index_test.go))で測った値です。
 
 1bit + rerank は int8 より 5 倍速く、精度は少し下です。絞り込みの段は粗くて速いほど有利で、落ちた精度は rerank が取り戻すからです。int8 を絞り込みに使う設計もあり、実際にはこの表から要件に合うものを選びます。
 
@@ -619,13 +619,13 @@ Recall@10 は 0.18 から **0.87** に戻り、速度は 0.82 ms(約 43x)と、�
 
 ## 07. 参考文献
 
-- Williams, Waterman, Patterson, *"Roofline: An Insightful Visual Performance Model for Multicore Architectures"*, CACM 52(4), 2009. [[論文 (ACM)]]([https://dl.acm.org/doi/10.1145/1498765.1498785](https://dl.acm.org/doi/10.1145/1498765.1498785))
+- Williams, Waterman, Patterson, *"Roofline: An Insightful Visual Performance Model for Multicore Architectures"*, CACM 52(4), 2009. [論文 (ACM)](https://dl.acm.org/doi/10.1145/1498765.1498785)
 - STREAM(メモリ帯域ベンチの定番), J. McCalpin. [cs.virginia.edu/stream](https://www.cs.virginia.edu/stream/)
 - Empirical Roofline Toolkit / NERSC ルーフライン解説. [docs.nersc.gov](https://docs.nersc.gov/tools/performance/roofline/)
 - Intel Advisor(自動ルーフライン作図). [intel.com](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-advisor-roofline.html)
 - Go × 内積 × SIMD の先行事例(archsimd 以前・アセンブリ実装): Sourcegraph, *"From slow to SIMD: A Go optimization story"*. [sourcegraph.com/blog/slow-to-simd](https://sourcegraph.com/blog/slow-to-simd)
 - Go の SIMD パッケージ: [Go 1.27 リリースノート(simd)](https://go.dev/doc/go1.27#simd)、[pkg.go.dev/simd](https://pkg.go.dev/simd)(ポータブル API)、[pkg.go.dev/simd/archsimd](https://pkg.go.dev/simd/archsimd)(アーキ固有 API。CPU 機能の表もここ)
-- CPU の命令ごとの待ち時間(レイテンシ)と発行数の表: Agner Fog, [Instruction tables](https://www.agner.org/optimize/instruction_tables.pdf)、[uops.info](https://uops.info/)。§05 の「加算 3 サイクル、FMA 4 サイクル」の出典
+- CPU の命令ごとの待ち時間(レイテンシ)と発行数の表: Agner Fog, [Instruction tables](https://www.agner.org/optimize/instruction_tables.pdf)、[uops.info](https://uops.info/)
 - AVX と SSE を混ぜたときのペナルティ(付録 1 節): Agner Fog, [The microarchitecture of Intel, AMD and VIA CPUs](https://www.agner.org/optimize/microarchitecture.pdf)
 - 近似最近傍探索の索引: HNSW は Malkov, Yashunin, [arXiv:1603.09320](https://arxiv.org/abs/1603.09320)。IVF などの索引の種類は [Faiss wiki](https://github.com/facebookresearch/faiss/wiki/Faiss-indexes)
 
