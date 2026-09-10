@@ -17,8 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu は amd64(AVX2 パス)、macos は arm64(Neon パス)を通す
-        os: [ubuntu-latest, macos-latest]
+        # ubuntu は amd64(AVX2 パス)、macos は arm64(Neon パス)、windows は amd64 を
+        # Windows 環境で通す(GOOS が違っても SIMD パスは同じ amd64 実装)
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
