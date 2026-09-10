@@ -125,7 +125,7 @@ roofline-plot:
 ## 「ロード(SP)、VFMADD、ストア(SP)」とスタックへ退避(spill)している様子を表示する。
 ## 12本+m+c=14 は使える 15本の Y レジスタ(Y15 は Go ABI の予約ゼロレジスタ:
 ## golang/go#76969)に収まる数なので、本数圧ではなく Go のコード生成の問題(1.26 / 1.27 とも退避する)。
-## amd64 用にクロスコンパイルするので mac でも可(objdump と違い -S は VFMADD を正名で出す)。
+## amd64 用にクロスコンパイルするので mac でも動く。
 spill:
 	GOARCH=amd64 $(GO) test -gcflags=-S -c -o /dev/null ./internal/vec 2>&1 \
 	  | awk '/\tTEXT\t.*BenchmarkPeakFLOP_AVX2\(SB\)/{f=1;next} /\tTEXT\t/{f=0} f' \
