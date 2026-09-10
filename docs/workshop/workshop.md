@@ -140,7 +140,9 @@ for len(a) >= n {
 }
 ```
 
-一方で、本ワークショップでは `archsimd` で進めます。simd パッケージにはどのarchiでも共通に持てる演算しか無く、この後の Stage 2 で使う int8 用の命令や popcount が入っていないためです。
+コード: [`internal/vec/dot_portable.go#L24-L59`](../../internal/vec/dot_portable.go#L24-L59)
+
+一方で、本ワークショップでは `archsimd` で進めます。simd パッケージにはどのアーキでも共通に持てる演算しか無く、この後の Stage 2 で使う int8 用の命令や popcount が入っていないためです。
 
 これで SIMD の書き方は分かりました。ただし、SIMD を足せばいつでも速くなるわけではありません。効くかどうかは、いまコードの性能を何が抑えているかで決まります。次章で、それを見極める道具のルーフラインモデルを導入します。
 
@@ -354,6 +356,8 @@ func (ix *Index) SearchNaive(q []float32, k int) []Result {
 }
 ```
 
+コード: [`internal/vec/dot.go#L7-L13`](../../internal/vec/dot.go#L7-L13)、[`internal/index/index.go#L62-L68`](../../internal/index/index.go#L62-L68)
+
 ```bash
 $ make bench0
 BenchmarkSearchNaive   35.7 ms/op   2.15 GFLOP/s   0.5 AI(flop/byte)   153.6 MB/query
@@ -438,7 +442,7 @@ func Dot(a, b []float32) float32 {
 }
 ```
 
-上のコードは主要部分だけです。長さのチェックと、8 の倍数に満たない端数の処理を含む完全なコードは [`internal/vec/dot_simd.go`](../../internal/vec/dot_simd.go) にあります。
+上のコードは主要部分だけです。8 の倍数に満たない端数の処理を含む完全なコードは [`internal/vec/dot_simd.go#L22-L52`](../../internal/vec/dot_simd.go#L22-L52) にあります。
 
 ```bash
 $ make bench1    # 内積単体(internal/vec)と全探索(internal/index)の2粒度(表示は整形・抜粋)
@@ -490,6 +494,8 @@ func QuantizeInt8(v []float32, out []int8) (scale float32)
 acc0 = acc0.Add(archsimd.LoadInt8x16(a).ExtendToInt16().       // VPMOVSXBW
     DotProductPairs(archsimd.LoadInt8x16(b).ExtendToInt16()))  // VPMADDWD
 ```
+
+コード: [`internal/vec/int8.go#L10-L40`](../../internal/vec/int8.go#L10-L40)、[`internal/vec/int8_simd.go#L23-L50`](../../internal/vec/int8_simd.go#L23-L50)、全探索は [`internal/index/int8.go#L25-L36`](../../internal/index/int8.go#L25-L36)
 
 int8 同士の積は最大 127 × 127 で、int32 に余裕で収まります。そのため桁あふれの対策なしで書けます。1 命令で 16 要素を処理でき、fp32 の 8 要素の 2 倍です。Go 1.27 の archsimd の arm64 API には VPMADDWD にあたるメソッドが無いので、[`int8_arm64.go`](../../internal/vec/int8_arm64.go) では SMULL で掛けて int16 に広げ、SXTL で int32 に広げてから足す、という 3 段で同じ計算をします。
 
@@ -558,6 +564,8 @@ func Hamming(a, b []uint64) int {            // XOR + popcount = 違うビット
 }
 ```
 
+コード: [`internal/vec/hamming.go#L10-L32`](../../internal/vec/hamming.go#L10-L32)、全探索は [`internal/index/index.go#L92-L100`](../../internal/index/index.go#L92-L100)
+
 ```bash
 $ make bench2
 BenchmarkSearchBinary  0.77 ms/op                       ← 46x。ただし…
@@ -605,6 +613,8 @@ func (ix *Index) SearchBinaryRerank(q []float32, k, factor int) []Result {
     return t.results()
 }
 ```
+
+コード: [`internal/index/index.go#L120-L127`](../../internal/index/index.go#L120-L127)
 
 ```bash
 $ make bench3    # 仕上げの速度(表示は整形・抜粋)
