@@ -9,20 +9,19 @@ import "simd"
 //   - 型名にレーン数が無い(Float32s)。幅は実行時に CPU が決める:
 //     AVX-512 機なら 512bit(16 レーン)、AVX2 機なら 256bit(8)、
 //     arm64 Neon / wasm なら 128bit(4)
-//   - amd64 / arm64 / wasm で同じソースが動く(ビルドタグ分岐が要らない)
+//   - amd64 / arm64 / wasm で同じソースが動く(アーキ別にカーネルを書き分けなくてよい。
+//     GOEXPERIMENT の有無の分岐と VZEROUPPER の後始末は別途要る)
 //   - 命令が無いアーキでは純 Go でエミュレートされる(simd.Emulated() で判定)
 //
 // 幅が実行時に決まるので、ループ 1 周の要素数は n = acc.Len() から組み立てる。
 // Codespaces(EPYC 7763)実測では 256bit で archsimd 版と同じ点(メモリ帯域の上限)に乗る
 // (make bench-portable)。
 //
-// 一方、Stage 2 の int8 積和(VPMADDWD / SMULL)や付録 B の popcount は
+// 一方、Stage 2 の int8 積和(VPMADDWD / SMULL)や付録 3 節の popcount は
 // ポータブル API には無い(アーキ間で共通に持てる演算だけが入っている)ので、
 // 量子化版の内積とハミング距離は archsimd のままにしてある。
+// a と b は同じ長さであること。
 func DotPortable(a, b []float32) float32 {
-	if len(b) < len(a) {
-		a = a[:len(b)]
-	}
 	// アキュムレータは 4 本。幅が 128bit(4 レーン)に狭まっても FMA の依存連鎖が
 	// 長くならないように(2 本だと 384 次元で 48 段の連鎖。Codespaces 実測では 2 本でも
 	// 4 本でも 128bit 時は全探索が 1.4x 遅く、律速は連鎖長より命令数だった)。
@@ -41,13 +40,12 @@ func DotPortable(a, b []float32) float32 {
 		a = a[n:]
 		b = b[n:]
 	}
-	// 端数はマスク付きロード(足りないレーンはゼロ埋め)でベクトルのまま処理する
-	for len(a) > 0 {
-		va, k := simd.LoadFloat32sPart(a)
+	// 端数はマスク付きロード(足りないレーンはゼロ埋め)でベクトルのまま処理する。
+	// 上のループを抜けた時点で残りは n 未満なので、必ず 1 回のロードで片付く
+	if len(a) > 0 {
+		va, _ := simd.LoadFloat32sPart(a)
 		vb, _ := simd.LoadFloat32sPart(b)
 		acc0 = va.MulAdd(vb, acc0)
-		a = a[k:]
-		b = b[k:]
 	}
 	// 水平加算: ポータブル API には ReduceSum が無いので、ストアして足す
 	var buf [16]float32 // 512bit = 16 レーンが上限

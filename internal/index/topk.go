@@ -8,10 +8,16 @@ type topK struct {
 }
 
 func newTopK(k int) *topK {
+	if k < 0 {
+		k = 0
+	}
 	return &topK{k: k, rs: make([]Result, 0, k)}
 }
 
 func (t *topK) push(id int, score float32) {
+	if t.k == 0 {
+		return
+	}
 	if len(t.rs) == t.k {
 		if score <= t.rs[t.k-1].Score {
 			return
@@ -27,4 +33,5 @@ func (t *topK) push(id int, score float32) {
 	t.rs[i] = Result{ID: id, Score: score}
 }
 
+// results は内部スライスをそのまま返す。呼び出し側は読み取りのみ想定。
 func (t *topK) results() []Result { return t.rs }

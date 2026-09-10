@@ -23,9 +23,6 @@ func HammingSIMD(a, b []uint64) int {
 	if !hasVPOPCNT {
 		return Hamming(a, b)
 	}
-	if len(b) < len(a) {
-		a = a[:len(b)]
-	}
 	var acc0, acc1 archsimd.Uint64x4
 	for len(a) >= 8 {
 		acc0 = acc0.Add(archsimd.LoadUint64x4(a).Xor(archsimd.LoadUint64x4(b)).OnesCount())

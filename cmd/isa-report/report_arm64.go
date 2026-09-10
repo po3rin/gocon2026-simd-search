@@ -7,6 +7,8 @@ import (
 	"runtime"
 
 	"simd"
+
+	"github.com/po3rin/gocon2026-simd-search/internal/vec"
 )
 
 const docURL = "https://pkg.go.dev/simd/archsimd"
@@ -39,7 +41,8 @@ func run() {
 	fmt.Printf("=== archsimd on this CPU (%s/%s) ===\n", runtime.GOOS, runtime.GOARCH)
 	fmt.Printf("(see %s)\n\n", docURL)
 	fmt.Printf("  %-20s ✓ true   (Neon 128bit は ARMv8-A 必須。機能チェック不要)\n", "NEON")
-	fmt.Printf("  %-20s   %v  (repo guard: dot_arm64.go / int8_arm64.go)\n", "HasSIMD", true)
+	fmt.Printf("  %-20s   %v  (repo guard: dot_arm64.go)\n", "HasSIMD", vec.HasSIMD())
+	fmt.Printf("  %-20s   %v  (repo guard: int8_arm64.go)\n", "HasInt8SIMD", vec.HasInt8SIMD())
 	fmt.Printf("  %-20s   %v  (AVX-512 専用。付録 3 節。arm64 ではスカラ Hamming)\n", "HasVPOPCNT", false)
 
 	fmt.Printf("\n=== portable simd package (Go 1.27) ===\n")

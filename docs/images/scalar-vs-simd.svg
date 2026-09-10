@@ -61,5 +61,5 @@
 <rect x="560" y="370" width="300" height="64" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
 <text x="710" y="397" font-size="13" fill="#111827" text-anchor="middle">384次元の内積が</text>
 <text x="710" y="418" font-size="14" font-weight="600" fill="#16a34a" text-anchor="middle">48回 で終わる(理論上8倍)</text>
-<text x="480" y="534" font-size="12" fill="#6b7280" text-anchor="middle">SIMD = Single Instruction, Multiple Data。Go 1.26 では GOEXPERIMENT=simd で simd/archsimd パッケージが使える(amd64限定)</text>
+<text x="480" y="534" font-size="12" fill="#6b7280" text-anchor="middle">SIMD = Single Instruction, Multiple Data。Go 1.27 では GOEXPERIMENT=simd で simd/archsimd パッケージが使える(amd64 / arm64 / Wasm)</text>
 </svg>

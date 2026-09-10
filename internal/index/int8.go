@@ -18,11 +18,13 @@ func (ix *Index) Code8(id int) []int8 {
 }
 
 // SearchInt8 は int8 量子化した表現で全探索する(Stage 2)。
+// 事前に BuildInt8() を呼んでおくこと(検索パスは Index を変更しないので、
+// goroutine 間で Index を共有する parallel.go と同じ前提で使える)。
 // スコアは qScale*dScale*dot_int8 ≈ fp32 の内積(近似)。
 // 転送は 1ベクトル 384 byte(fp32 の 1/4)→ AI が4倍に上がる。
 func (ix *Index) SearchInt8(q []float32, k int) []Result {
 	if ix.Codes8 == nil {
-		ix.BuildInt8()
+		panic("index: SearchInt8 の前に BuildInt8() を呼んでください")
 	}
 	q8 := make([]int8, ix.Dim)
 	qScale := vec.QuantizeInt8(q, q8)

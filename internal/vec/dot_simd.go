@@ -12,17 +12,16 @@ var hasSIMD = archsimd.X86.AVX2() && archsimd.X86.FMA()
 func HasSIMD() bool { return hasSIMD }
 
 // Dot computes the dot product using 256-bit SIMD (8 float32 lanes).
+// a と b は同じ長さであること(全カーネル共通の事前条件。Index は常に Dim で揃える)。
 //
 // 性能上のポイント2つ:
-//   - スライスは a[i:] でインデックスせず a = a[16:] と前進させる。
+//   - スライスは誘導変数でインデックスせず a = a[16:] と前進させる。
 //     インデックス式だと境界計算がループ毎に再実行されて支配的になる
+//     (ループ内の a[8:] は定数オフセットなので境界計算は畳まれる)
 //   - アキュムレータを2本にして FMA のレイテンシチェーンを分割する
 func Dot(a, b []float32) float32 {
 	if !hasSIMD {
 		return DotNaive(a, b)
-	}
-	if len(b) < len(a) {
-		a = a[:len(b)]
 	}
 	var acc0, acc1 archsimd.Float32x8 // ゼロ値は全要素 0
 	for len(a) >= 16 {
@@ -36,7 +35,7 @@ func Dot(a, b []float32) float32 {
 		a = a[8:]
 		b = b[8:]
 	}
-	// 水平加算: 16レーンをスカラーに畳み込む
+	// 水平加算: 2 本を 1 本に足してから、8 レーンをスカラーへ畳み込む
 	var buf [8]float32
 	acc0.Add(acc1).Store(buf[:])
 	// ベクトルからスカラーへ戻る境界。Go は 1.27 でも VZEROUPPER を自動挿入しないため、

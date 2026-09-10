@@ -5,8 +5,8 @@
 //
 // The point of the *interactive* version (vs the static docs/images/rl-*.png)
 // is that every run re-measures and re-plots: you watch the point appear and
-// stick to a ceiling. Stage 1 (AI=0.5) pins to the memory roof; the batched
-// The batch point (AI=16) crosses the ridge onto the compute roof.
+// stick to a ceiling. Stage 1 (AI=0.5) pins to the memory roof; the batch
+// point (AI=16) crosses the ridge onto the compute roof.
 //
 // Usage (see `make roofline-plot`):
 //
@@ -18,7 +18,7 @@
 // `make roofline-ceiling`. Zero dependencies — same hand-built-SVG style as
 // cmd/roofline-decompose. Benchmarks without AI/GFLOP/s (e.g. SearchBinary,
 // which uses Hamming distance, not flop) are skipped: they live on a different
-// axis and are covered by the static Stage 2 image instead.
+// axis and are covered by the static Stage 3 image (docs/images/rl-stage3.png) instead.
 package main
 
 import (
@@ -38,23 +38,26 @@ type point struct {
 	gf   float64 // achieved GFLOP/s
 }
 
-// label maps a raw benchmark name to a friendly stage label.
+// label maps a raw benchmark name to a friendly stage label
+// (静止画 cmd/roofline-figures と同じ日本語ラベルに揃える)。
 func label(raw string) string {
 	switch raw {
 	case "SearchNaive":
-		return "Stage 0  scalar (B=1)"
+		return "Stage 0 スカラ全探索"
 	case "SearchSIMD":
-		return "Stage 1  SIMD (B=1)"
+		return "Stage 1 SIMD 全探索"
+	case "SearchInt8":
+		return "Stage 2 int8"
 	case "SearchBatchNaive":
-		return "scalar batch (B=32)"
+		return "バッチ スカラ(B=32)"
 	case "SearchBatchSIMD":
-		return "SIMD batch (B=32)"
+		return "バッチ SIMD(B=32)"
 	}
 	return strings.TrimPrefix(raw, "Search")
 }
 
 // parseBench reads `go test -bench` output and returns the points that report
-// both AI(flop/byte) and GFLOP/s.
+// AI(flop/byte) と GFLOP/s(int8 は Gop/s)の両方を報告するベンチだけが点になる。
 func parseBench(r *bufio.Scanner) []point {
 	var pts []point
 	for r.Scan() {
@@ -63,24 +66,52 @@ func parseBench(r *bufio.Scanner) []point {
 			continue
 		}
 		raw := strings.TrimPrefix(f[0], "Benchmark")
-		if i := strings.LastIndexByte(raw, '-'); i >= 0 { // strip the -GOMAXPROCS suffix
-			raw = raw[:i]
+		if i := strings.LastIndexByte(raw, '-'); i >= 0 && allDigits(raw[i+1:]) {
+			raw = raw[:i] // strip the -GOMAXPROCS suffix
 		}
 		var ai, gf float64
 		for i := 1; i < len(f); i++ {
 			switch f[i] {
-			case "AI(flop/byte)":
-				ai, _ = strconv.ParseFloat(f[i-1], 64)
-			case "GFLOP/s":
-				gf, _ = strconv.ParseFloat(f[i-1], 64)
+			case "AI(flop/byte)", "GFLOP/s", "Gop/s":
+				v, err := strconv.ParseFloat(f[i-1], 64)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "roofline-plot: %s: %q を数値にできない: %v\n", raw, f[i-1], err)
+					continue
+				}
+				if f[i] == "AI(flop/byte)" {
+					ai = v
+				} else {
+					gf = v
+				}
 			}
 		}
 		if ai <= 0 || gf <= 0 {
+			// AI と GFLOP/s を報告しないベンチ(SearchBinary 等)は意図的にスキップ
 			continue
 		}
-		pts = append(pts, point{label(raw), ai, gf})
+		pts = append(pts, point{esc(label(raw)), ai, gf})
+	}
+	if err := r.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "roofline-plot: 入力の読み取りに失敗: %v\n", err)
+		os.Exit(1)
 	}
 	return pts
+}
+
+func allDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func esc(s string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;").Replace(s)
 }
 
 func main() {
@@ -109,7 +140,11 @@ func main() {
 		gfHi = math.Max(gfHi, *tpeak)
 	}
 	aiLo, aiHi = aiLo*0.7, aiHi*1.5
-	gfLo, gfHiP := 1.0, gfHi*1.5
+	gfLo := 1.0
+	for _, p := range pts {
+		gfLo = math.Min(gfLo, p.gf*0.7) // 1 GF 未満の点も軸内に収める
+	}
+	gfHiP := gfHi * 1.5
 
 	// --- plot geometry.
 	const W, H = 960, 600

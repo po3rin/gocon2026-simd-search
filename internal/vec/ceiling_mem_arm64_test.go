@@ -25,7 +25,6 @@ import (
 // DRAM を流し、その帯域を read 天井とする(q は L1 常駐なので DRAM 転送に数えない)。
 func BenchmarkPeakReadBW(b *testing.B) {
 	memSetup()
-	b.SetBytes(int64(memN) * 4)
 	q := memB[:384] // クエリ相当(L1 に乗る)
 	var sink float32
 	iters := 0
@@ -50,7 +49,6 @@ func BenchmarkPeakReadBW(b *testing.B) {
 // write a = 3 配列 ×4byte の論理転送(STREAM 慣習)。
 func BenchmarkPeakTriadBW(b *testing.B) {
 	memSetup()
-	b.SetBytes(int64(memN) * 4 * 3)
 	s := archsimd.BroadcastFloat32x4(3.0)
 	iters := 0
 	for b.Loop() {

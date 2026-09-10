@@ -56,7 +56,13 @@ func TestSearchBatchParallelMatchesBatchSIMD(t *testing.T) {
 
 	want := ix.SearchBatchSIMD(qs, 10)
 	got := ix.SearchBatchParallel(qs, 10, 4)
+	if len(got) != len(want) {
+		t.Fatalf("got %d query results, want %d", len(got), len(want))
+	}
 	for b := range want {
+		if len(got[b]) != len(want[b]) {
+			t.Fatalf("query %d: got %d results, want %d", b, len(got[b]), len(want[b]))
+		}
 		for i := range want[b] {
 			if got[b][i].ID != want[b][i].ID {
 				t.Errorf("query %d rank %d: got %v want %v", b, i, got[b][i], want[b][i])

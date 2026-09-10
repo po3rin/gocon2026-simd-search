@@ -16,11 +16,12 @@ import (
 // 256bit ロード×8本のアキュムレータで発行/レイテンシ律速を避け、純粋に
 // DRAM 読み出しを飽和させる(検索の「順次読み」が到達できる帯域 = メモリ天井)。
 func BenchmarkPeakReadBW(b *testing.B) {
-	memSetup()
-	if !hasSIMD {
-		b.Skip("requires AVX2+FMA")
+	// Load+Add しか使わないので要件は AVX2(FMA 不要)。Skip 判定を先にやり、
+	// スキップされる環境で 768MB を確保しないようにする
+	if !archsimd.X86.AVX2() {
+		b.Skip("requires AVX2")
 	}
-	b.SetBytes(int64(memN) * 4)
+	memSetup()
 	var sink float32
 	iters := 0
 	for b.Loop() {
@@ -55,12 +56,11 @@ func BenchmarkPeakReadBW(b *testing.B) {
 // MulAdd(VFMADD)1発で c*s+b を計算して store。1要素あたり read b + read c +
 // write a = 3 配列 ×4byte の論理転送(STREAM 慣習)。
 func BenchmarkPeakTriadBW(b *testing.B) {
-	memSetup()
 	if !hasSIMD {
 		b.Skip("requires AVX2+FMA")
 	}
-	s := fill8(3.0)
-	b.SetBytes(int64(memN) * 3 * 4)
+	memSetup()
+	s := archsimd.BroadcastFloat32x8(3.0)
 	iters := 0
 	for b.Loop() {
 		aa, bb, cc := memA, memB, memC

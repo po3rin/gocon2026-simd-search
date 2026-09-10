@@ -11,7 +11,6 @@ import "testing"
 // BenchmarkPeakReadBW は読み取り専用の逐次ストリーム帯域を測る(スカラー8本)。
 func BenchmarkPeakReadBW(b *testing.B) {
 	memSetup()
-	b.SetBytes(int64(memN) * 4)
 	var s0, s1, s2, s3, s4, s5, s6, s7 float32
 	iters := 0
 	for b.Loop() {
@@ -40,7 +39,6 @@ func BenchmarkPeakReadBW(b *testing.B) {
 func BenchmarkPeakTriadBW(b *testing.B) {
 	memSetup()
 	const scalar = 3.0
-	b.SetBytes(int64(memN) * 3 * 4)
 	iters := 0
 	for b.Loop() {
 		for i := 0; i < memN; i++ {

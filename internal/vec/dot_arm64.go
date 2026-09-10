@@ -23,10 +23,8 @@ func HasSIMD() bool { return hasSIMD }
 //
 // 本編(Codespaces / amd64)の数字とは別物なので、ここで出る倍率は
 // 「自分の Mac の点」として読むこと(レジスタ幅 256→128、メモリ帯域も別)。
+// a と b は同じ長さであること。
 func Dot(a, b []float32) float32 {
-	if len(b) < len(a) {
-		a = a[:len(b)]
-	}
 	var acc0, acc1, acc2, acc3 archsimd.Float32x4 // ゼロ値は全要素 0
 	for len(a) >= 16 {
 		acc0 = archsimd.LoadFloat32x4(a).MulAdd(archsimd.LoadFloat32x4(b), acc0) // FMLA

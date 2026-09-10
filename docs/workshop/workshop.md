@@ -322,7 +322,7 @@ make recall-int8     # Stage 2: int8 の精度(Recall@10)
 make bench2          # Stage 3: バイナリ量子化(1/32)
 make bench3          # Stage 4: 仕上げ(rerank の速度)
 make recall          # Stage 2/4: 精度まとめ(binary / rerank / int8)
-make roofline        # 上の結果をルーフライン図用に一覧
+make roofline        # 上の結果をルーフライン図用に一覧(bench2 と同じ計測)
 make roofline-plot   # 実測から対話的ルーフライン HTML を生成(点が上限に近づくのを見る)
 ```
 
@@ -495,7 +495,7 @@ int8 同士の積は最大 127 × 127 で、int32 に余裕で収まります。
 $ make bench-int8
 BenchmarkDotInt8Naive    364  ns/op                     ← 内積単体: スカラ
 BenchmarkDotInt8SIMD      34.6 ns/op                    ← 内積単体 10.5x(fp32 SIMD の 55ns より速い)
-BenchmarkSearchInt8        4.2 ms/op   38.4 MB/query    ← 全探索: fp32 SIMD 比 ~2x
+BenchmarkSearchInt8        4.2 ms/op   18.3 Gop/s   38.4 MB/query   ← 全探索: fp32 SIMD 比 ~2x
 $ make recall-int8
 Recall@10: int8=0.948                                   ← rerank なしで実用域
 ```
