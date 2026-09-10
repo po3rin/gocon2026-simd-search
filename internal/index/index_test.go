@@ -112,7 +112,7 @@ func TestAddInvalidatesInt8(t *testing.T) {
 	}
 }
 
-// TestRecall measures Recall@10 of the binary stage on clustered data.
+// TestRecall はクラスタ構造のある合成データで binary の Recall@10 を測る。
 // 合成データの作り方は helpers_test.go の clusteredIndex を参照。
 func TestRecall(t *testing.T) {
 	const (

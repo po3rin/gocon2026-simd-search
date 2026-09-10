@@ -4,14 +4,14 @@ package vec
 
 import "simd/archsimd"
 
-// hasSIMD reports whether the CPU supports the 256-bit FMA path.
-// MulAdd compiles to VFMADD213PS, which requires FMA in addition to AVX2.
+// hasSIMD: この CPU で 256bit の FMA パスが使えるか。
+// MulAdd は VFMADD213PS になるので、AVX2 に加えて FMA も要る。
 var hasSIMD = archsimd.X86.AVX2() && archsimd.X86.FMA()
 
-// HasSIMD reports whether the SIMD fast path is compiled in and usable.
+// HasSIMD は SIMD の高速パスがビルドに含まれ、実行環境で使えるかを返す。
 func HasSIMD() bool { return hasSIMD }
 
-// Dot computes the dot product using 256-bit SIMD (8 float32 lanes).
+// Dot は 256bit SIMD(float32 8 レーン)で内積を計算する。
 // a と b は同じ長さであること(全カーネル共通の事前条件。Index は常に Dim で揃える)。
 //
 // 性能上のポイント2つ:

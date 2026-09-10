@@ -4,7 +4,7 @@ package vec
 
 import "simd/archsimd"
 
-// HasInt8SIMD reports whether the int8 SIMD path is compiled in and usable.
+// HasInt8SIMD は int8 の SIMD パスがビルドに含まれ、実行環境で使えるかを返す。
 // arm64 では Neon が必須機能なので常に true。
 func HasInt8SIMD() bool { return true }
 

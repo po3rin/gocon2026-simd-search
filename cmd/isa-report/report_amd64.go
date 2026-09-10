@@ -12,7 +12,7 @@ import (
 
 const docURL = "https://pkg.go.dev/simd/archsimd"
 
-// feature maps a pkg.go.dev "CPU Feature" label to archsimd.X86.
+// feature は pkg.go.dev の「CPU Feature」ラベルと archsimd.X86 の対応 1 件。
 type feature struct {
 	name  string
 	check func() bool
@@ -26,7 +26,7 @@ var features = []feature{
 	{"AVX512VPOPCNTDQ", archsimd.X86.AVX512VPOPCNTDQ},
 }
 
-// api is one archsimd (or related) operation used in this repo.
+// api はこのリポジトリで使う archsimd(と関連)の演算 1 件。
 type api struct {
 	stage  string
 	symbol string

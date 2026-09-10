@@ -2,10 +2,10 @@ package vec
 
 import "math/bits"
 
-// Words returns the number of uint64 words needed to hold dim bits.
+// Words は dim bit を収めるのに必要な uint64 の個数を返す。
 func Words(dim int) int { return (dim + 63) / 64 }
 
-// Quantize packs the sign bits of v into out (bit i = 1 iff v[i] > 0).
+// Quantize は v の符号ビットを out に詰める(v[i] > 0 のとき bit i が 1)。
 // バイナリ量子化: float32 1要素 → 1bit。メモリは 1/32 になる。
 func Quantize(v []float32, out []uint64) {
 	for i := range out {
@@ -18,7 +18,7 @@ func Quantize(v []float32, out []uint64) {
 	}
 }
 
-// Hamming returns the number of differing bits between a and b.
+// Hamming は a と b で異なるビットの数を返す。
 //
 // Stage 3 の距離計算。XOR + popcount だけで距離が出る。
 // math/bits.OnesCount64 はスカラーの POPCNT 命令にコンパイルされる。

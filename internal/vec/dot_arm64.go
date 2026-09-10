@@ -8,7 +8,7 @@ import "simd/archsimd"
 // amd64 版(dot_simd.go)のような CPU 機能チェックは要らない。
 var hasSIMD = true
 
-// HasSIMD reports whether the SIMD fast path is compiled in and usable.
+// HasSIMD は SIMD の高速パスがビルドに含まれ、実行環境で使えるかを返す。
 func HasSIMD() bool { return hasSIMD }
 
 // Dot は Neon(Float32x4 = 128bit・4レーン)で内積を計算する(Stage 1 の arm64 版)。

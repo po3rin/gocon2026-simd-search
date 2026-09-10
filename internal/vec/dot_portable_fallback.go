@@ -2,12 +2,12 @@
 
 package vec
 
-// DotPortable falls back to the scalar implementation when the simd
-// package is not compiled in (GOEXPERIMENT=simd 未指定)。
+// DotPortable は simd パッケージが無いビルド(GOEXPERIMENT=simd 未指定)では
+// スカラ実装にフォールバックする。
 func DotPortable(a, b []float32) float32 { return DotNaive(a, b) }
 
-// PortableVectorBits returns 0 when the simd package is not compiled in.
+// PortableVectorBits は simd パッケージが無いビルドでは 0 を返す。
 func PortableVectorBits() int { return 0 }
 
-// PortableEmulated returns false when the simd package is not compiled in.
+// PortableEmulated は simd パッケージが無いビルドでは false を返す。
 func PortableEmulated() bool { return false }

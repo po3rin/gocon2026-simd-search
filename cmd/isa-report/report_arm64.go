@@ -13,7 +13,7 @@ import (
 
 const docURL = "https://pkg.go.dev/simd/archsimd"
 
-// api is one archsimd (or related) operation used by the arm64 kernels in this repo.
+// api はこのリポジトリの arm64 カーネルが使う archsimd(と関連)の演算 1 件。
 // Go 1.27 の archsimd は arm64 では Neon(128bit)のみ。Neon は ARMv8-A の必須機能
 // なので、amd64 のような CPU 機能チェック(archsimd.X86.*)は arm64 には無い
 // (archsimd.ARM64 にあるのは PMULL だけ)。
