@@ -75,7 +75,7 @@ make GO=$(go env GOPATH)/bin/go1.27.1 test                      # GOEXPERIMENT=s
 
 ## Docker で amd64 を指定しても動かない理由
 
-Apple Silicon でも `docker run --platform linux/amd64` を使えば x86 として測れそうに見えます。しかし、これの中身は QEMU のエミュレーション(または [Rosetta](https://developer.apple.com/documentation/apple-silicon/about-the-rosetta-translation-environment))で、実際の x86 CPU ではないからです([Docker のマルチプラットフォームビルド](https://docs.docker.com/build/building/multi-platform/))。
+Apple Silicon でも `docker run --platform linux/amd64` を使えば x86 として測れそうに見えます。しかし、これの中身は QEMU のエミュレーション(または [Rosetta](https://developer.apple.com/documentation/apple-silicon/about-the-rosetta-translation-environment))で、実際の x86 CPU ではないからです([Docker のマルチプラットフォームビルド](https://docs.docker.com/build/building/multi-platform/))。Rosetta で amd64 バイナリを直接動かす場合も、FMA が CPUID で false になるため fp32 の SIMD 内積はスカラに落ちます。
 
 ---
 
