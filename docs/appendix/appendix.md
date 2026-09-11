@@ -262,7 +262,7 @@ SearchBatchParallel/workers=4   3.5 ms/query            ← 1.9x = 物理コア�
 
 ### 回転 + 理論保証: RaBitQ 系
 
-[RaBitQ(Gao &amp; Long, SIGMOD 2024)](https://dl.acm.org/doi/10.1145/3654970)は、ランダム回転してから 1bit 量子化すると、距離推定の誤差に理論保証が付くことを示しました。結果 D 次元を D bit に変換します。多ビット拡張の Extended RaBitQ(SIGMOD 2025。[実装](https://github.com/VectorDB-NTU/RaBitQ-Library))は 2〜6bit の帯域で特に強く、rerank なしでも高い Recall に届きます。Elasticsearch/Lucene の [BBQ](https://www.elastic.co/search-labs/blog/better-binary-quantization-lucene-elasticsearch) はこの系譜の実装です。本編 Stage 3 の素朴な符号 1bit と比べると、「量子化の前にランダム回転を入れる」だけで同じ 1bit でも精度が大きく変わる、というのがこの系譜の核心です。
+[RaBitQ(Gao &amp; Long, SIGMOD 2024)](https://dl.acm.org/doi/10.1145/3654970)は、ランダム回転してから 1bit 量子化すると、距離推定の誤差に理論保証が付くことを示しました。結果 D 次元を D bit に変換します。多ビット拡張の Extended RaBitQ(SIGMOD 2025。[実装](https://github.com/VectorDB-NTU/RaBitQ-Library))は 2〜6bit の帯域で特に強く、rerank なしでも高い Recall に届きます。Elasticsearch/Lucene の [BBQ](https://www.elastic.co/search-labs/blog/better-binary-quantization-lucene-elasticsearch) はこの系譜の実装です。本編 Stage 3 の素朴な符号 1bit と比べると、「量子化の前にランダム回転を入れる」だけで同じ 1bit でも精度が大きく変わるのが非常に面白いです。
 
 ### オンライン・データ非依存: TurboQuant
 
